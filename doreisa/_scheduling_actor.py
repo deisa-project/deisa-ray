@@ -100,6 +100,7 @@ class _ArrayTimestep:
         self.chunks_ready_event: asyncio.Event = asyncio.Event()
 
         # {position: chunk}
+        # The chunk is represented by an ObjectRef that directly contains the data.
         self.local_chunks: AsyncDict[tuple[int, ...], ray.ObjectRef] = AsyncDict()
 
 
@@ -167,7 +168,7 @@ class SchedulingActor:
         array_timestep = array.timesteps[timestep]
 
         assert chunk_position not in array_timestep.local_chunks
-        array_timestep.local_chunks[chunk_position] = self.actor_handle._pack_object_ref.remote(chunk)
+        array_timestep.local_chunks[chunk_position] = chunk[0]
 
         array.owned_chunks.add((chunk_position, chunk_shape))
 
@@ -186,7 +187,6 @@ class SchedulingActor:
             chunks: dict[tuple[int, ...], ray.ObjectRef] = {}
             for position, size in array.owned_chunks:
                 chunks[position] = array_timestep.local_chunks[position]
-            array_timestep.local_chunks.clear()
 
             all_chunks_ref = ray.put(chunks)
 
@@ -218,12 +218,12 @@ class SchedulingActor:
                 assert val.actor_id == self.actor_id
 
                 if val.all_chunks is None:
-                    raise NotImplementedError
+                    ref = self.actor_handle.get_local_chunk.remote(val.array_name, val.timestep, val.position)
                 else:
                     # TODO get the dictionnary only once
                     local_refs = await val.all_chunks
 
-                    ref = local_refs[val.position]
+                    ref = self.actor_handle._pack_object_ref.remote([local_refs[val.position]])
 
                 # TODO do we still need to have asyncdicts?
                 # array = await self.arrays.wait_for_key(val.array_name)
@@ -242,6 +242,12 @@ class SchedulingActor:
 
         info.scheduled_event.set()
 
+    async def get_local_chunk(self, array_name: str, timestep: Timestep, position: tuple[int, ...]) -> ray.ObjectRef:
+        array = await self.arrays.wait_for_key(array_name)
+        array_timestep = await array.timesteps.wait_for_key(timestep)
+        res = await array_timestep.local_chunks.wait_for_key(position)
+        return res
+
     async def get_value(self, graph_id: int, key: str):
         graph_info = await self.graph_infos.wait_for_key(graph_id)
 
@@ -249,7 +255,8 @@ class SchedulingActor:
         return await graph_info.refs[key]
 
     def clear_graph(self, graph_id: int):
+        # return  # TODO if we add this return, everything works
         del self.graph_infos[graph_id]
 
     def clear_array(self, name: str, timestep: int):
-        pass
+        del self.arrays[name].timesteps[timestep]

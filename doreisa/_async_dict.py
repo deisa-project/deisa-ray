@@ -10,13 +10,16 @@ class AsyncDict(Generic[K, V]):
         self._data: dict[K, V] = {}
         self._new_key_event = asyncio.Event()
 
+    def __getitem__(self, key: K) -> V:
+        return self._data[key]
+
     def __setitem__(self, key: K, value: V):
         self._data[key] = value
         self._new_key_event.set()
         self._new_key_event.clear()
 
-    def __getitem__(self, key: K) -> V:
-        return self._data[key]
+    def __delitem__(self, key: K):
+        del self._data[key]
 
     async def wait_for_key(self, key: K) -> V:
         while key not in self._data:
