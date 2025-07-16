@@ -28,3 +28,6 @@ class AsyncDict(Generic[K, V]):
 
     def __len__(self) -> int:
         return len(self._data)
+
+    def clear(self):
+        self._data.clear()

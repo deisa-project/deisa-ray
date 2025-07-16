@@ -111,6 +111,15 @@ def doreisa_get(dsk, keys, **kwargs):
 
     res_ref = scheduling_actors[partition[key]].get_value.remote(graph_id, key)
 
+    # At this point, get_value will not be called anymore for this graph.
+    ray.get(
+        [
+            actor.clear_graph.options(enable_task_events=False).remote(graph_id)
+            for id, actor in enumerate(scheduling_actors)
+            if partitionned_graphs[id]
+        ]
+    )
+
     if kwargs.get("ray_persist"):
         if isinstance(keys[0], list):
             return [[res_ref]]
