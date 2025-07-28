@@ -113,7 +113,7 @@ def doreisa_get(dsk, keys, **kwargs):
     res_ref = scheduling_actors[partition[key]].get_value.remote(graph_id, key)
 
     clear_graph.remote(
-        [actor for id, actor in enumerate(scheduling_actors) if partitionned_graphs[id]], res_ref, graph_id
+        [actor for id, actor in enumerate(scheduling_actors) if partitioned_graphs[id]], res_ref, graph_id
     )
 
     if kwargs.get("ray_persist"):
