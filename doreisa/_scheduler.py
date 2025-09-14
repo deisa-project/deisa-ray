@@ -4,6 +4,7 @@ from collections import Counter
 from typing import Callable
 
 import ray
+import ray.actor
 from dask.core import get_dependencies
 
 from doreisa._scheduling_actor import ChunkRef, ScheduledByOtherActor
@@ -111,6 +112,10 @@ def doreisa_get(dsk, keys, **kwargs):
 
     res_ref = scheduling_actors[partition[key]].get_value.remote(graph_id, key)
 
+    clear_graph.remote(
+        [actor for id, actor in enumerate(scheduling_actors) if partitioned_graphs[id]], res_ref, graph_id
+    )
+
     if kwargs.get("ray_persist"):
         if isinstance(keys[0], list):
             return [[res_ref]]
@@ -123,3 +128,12 @@ def doreisa_get(dsk, keys, **kwargs):
     if isinstance(keys[0], list):
         return [[res]]
     return [res]
+
+
+@ray.remote(max_retries=0, num_cpus=0)
+def clear_graph(scheduling_actors: list[ray.actor.ActorHandle], res: ray.ObjectRef, graph_id: int) -> None:
+    # Wait until the result is ready
+    ray.wait([res], fetch_local=False)
+
+    # Clear the graph
+    ray.get([actor.clear_graph.remote(graph_id) for actor in scheduling_actors])
