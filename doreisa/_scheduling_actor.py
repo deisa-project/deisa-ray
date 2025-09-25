@@ -95,8 +95,9 @@ def remote_ray_dask_get(dsk, keys):
 
 class _ArrayTimestep:
     def __init__(self):
+        # NOT USED in juwels cluster
         # Triggered when all the chunks are ready
-        self.chunks_ready_event: asyncio.Event = asyncio.Event()
+        # self.chunks_ready_event: asyncio.Event = asyncio.Event()
 
         # {position: chunk}
         self.local_chunks: AsyncDict[tuple[int, ...], ray.ObjectRef | bytes] = AsyncDict()
@@ -194,11 +195,6 @@ class SchedulingActor:
             await self.head.chunks_ready.options(enable_task_events=False).remote(
                 array_name, timestep, [all_chunks_ref]
             )
-
-            array_timestep.chunks_ready_event.set()
-            array_timestep.chunks_ready_event.clear()
-        else:
-            await array_timestep.chunks_ready_event.wait()
 
     async def schedule_graph(self, graph_id: int, dsk: dict) -> None:
         # Find the scheduling actors
