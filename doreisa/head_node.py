@@ -14,7 +14,7 @@ from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 
 from doreisa import Timestep
 from doreisa._scheduler import doreisa_get
-from doreisa._scheduling_actor import ChunkRef, SchedulingActor
+from doreisa._scheduling_actor import ChunkRef
 
 
 def init():
@@ -164,6 +164,16 @@ class _DaskArrayData:
         return full_array
 
 
+def get_head_node_id() -> str:
+    from ray.util import state
+
+    nodes = state.list_nodes(filters=[("is_head_node", "=", True)])
+
+    assert len(nodes) == 1, "There should be exactly one head node"
+
+    return nodes[0].node_id
+
+
 def get_head_actor_options() -> dict:
     """Return the options that should be used to start the head actor."""
     return dict(
@@ -172,7 +182,7 @@ def get_head_actor_options() -> dict:
         namespace="doreisa",
         # Schedule the actor on this node
         scheduling_strategy=NodeAffinitySchedulingStrategy(
-            node_id=ray.get_runtime_context().get_node_id(),
+            node_id=get_head_node_id(),
             soft=False,
         ),
         # Prevents the actor from being stuck when it needs to gather many refs
@@ -217,37 +227,14 @@ class SimulationHead:
         """
         Return the list of scheduling actors.
         """
-        return list(self.scheduling_actors.values())
+        return self.scheduling_actors
 
-    async def scheduling_actor(self, node_id: str, *, is_fake_id: bool = False) -> ray.actor.ActorHandle:
+    async def register_scheduling_actor(self, actor_id: str, actor_handle: ray.actor.ActorHandle):
         """
-        Return the scheduling actor for the given node ID.
-
-        Args:
-            node_id: The ID of the node.
-            is_fake_id: If True, the ID isn't a Ray node ID, and the actor can be scheduled
-                anywhere. This is useful for testing purposes.
+        Registers scheduling actors that are created.
         """
-
-        if node_id not in self.scheduling_actors:
-            actor_id = len(self.scheduling_actors)
-
-            if is_fake_id:
-                self.scheduling_actors[node_id] = SchedulingActor.remote(actor_id)  # type: ignore
-            else:
-                self.scheduling_actors[node_id] = SchedulingActor.options(  # type: ignore
-                    # Schedule the actor on this node
-                    scheduling_strategy=NodeAffinitySchedulingStrategy(
-                        node_id=node_id,
-                        soft=False,
-                    ),
-                    max_concurrency=1000_000_000,  # Prevents the actor from being stuck
-                    num_cpus=0,
-                    enable_task_events=False,
-                ).remote(actor_id)
-
-        await self.scheduling_actors[node_id].ready.remote()  # type: ignore
-        return self.scheduling_actors[node_id]
+        if actor_id not in self.scheduling_actors:
+            self.scheduling_actors[actor_id] = actor_handle
 
     def preprocessing_callbacks(self) -> dict[str, Callable]:
         """
@@ -309,6 +296,9 @@ class SimulationHead:
                 )
             )
             array.fully_defined.set()
+
+    def ready(self):
+        return True
 
     async def get_next_array(self) -> tuple[str, Timestep, da.Array]:
         array = await self.arrays_ready.get()
