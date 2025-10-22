@@ -170,7 +170,7 @@ def get_head_actor_options() -> dict:
         # The workers will be able to access to this actor using its name
         name="simulation_head",
         namespace="doreisa",
-        # Schedule the actor on this node
+        # Schedule this actor on head node  
         scheduling_strategy=NodeAffinitySchedulingStrategy(
             node_id=ray.get_runtime_context().get_node_id(),
             soft=False,
@@ -181,14 +181,39 @@ def get_head_actor_options() -> dict:
         lifetime="detached",
         # Disabled for performance reasons
         enable_task_events=False,
+        # Return existing actor if already running 
+        get_if_exists=True,
     )
 
 
 @ray.remote
 class SimulationHead:
-    def __init__(self, arrays_definitions: list[ArrayDefinition], max_pending_arrays: int = 1_000_000_000) -> None:
+#    def __init__(self, arrays_definitions: list[ArrayDefinition], max_pending_arrays: int = 1_000_000_000) -> None:
+    def __init__(self) -> None:
         """
-        Initialize the simulation head.
+        Partial initialization of  the simulation head.
+
+         Simulation head can be started  either by a MPI client process or the analytics client, however starts first.
+         If initialized by a MPI process, the initialization is incomplet and must be finished by the analytics client calling init_by_analytics.
+         MPI clients will wait for the complet initialization. Thus analytics does not necessarily have to start before the simulation. 
+                
+        """
+        
+        # For each ID of a simulation node, the corresponding scheduling actor
+        self.scheduling_actors: dict[str, ray.actor.ActorHandle] = {}
+
+        # All the newly created arrays
+        self.arrays_ready: asyncio.Queue[tuple[str, Timestep, da.Array]] = asyncio.Queue()
+        
+        self.new_array_created = asyncio.Event()
+
+        # To lock simulation processes until actor properly initialized by analytics
+        self.analytics_init = asyncio.Event()
+
+
+    def init_by_analytics(self,arrays_definitions: list[ArrayDefinition], max_pending_arrays: int = 1_000_000_000) -> None:
+        """
+        Must be called once by the analytics client to initialize the head  actor with data only this client  knows.
 
         Args:
             arrays_description: Description of the arrays to be created.
@@ -196,22 +221,26 @@ class SimulationHead:
                 waiting to be collected at the same time. Setting the value can prevent
                 the simulation to be many iterations in advance of the analytics.
         """
-
-        # For each ID of a simulation node, the corresponding scheduling actor
-        self.scheduling_actors: dict[str, ray.actor.ActorHandle] = {}
+        # Decouplled from the actor __init__ method to enable the head actor to be created by the simulation processes if not yet done by the client
 
         # Must be used before creating a new array, to prevent the simulation from being
         # too many iterations in advance of the analytics.
         self.new_pending_array_semaphore = asyncio.Semaphore(max_pending_arrays)
 
-        self.new_array_created = asyncio.Event()
-
         self.arrays: dict[str, _DaskArrayData] = {
             definition.name: _DaskArrayData(definition) for definition in arrays_definitions
         }
+        # init done, unlock simulation processes
+        self.analytics_init.set()
 
-        # All the newly created arrays
-        self.arrays_ready: asyncio.Queue[tuple[str, Timestep, da.Array]] = asyncio.Queue()
+    async def wait_init(self):
+        """
+        Return  when actor fully initialized
+        """
+        print("Event locked")
+        await self.analytics_init.wait()
+        print("Event unlocked")
+        return True
 
     def list_scheduling_actors(self) -> list[ray.actor.ActorHandle]:
         """
