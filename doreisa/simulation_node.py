@@ -5,6 +5,8 @@ import numpy as np
 import ray
 import ray.actor
 
+from doreisa.head_node import SimulationHead, get_head_actor_options
+
 
 class Client:
     """
@@ -25,10 +27,19 @@ class Client:
 
         self.node_id = _fake_node_id or ray.get_runtime_context().get_node_id()
 
-        self.head = ray.get_actor("simulation_head", namespace="doreisa")
+        # self.head = ray.get_actor("simulation_head", namespace="doreisa")
+        
+        # get head/simulation  actor, create it if not yet done by client 
+        self.head  = SimulationHead.options(**get_head_actor_options()).remote()
+
         self.scheduling_actor: ray.actor.ActorHandle = ray.get(
             self.head.scheduling_actor.remote(self.node_id, is_fake_id=bool(_fake_node_id))
         )
+
+        # Wait client  properly parametrized the head  actor
+        ray.get(self.head.wait_init.remote())
+
+
 
         self.preprocessing_callbacks: dict[str, Callable] = ray.get(self.head.preprocessing_callbacks.remote())
 

@@ -51,7 +51,12 @@ def run_simulation(
     # Limit the advance the simulation can have over the analytics
     max_pending_arrays = 2 * len(arrays_description)
 
-    head: Any = SimulationHead.options(**get_head_actor_options()).remote(head_arrays_description, max_pending_arrays)
+    #    head: Any = SimulationHead.options(**get_head_actor_options()).remote(head_arrays_description, max_pending_arrays)
+    # Get or create head actor (can be created by simulation)
+    head: Any = SimulationHead.options(**get_head_actor_options()).remote()
+    # Properly initialize head actor and  unlock simulation processes waiting for it.  
+    head.init_by_analytics.remote(head_arrays_description, max_pending_arrays)
+    
 
     arrays_by_iteration: dict[int, dict[str, da.Array]] = {}
 
