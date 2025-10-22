@@ -5,7 +5,8 @@ import pytest
 import ray
 
 
-@pytest.fixture
+# @pytest.fixture(scope = "session")
+@pytest.fixture()
 def ray_cluster():
     """Start a Ray cluster for this test"""
     ray.init()
@@ -17,7 +18,8 @@ def wait_for_head_node() -> None:
     """Wait until the head node is ready"""
     while True:
         try:
-            ray.get_actor("simulation_head", namespace="doreisa")
+            a = ray.get_actor("simulation_head", namespace="doreisa")
+            ray.get(a.ready.remote())
             return
         except ValueError:
             time.sleep(0.1)
@@ -39,7 +41,7 @@ def simple_worker(
     """Worker node sending chunks of data"""
     from doreisa.simulation_node import Client
 
-    client = Client(_fake_node_id=node_id)
+    client = Client(_node_id=node_id)
 
     array = (rank + 1) * np.ones(chunk_size, dtype=dtype)
 

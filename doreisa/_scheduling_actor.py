@@ -1,5 +1,7 @@
 import asyncio
 import pickle
+import time
+import random
 from dataclasses import dataclass
 
 import numpy as np
@@ -114,17 +116,36 @@ class _Array:
         self.timesteps: AsyncDict[Timestep, _ArrayTimestep] = AsyncDict()
 
 
+def get_ready_actor_with_retry(name, namespace, deadline_s=180):
+    start, delay = time.time(), 0.2
+    while True:
+        try:
+            actor = ray.get_actor(name=name, namespace=namespace)
+            # ready gate
+            # TODO for even more reliability, in the future we should handle
+            # actor exists, but unavailable
+            # actor exists, crashed, need to recreate
+            ray.get(actor.ready.remote())
+            return actor
+        except ValueError:
+            if time.time() - start > deadline_s:
+                raise TimeoutError(f"{namespace}/{name} not found in {deadline_s}s")
+            time.sleep(delay + random.random() * 0.1)
+            delay = min(delay * 1.5, 5.0)
+
+
 @ray.remote
 class SchedulingActor:
     """
     Actor in charge of gathering ObjectRefs and scheduling the tasks produced by the head node.
     """
 
-    def __init__(self, actor_id: int) -> None:
+    async def __init__(self, actor_id: int) -> None:
         self.actor_id = actor_id
         self.actor_handle = ray.get_runtime_context().current_actor
 
-        self.head = ray.get_actor("simulation_head", namespace="doreisa")
+        self.head = get_ready_actor_with_retry(name="simulation_head", namespace="doreisa")
+        await self.head.register_scheduling_actor.remote(actor_id, self.actor_handle)
         self.scheduling_actors: list[ray.actor.ActorHandle] = []
 
         # For collecting chunks
@@ -132,6 +153,12 @@ class SchedulingActor:
 
         # For scheduling
         self.graph_infos: AsyncDict[int, GraphInfo] = AsyncDict()
+
+    def preprocessing_callbacks(self) -> ray.ObjectRef:
+        # return obect ref
+        p_clbs = self.head.preprocessing_callbacks.remote()
+        assert isinstance(p_clbs, ray.ObjectRef)
+        return p_clbs
 
     def ready(self) -> None:
         pass
