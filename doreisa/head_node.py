@@ -4,12 +4,20 @@ import math
 from dataclasses import dataclass
 from typing import Callable
 
+import warnings
 import dask
 import dask.array as da
 import numpy as np
 import ray
 import ray.actor
 from dask.highlevelgraph import HighLevelGraph
+try:
+    from dask._task_spec import Alias, DataNode, Task, TaskRef, convert_legacy_graph
+except ImportError:
+    warnings.warn(
+        "Dask on Ray is available only on dask>=2024.11.0, "
+        f"you are on version {dask.__version__}."
+    )
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 
 from doreisa import Timestep
@@ -19,7 +27,8 @@ from doreisa._scheduling_actor import ChunkRef, SchedulingActor
 
 def init():
     if not ray.is_initialized():
-        ray.init(address="auto", log_to_driver=False, logging_level=logging.ERROR)
+        ray.init(address="auto", log_to_driver=False,
+                 logging_level=logging.ERROR)
 
     dask.config.set(scheduler=doreisa_get, shuffle="tasks")
 
@@ -82,7 +91,8 @@ class _DaskArrayData:
             self.nb_chunks = math.prod(nb_chunks_per_dim)
 
             self.dtype = dtype
-            self.chunks_size = [[None for _ in range(n)] for n in nb_chunks_per_dim]
+            self.chunks_size = [
+                [None for _ in range(n)] for n in nb_chunks_per_dim]
         else:
             assert self.nb_chunks_per_dim == nb_chunks_per_dim
             assert self.dtype == dtype
@@ -113,7 +123,8 @@ class _DaskArrayData:
             return False
 
         if self.nb_scheduling_actors is None:
-            self.nb_scheduling_actors = len(set(self.scheduling_actors_id.values()))
+            self.nb_scheduling_actors = len(
+                set(self.scheduling_actors_id.values()))
 
         return len(self.chunk_refs[timestep]) == self.nb_scheduling_actors
 
@@ -152,7 +163,8 @@ class _DaskArrayData:
             for it, (position, actor_id) in enumerate(self.scheduling_actors_id.items())
         }
 
-        dsk = HighLevelGraph.from_collections(dask_name, graph, dependencies=())
+        dsk = HighLevelGraph.from_collections(
+            dask_name, graph, dependencies=())
 
         full_array = da.Array(
             dsk,
@@ -202,7 +214,8 @@ class SimulationHead:
 
         # Must be used before creating a new array, to prevent the simulation from being
         # too many iterations in advance of the analytics.
-        self.new_pending_array_semaphore = asyncio.Semaphore(max_pending_arrays)
+        self.new_pending_array_semaphore = asyncio.Semaphore(
+            max_pending_arrays)
 
         self.new_array_created = asyncio.Event()
 
@@ -211,7 +224,8 @@ class SimulationHead:
         }
 
         # All the newly created arrays
-        self.arrays_ready: asyncio.Queue[tuple[str, Timestep, da.Array]] = asyncio.Queue()
+        self.arrays_ready: asyncio.Queue[tuple[str,
+                                               Timestep, da.Array]] = asyncio.Queue()
 
     def list_scheduling_actors(self) -> list[ray.actor.ActorHandle]:
         """
@@ -233,7 +247,8 @@ class SimulationHead:
             actor_id = len(self.scheduling_actors)
 
             if is_fake_id:
-                self.scheduling_actors[node_id] = SchedulingActor.remote(actor_id)  # type: ignore
+                self.scheduling_actors[node_id] = SchedulingActor.remote(
+                    actor_id)  # type: ignore
             else:
                 self.scheduling_actors[node_id] = SchedulingActor.options(  # type: ignore
                     # Schedule the actor on this node
@@ -261,12 +276,14 @@ class SimulationHead:
         array_name: str,
         dtype: np.dtype,
         nb_chunks_per_dim: tuple[int, ...],
-        chunks: list[tuple[tuple[int, ...], tuple[int, ...]]],  # [(chunk position, chunk size), ...]
+        # [(chunk position, chunk size), ...]
+        chunks: list[tuple[tuple[int, ...], tuple[int, ...]]],
     ):
         array = self.arrays[array_name]
 
         for position, size in chunks:
-            array.set_chunk_owner(nb_chunks_per_dim, dtype, position, size, scheduling_actor_id)
+            array.set_chunk_owner(nb_chunks_per_dim, dtype,
+                                  position, size, scheduling_actor_id)
 
     async def chunks_ready(self, array_name: str, timestep: Timestep, all_chunks_ref: list[ray.ObjectRef]) -> None:
         """
@@ -280,7 +297,8 @@ class SimulationHead:
         array = self.arrays[array_name]
 
         while timestep not in array.chunk_refs:
-            t1 = asyncio.create_task(self.new_pending_array_semaphore.acquire())
+            t1 = asyncio.create_task(
+                self.new_pending_array_semaphore.acquire())
             t2 = asyncio.create_task(self.new_array_created.wait())
 
             done, pending = await asyncio.wait([t1, t2], return_when=asyncio.FIRST_COMPLETED)

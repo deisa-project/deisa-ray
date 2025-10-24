@@ -10,6 +10,17 @@ import ray.util.dask.scheduler
 from doreisa import Timestep
 from doreisa._async_dict import AsyncDict
 
+from collections.abc import Mapping
+import warnings
+import dask
+try:
+    from dask._task_spec import Alias, DataNode, Task, TaskRef, convert_legacy_graph
+except ImportError:
+    warnings.warn(
+        "Dask on Ray is available only on dask>=2024.11.0, "
+        f"you are on version {dask.__version__}."
+    )
+
 
 @dataclass
 class ChunkRef:
@@ -50,7 +61,7 @@ class GraphInfo:
 
 
 @ray.remote(num_cpus=0, enable_task_events=False)
-def patched_dask_task_wrapper(func, repack, key, ray_pretask_cbs, ray_posttask_cbs, *args, first_call=True):
+def patched_dask_task_wrapper(task, repack, key, ray_pretask_cbs, ray_posttask_cbs, *arg_object_refs, first_call=True):
     """
     Patched version of the original dask_task_wrapper function.
 
@@ -59,21 +70,42 @@ def patched_dask_task_wrapper(func, repack, key, ray_pretask_cbs, ray_posttask_c
 
     TODO can probably be rewritten without copying the whole function
     """
-
     if first_call:
-        assert all([isinstance(a, ray.ObjectRef) for a in args])
+        assert all([isinstance(a, ray.ObjectRef) for a in arg_object_refs])
         # Use one CPU for the actual computation
         return patched_dask_task_wrapper.options(num_cpus=1).remote(
-            func, repack, key, ray_pretask_cbs, ray_posttask_cbs, *args, first_call=False
+            task, repack, key, ray_pretask_cbs, ray_posttask_cbs, *
+            arg_object_refs, first_call=False
         )
 
     if ray_pretask_cbs is not None:
-        pre_states = [cb(key, args) if cb is not None else None for cb in ray_pretask_cbs]
-    repacked_args, repacked_deps = repack(args)
-    # Recursively execute Dask-inlined tasks.
-    actual_args = [ray.util.dask.scheduler._execute_task(a, repacked_deps) for a in repacked_args]
-    # Execute the actual underlying Dask task.
-    result = func(*actual_args)
+        pre_states = [
+            cb(key, arg_object_refs) if cb is not None else None
+            for cb in ray_pretask_cbs
+        ]
+
+    (repacked_deps,) = repack(arg_object_refs)
+
+    # De-reference the potentially nested arguments recursively.
+    def _dereference_args(x):
+        if isinstance(x, Task):
+            return x
+        elif isinstance(x, Mapping):
+            return {k: _dereference_args(v) for k, v in x.items()}
+        elif isinstance(x, tuple):
+            return tuple(_dereference_args(x) for x in x)
+        elif isinstance(x, ray.ObjectRef):
+            return _dereference_args(ray.get(x))
+        elif isinstance(x, DataNode):
+            if isinstance(x.value, ray.ObjectRef):
+                value = ray.get(x.value)
+                return DataNode(key=x.key, value=value)
+            return x
+        else:
+            return x
+
+    task = _dereference_args(task)
+    result = task(repacked_deps)
 
     if ray_posttask_cbs is not None:
         for cb, pre_state in zip(ray_posttask_cbs, pre_states):
@@ -99,7 +131,8 @@ class _ArrayTimestep:
         self.chunks_ready_event: asyncio.Event = asyncio.Event()
 
         # {position: chunk}
-        self.local_chunks: AsyncDict[tuple[int, ...], ray.ObjectRef | bytes] = AsyncDict()
+        self.local_chunks: AsyncDict[tuple[int, ...],
+                                     ray.ObjectRef | bytes] = AsyncDict()
 
 
 class _Array:
@@ -166,7 +199,8 @@ class SchedulingActor:
         array_timestep = array.timesteps[timestep]
 
         assert chunk_position not in array_timestep.local_chunks
-        array_timestep.local_chunks[chunk_position] = self.actor_handle._pack_object_ref.remote(chunk)
+        array_timestep.local_chunks[chunk_position] = self.actor_handle._pack_object_ref.remote(
+            chunk)
 
         array.owned_chunks.add((chunk_position, chunk_shape))
 
@@ -201,6 +235,7 @@ class SchedulingActor:
             await array_timestep.chunks_ready_event.wait()
 
     async def schedule_graph(self, graph_id: int, dsk: dict) -> None:
+
         # Find the scheduling actors
         if not self.scheduling_actors:
             self.scheduling_actors = await self.head.list_scheduling_actors.options(enable_task_events=False).remote()
@@ -208,24 +243,38 @@ class SchedulingActor:
         info = GraphInfo()
         self.graph_infos[graph_id] = info
 
+        def get_ref_from_task(task: Task):
+            for arg in task.args:
+                if isinstance(arg, dict):
+                    for value in arg.values():
+                        if isinstance(value, DataNode):
+                            return value.value
+            return -1
+
         for key, val in dsk.items():
             # Adapt external keys
             if isinstance(val, ScheduledByOtherActor):
                 actor = self.scheduling_actors[val.actor_id]
-                dsk[key] = actor.get_value.options(enable_task_events=False).remote(graph_id, key)
+                dsk[key] = actor.get_value.options(
+                    enable_task_events=False).remote(graph_id, key)
+            is_chunk = None
+            if isinstance(val, Task):
+                is_chunk = get_ref_from_task(val)
+            if isinstance(val, DataNode):
+                is_chunk = val.value
+            if isinstance(is_chunk, ChunkRef):
+                assert is_chunk.actor_id == self.actor_id
 
-            # Replace the false chunks by the real ObjectRefs
-            if isinstance(val, ChunkRef):
-                assert val.actor_id == self.actor_id
+                array = await self.arrays.wait_for_key(is_chunk.array_name)
+                array_timestep = await array.timesteps.wait_for_key(is_chunk.timestep)
+                ref = await array_timestep.local_chunks.wait_for_key(is_chunk.position)
 
-                array = await self.arrays.wait_for_key(val.array_name)
-                array_timestep = await array.timesteps.wait_for_key(val.timestep)
-                ref = await array_timestep.local_chunks.wait_for_key(val.position)
-
-                if isinstance(ref, bytes):  # This may not be the case depending on the asyncio scheduling order
+                # This may not be the case depending on the asyncio scheduling order
+                if isinstance(ref, bytes):
                     ref = pickle.loads(ref)
                 else:
-                    ref = pickle.loads(pickle.dumps(ref))  # To free the memory automatically
+                    # To free the memory automatically
+                    ref = pickle.loads(pickle.dumps(ref))
 
                 dsk[key] = ref
 
