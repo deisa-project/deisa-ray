@@ -1,29 +1,24 @@
 import random
-import warnings
 from collections import Counter
 from typing import Callable
 
 import ray
-import dask
 from dask.core import get_dependencies
-try:
-    from dask._task_spec import Alias, DataNode, Task, TaskRef, Mapping
-except ImportError:
-    warnings.warn(
-        "Dask on Ray is available only on dask>=2024.11.0, "
-        f"you are on version {dask.__version__}."
-    )
+from dask._task_spec import DataNode, Task
 
 from doreisa._scheduling_actor import ChunkRef, ScheduledByOtherActor
 
 
 def explore_task_args(task: Task) -> int:
+    # Explore arguments of a given task looking for a ChunkRef
+    # return actor_id of the ChunkRef if a ChunkRef is found,
+    # return -1 if no ChunkRef is found
     for arg in task.args:
         if isinstance(arg, dict):
             for value in arg.values():
                 if isinstance(value, DataNode) and isinstance(value.value, ChunkRef):
                     return value.value.actor_id
-    return -2
+    return -1
 
 
 # TODO : partition assignation to actors may be better
@@ -37,7 +32,7 @@ def random_partitioning(dsk, nb_scheduling_actors: int) -> dict[str, int]:
             partition[key] = val.value.actor_id
         elif isinstance(val, Task):
             actors_id = explore_task_args(val)
-            if actors_id != -2:
+            if actors_id != -1:
                 partition[key] = actors_id
             else:
                 partition[key] = actors[random.randint(0, len(actors)-1)]
@@ -57,9 +52,9 @@ def greedy_partitioning(dsk, nb_scheduling_actors: int) -> dict[str, int]:
 
         if isinstance(val, DataNode) and isinstance(val.value, ChunkRef):
             partition[k] = val.value.actor_id
-        elif isinstance(val, Task) and explore_task_args(val) != -2:
+        elif isinstance(val, Task) and explore_task_args(val) != -1:
             actors_id = explore_task_args(val)
-            if actors_id != -2:
+            if actors_id != -1:
                 partition[k] = actors_id
         else:
             actors_dependencies = [explore(dep)
@@ -80,8 +75,7 @@ def greedy_partitioning(dsk, nb_scheduling_actors: int) -> dict[str, int]:
 
 
 def doreisa_get(dsk, keys, **kwargs):
-    # debug_logs_path: str | None = kwargs.get("doreisa_debug_logs", None)
-    debug_logs_path = "./logs"
+    debug_logs_path: str | None = kwargs.get("doreisa_debug_logs", None)
 
     def log(message: str, debug_logs_path: str | None) -> None:
         if debug_logs_path is not None:
@@ -94,9 +88,7 @@ def doreisa_get(dsk, keys, **kwargs):
 
     log("1. Begin Doreisa scheduler", debug_logs_path)
 
-    dsk = dsk.__dask_graph__()
-
-    log(f"\n[DEBUG] Initial graph = {dsk}\n", debug_logs_path)
+    dsk = dsk.dask
 
     head_node = ray.get_actor("simulation_head", namespace="doreisa")  # noqa: F841
 
@@ -128,7 +120,6 @@ def doreisa_get(dsk, keys, **kwargs):
                     partition[dep])
 
     log("3. Partitioned graphs created", debug_logs_path)
-    log(f"[DEBUG] Partitioned graph = {partitioned_graphs}", debug_logs_path)
 
     graph_id = random.randint(0, 2**128 - 1)
 
@@ -141,16 +132,10 @@ def doreisa_get(dsk, keys, **kwargs):
     res_ref = scheduling_actors[partition[key]].get_value.remote(graph_id, key)
 
     if kwargs.get("ray_persist"):
-        log(f"[DEBUG, doreisa_get] keys[0] = {keys[0]}", "./logs")
         if isinstance(keys[0], list):
-            # TODO : verify that the return value works
-            # if the condition is verified
-            return [[res_ref]]
-        log(f"[DEBUG, doreisa_get] res_ref = {res_ref}", "./logs")
-        log(f"[DEBUG, doreisa_get] ray.get(res_ref) = {
-            ray.get(res_ref)}", "./logs")
-        log(f"[DEBUG, doreisa_get] ray.get(ray.get(res_ref) = {
-            ray.get(ray.get(res_ref))}", "./logs")
+            # TODO : verify that the return value is correct
+            # if this condition is verified
+            return [[ray.get(ray.get(res_ref))]]
         return [ray.get(ray.get(res_ref))]
 
     res = ray.get(ray.get(res_ref))

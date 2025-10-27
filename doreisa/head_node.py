@@ -4,20 +4,12 @@ import math
 from dataclasses import dataclass
 from typing import Callable
 
-import warnings
 import dask
 import dask.array as da
 import numpy as np
 import ray
 import ray.actor
 from dask.highlevelgraph import HighLevelGraph
-try:
-    from dask._task_spec import Alias, DataNode, Task, TaskRef, convert_legacy_graph
-except ImportError:
-    warnings.warn(
-        "Dask on Ray is available only on dask>=2024.11.0, "
-        f"you are on version {dask.__version__}."
-    )
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 
 from doreisa import Timestep

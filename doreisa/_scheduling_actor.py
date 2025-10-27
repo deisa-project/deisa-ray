@@ -6,20 +6,10 @@ import numpy as np
 import ray
 import ray.actor
 import ray.util.dask.scheduler
-
+from dask._task_spec import DataNode, Task
 from doreisa import Timestep
 from doreisa._async_dict import AsyncDict
-
 from collections.abc import Mapping
-import warnings
-import dask
-try:
-    from dask._task_spec import Alias, DataNode, Task, TaskRef, convert_legacy_graph
-except ImportError:
-    warnings.warn(
-        "Dask on Ray is available only on dask>=2024.11.0, "
-        f"you are on version {dask.__version__}."
-    )
 
 
 @dataclass
@@ -243,7 +233,9 @@ class SchedulingActor:
         info = GraphInfo()
         self.graph_infos[graph_id] = info
 
-        def get_ref_from_task(task: Task):
+        # Get either the DataNode containing the ChunkRef or
+        # the ChunkRef itself if it exist
+        def get_chunkref_from_task(task: Task):
             for arg in task.args:
                 if isinstance(arg, dict):
                     for value in arg.values():
@@ -257,9 +249,11 @@ class SchedulingActor:
                 actor = self.scheduling_actors[val.actor_id]
                 dsk[key] = actor.get_value.options(
                     enable_task_events=False).remote(graph_id, key)
+
+            # Replace the false chunks by the real ObjectRefs
             is_chunk = None
             if isinstance(val, Task):
-                is_chunk = get_ref_from_task(val)
+                is_chunk = get_chunkref_from_task(val)
             if isinstance(val, DataNode):
                 is_chunk = val.value
             if isinstance(is_chunk, ChunkRef):
