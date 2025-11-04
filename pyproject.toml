@@ -45,3 +45,10 @@ help = "Format the source code, and sort the imports"
 [tool.poe.tasks.serve-docs]
 cmd = "mkdocs serve"
 help = "Serve the documentation locally"
+
+[tool.pytest.ini_options]
+markers = [
+  "slow: slow/long-running tests"
+]
+
+

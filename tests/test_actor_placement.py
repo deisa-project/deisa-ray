@@ -118,7 +118,7 @@ def test_actor_placement(ray_multinode_cluster):
     assert client_node_id == worker_node_id
     assert actor_node_id_by_name(sched_name) == worker_node_id
 
-
+@pytest.mark.slow
 @pytest.mark.parametrize("sleep_t", [0, 60, 120])
 def test_analytics_late_start(ray_multinode_cluster, sleep_t):
     ids = ray_multinode_cluster["ids"]
@@ -163,6 +163,7 @@ def test_analytics_late_start(ray_multinode_cluster, sleep_t):
 
 
 # TODO use more specific timeoutError
+@pytest.mark.slow
 def test_sim_exits_if_analytics_dont_start(ray_multinode_cluster):
     ids = ray_multinode_cluster["ids"]
     worker_node_id = ids["node1"]
