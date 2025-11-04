@@ -19,7 +19,10 @@ from doreisa._scheduling_actor import ChunkRef, SchedulingActor
 
 def init():
     if not ray.is_initialized():
-        ray.init(address="auto", log_to_driver=False, logging_level=logging.ERROR)
+        try: 
+            ray.init(address="auto", log_to_driver=False, logging_level=logging.ERROR)
+        except Exception as e:
+            raise RuntimeError(f"Error initializing Ray: {e}") from e
 
     dask.config.set(scheduler=doreisa_get, shuffle="tasks")
 
@@ -46,10 +49,11 @@ class _DaskArrayData:
         self.fully_defined: asyncio.Event = asyncio.Event()
 
         # This will be set when the first chunk is added
-        self.nb_chunks_per_dim: tuple[int, ...] | None = None
-        self.nb_chunks: int | None = None
+        # ex: (2,3,3) - 2 chunks in dim0, 3 chunks in dim1, ...
+        self.num_chunks_per_dim: tuple[int, ...] | None = None
 
         # For each dimension, the size of the chunks in this dimension
+        # NOTE: len(self.chunks_size) == number of dimensions, len(self.chunks_size[X]) == num_chunks_per_dim[X] 
         self.chunks_size: list[list[int | None]] | None = None
 
         # Type of the numpy arrays
@@ -58,38 +62,67 @@ class _DaskArrayData:
         # ID of the scheduling actor in charge of the chunk at each position
         self.scheduling_actors_id: dict[tuple[int, ...], int] = {}
 
-        # Number of scheduling actors owning chunks of this array.
-        self.nb_scheduling_actors: int | None = None
-
-        # Each reference comes from one scheduling actor. The reference a list of
+        # Each reference comes from one scheduling actor. The reference is a list of
         # ObjectRefs, each ObjectRef corresponding to a chunk. These references
         # shouldn't be used directly. They exists only to release the memory
         # automatically.
         # When the array is buit, these references are put in the object store, and the
         # global reference is added to the Dask graph. Then, the list is cleared.
+        # TODO: improve?
         self.chunk_refs: dict[Timestep, list[ray.ObjectRef]] = {}
+    
+    @property
+    def num_scheduling_actors(self) -> int | None:
+        """
+        Return the number of scheduling actors.
+        """
+        if self.scheduling_actors_id is None:
+            return None
+        return len(set(self.scheduling_actors_id.values()))
+
+    @property
+    def num_chunks(self) -> int | None:
+        """
+        Invariant: total number of chunks equals the product of the per-dimension counts.
+
+        Returns None until `num_chunks_per_dim` is known.
+        """
+        if self.num_chunks_per_dim is None:
+            return None
+        return math.prod(self.num_chunks_per_dim)
 
     def set_chunk_owner(
         self,
-        nb_chunks_per_dim: tuple[int, ...],
+        num_chunks_per_dim: tuple[int, ...],
         dtype: np.dtype,
         position: tuple[int, ...],
         size: tuple[int, ...],
         scheduling_actor_id: int,
     ) -> None:
-        if self.nb_chunks_per_dim is None:
-            self.nb_chunks_per_dim = nb_chunks_per_dim
-            self.nb_chunks = math.prod(nb_chunks_per_dim)
+        """
+        Set the owner (scheduling actor) of a chunk of an array.
+
+        Args:
+            num_chunks_per_dim: Number of chunks per dimension.
+            dtype: Type of the chunks.
+            position: Position of the chunk.
+            size: Size of the chunk.
+            scheduling_actor_id: ID of the scheduling actor in charge of the chunk.
+        """
+        # TODO: too many responsabilities. Should be split into more methods. Also, I think this should just be handled by the scheduling 
+        # actor, not the head node.
+        if self.num_chunks_per_dim is None:
+            self.num_chunks_per_dim = num_chunks_per_dim
 
             self.dtype = dtype
-            self.chunks_size = [[None for _ in range(n)] for n in nb_chunks_per_dim]
+            self.chunks_size = [[None for _ in range(n)] for n in num_chunks_per_dim]
         else:
-            assert self.nb_chunks_per_dim == nb_chunks_per_dim
+            assert self.num_chunks_per_dim == num_chunks_per_dim
             assert self.dtype == dtype
             assert self.chunks_size is not None
 
-        for pos, nb_chunks in zip(position, nb_chunks_per_dim):
-            assert 0 <= pos < nb_chunks
+        for pos, num_chunks in zip(position, num_chunks_per_dim):
+            assert 0 <= pos < num_chunks
 
         self.scheduling_actors_id[position] = scheduling_actor_id
 
@@ -109,13 +142,17 @@ class _DaskArrayData:
         self.chunk_refs[timestep].append(chunk_ref)
 
         # We don't know all the owners yet
-        if len(self.scheduling_actors_id) != self.nb_chunks:
+        if len(self.scheduling_actors_id) != self.num_chunks:
             return False
 
-        if self.nb_scheduling_actors is None:
-            self.nb_scheduling_actors = len(set(self.scheduling_actors_id.values()))
-
-        return len(self.chunk_refs[timestep]) == self.nb_scheduling_actors
+        return len(self.chunk_refs[timestep]) == self.num_scheduling_actors
+    
+    def _validate_build_ready(self, timestep: Timestep) -> None:
+        assert self.num_chunks_per_dim is not None, "nb_chunks_per_dim must be set"
+        assert len(self.scheduling_actors_id) == self.num_chunks, "incomplete ownership map"
+        if timestep in self.chunk_refs:
+            assert len(self.chunk_refs[timestep]) == self.num_scheduling_actors, f"Not all scheduling actors have added their ref for {timestep=}." 
+            f"Got: {len(self.chunk_refs[timestep])}, expected: {self.num_scheduling_actors}"
 
     def get_full_array(self, timestep: Timestep, *, is_preparation: bool = False) -> da.Array:
         """
@@ -123,20 +160,33 @@ class _DaskArrayData:
 
         Args:
             timestep: The timestep for which the full array should be returned.
-            is_preparation: If True, the array will not contain ObjectRefs to the
+            is_preparation: If True, the array  will not contain ObjectRefs to the
                 actual data.
         """
-        assert len(self.scheduling_actors_id) == self.nb_chunks
-        assert self.nb_chunks is not None and self.nb_chunks_per_dim is not None
+        # NOTE: only need to check this as self.num_chunks is a property that depends on this
+        assert self.num_chunks_per_dim is not None, "Num chunks per dim is None"
 
+        assert len(self.scheduling_actors_id) == self.num_chunks, "Incomplete mapping for array."
+
+        # NOTE: is_preparation means we create array ahead of time and avoid putting actual data for the refs.
         if is_preparation:
             all_chunks = None
         else:
+            # make sure all chunk refs have been added
+            # NOTE: scheduling actors aggregate local chunk refs, put in list, and do ray.put(list). So 
+            # you only get 1 chunk ref per scheduling actor in the end (per timemstep).
+            assert len(self.chunk_refs[timestep]) == self.num_scheduling_actors
+
+            # do a final ray.put() of list of all chunk refs.
             all_chunks = ray.put(self.chunk_refs[timestep])
+
+            # TODO: why this hierarchical ray.put()? 
+            # TODO: Also, deleting a ref of a ref in ray, what does it do to the original ref?
+            # aka: when is data deleted when window size > 1?
+
             del self.chunk_refs[timestep]
 
-        # We need to add the timestep since the same name can be used several times for different
-        # timesteps
+        # We need to add the timestep since the same name can be used several times for different timesteps
         dask_name = f"{self.definition.name}_{timestep}"
 
         graph = {
@@ -152,7 +202,7 @@ class _DaskArrayData:
             for it, (position, actor_id) in enumerate(self.scheduling_actors_id.items())
         }
 
-        dsk = HighLevelGraph.from_collections(dask_name, graph, dependencies=())
+        dsk = HighLevelGraph.from_collections(dask_name, graph, dependencies=())  # type: ignore[arg-type]
 
         full_array = da.Array(
             dsk,
@@ -164,13 +214,17 @@ class _DaskArrayData:
         return full_array
 
 def get_head_node_id() -> str:
+    """
+    Return options for creating head node actor in head node. 
+    """
+
     from ray.util import state
 
     nodes = state.list_nodes(filters=[("is_head_node", "=", True)])
 
     assert len(nodes) == 1, "There should be exactly one head node"
 
-    return nodes[0].node_id
+    return nodes[0].node_id  # type: ignore[attr-defined]
 
 def get_head_actor_options() -> dict:
     """Return the options that should be used to start the head actor."""
@@ -221,9 +275,9 @@ class SimulationHead:
         # All the newly created arrays
         self.arrays_ready: asyncio.Queue[tuple[str, Timestep, da.Array]] = asyncio.Queue()
 
-    def list_scheduling_actors(self) -> list[ray.actor.ActorHandle]:
+    def list_scheduling_actors(self) -> dict[str, ray.actor.ActorHandle]:
         """
-        Return the list of scheduling actors.
+        Return the mapping of scheduling actor IDs to actor handles.
         """
         return self.scheduling_actors
 
@@ -245,13 +299,13 @@ class SimulationHead:
         scheduling_actor_id: int,
         array_name: str,
         dtype: np.dtype,
-        nb_chunks_per_dim: tuple[int, ...],
+        num_chunks_per_dim: tuple[int, ...],
         chunks: list[tuple[tuple[int, ...], tuple[int, ...]]],  # [(chunk position, chunk size), ...]
     ):
         array = self.arrays[array_name]
 
         for position, size in chunks:
-            array.set_chunk_owner(nb_chunks_per_dim, dtype, position, size, scheduling_actor_id)
+            array.set_chunk_owner(num_chunks_per_dim, dtype, position, size, scheduling_actor_id)
 
     async def chunks_ready(self, array_name: str, timestep: Timestep, all_chunks_ref: list[ray.ObjectRef]) -> None:
         """
