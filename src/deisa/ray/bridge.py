@@ -8,13 +8,54 @@ from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 from deisa.ray._scheduling_actor import SchedulingActor as _RealSchedulingActor
 
 
-class Client:
+class Bridge:
     """
-    Instantiated by each MPI node to send data to the Ray cluster which will subsequently perform
-    the requested analytics.
+    Bridge between MPI ranks and Ray cluster for distributed array processing.
 
-    The client is in charge of a several *local* chunks of data which are part of a global array. Each chunk has
-    a specific position within the global array.
+    Each Bridge instance is created by an MPI rank to connect to the Ray cluster
+    and send data chunks. Each Bridge is responsible for managing a chunk of data
+    from the decomposed distributed array.
+
+    Parameters
+    ----------
+    _node_id : str or None, optional
+        The ID of the node. If None, the ID is taken from the Ray runtime context.
+        Useful for testing with several scheduling actors on a single machine.
+        Default is None.
+    scheduling_actor_cls : Type, optional
+        The class to use for creating the scheduling actor. Default is
+        `_RealSchedulingActor`.
+    _init_retries : int, optional
+        Number of retry attempts when initializing the scheduling actor.
+        Default is 3.
+
+    Attributes
+    ----------
+    node_id : str
+        The ID of the node this Bridge is associated with.
+    scheduling_actor : ray.actor.ActorHandle
+        The Ray actor handle for the scheduling actor.
+    preprocessing_callbacks : dict[str, Callable]
+        Dictionary mapping array names to their preprocessing callback functions.
+
+    Notes
+    -----
+    The Bridge automatically initializes Ray if it hasn't been initialized yet.
+    The scheduling actor is created with a detached lifetime to persist beyond
+    the Bridge initialization. The actor uses node affinity scheduling to ensure
+    it runs on the specified node.
+
+    Examples
+    --------
+    >>> bridge = Bridge()
+    >>> bridge.add_chunk(
+    ...     array_name="temperature",
+    ...     chunk_position=(0, 0),
+    ...     nb_chunks_per_dim=(2, 2),
+    ...     nb_chunks_in_node=1,
+    ...     timestep=0,
+    ...     chunk=np.array([[1.0, 2.0], [3.0, 4.0]])
+    ... )
     """
 
     def __init__(
@@ -25,9 +66,33 @@ class Client:
         _init_retries: int = 3,
     ) -> None:
         """
-        Args:
-            _node_id: The ID of the node. If None, the ID is taken from the Ray runtime context.
-                Useful for testing with several scheduling actors on a single machine.
+        Initialize the Bridge to connect MPI rank to Ray cluster.
+
+        Parameters
+        ----------
+        _node_id : str or None, optional
+            The ID of the node. If None, the ID is taken from the Ray runtime
+            context. Useful for testing with several scheduling actors on a
+            single machine. Default is None.
+        scheduling_actor_cls : Type, optional
+            The class to use for creating the scheduling actor. Default is
+            `_RealSchedulingActor`.
+        _init_retries : int, optional
+            Number of retry attempts when initializing the scheduling actor.
+            Default is 3.
+
+        Raises
+        ------
+        RuntimeError
+            If the scheduling actor cannot be created or initialized after
+            the specified number of retries.
+
+        Notes
+        -----
+        This method automatically initializes Ray if it hasn't been initialized
+        yet. The scheduling actor is created with a detached lifetime and uses
+        node affinity scheduling when `_node_id` is None. The first remote call
+        to the scheduling actor serves as a readiness check.
         """
         # check if ray.init has already been called.
         # Needed when starting ray cluster from python (mainly testing)
@@ -114,14 +179,43 @@ class Client:
         """
         Make a chunk of data available to the analytic.
 
-        Args:
-            array_name: The name of the array.
-            chunk_position: The position of the chunk in the array.
-            nb_chunks_per_dim: The number of chunks per dimension.
-            nb_chunks_of_node: The number of chunks sent by this node. The scheduling actor will
-                inform the head actor when all the chunks are ready.
-            chunk: The chunk of data.
-            store_externally: If True, the data is stored externally. TODO Not implemented yet.
+        This method applies preprocessing callbacks to the chunk, stores it in
+        Ray's object store, and sends it to the scheduling actor. The method
+        blocks until the data is processed by the scheduling actor.
+
+        Parameters
+        ----------
+        array_name : str
+            The name of the array this chunk belongs to.
+        chunk_position : tuple[int, ...]
+            The position of the chunk in the array decomposition, specified as
+            a tuple of indices for each dimension.
+        nb_chunks_per_dim : tuple[int, ...]
+            The number of chunks per dimension in the array decomposition.
+        nb_chunks_in_node : int
+            The number of chunks sent by this node. The scheduling actor will
+            inform the head actor when all chunks from this node are ready.
+        timestep : int
+            The timestep index for this chunk of data.
+        chunk : np.ndarray
+            The chunk of data to be sent to the analytic.
+        store_externally : bool, optional
+            If True, the data is stored externally. Not implemented yet.
+            Default is False.
+
+        Notes
+        -----
+        The chunk is first processed through the preprocessing callback
+        associated with `array_name`. The processed chunk is then stored in
+        Ray's object store with the scheduling actor as the owner, ensuring
+        the reference persists even after the simulation script terminates.
+        This method blocks until the scheduling actor has processed the chunk.
+
+        Raises
+        ------
+        KeyError
+            If `array_name` is not found in the preprocessing callbacks
+            dictionary.
         """
         chunk = self.preprocessing_callbacks[array_name](chunk)
 

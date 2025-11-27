@@ -2,7 +2,7 @@ import pytest
 import ray
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 from tests.stubs import StubSchedulingActor
-from deisa.ray.simulation_node import Client
+from deisa.ray.bridge import Bridge
 from ray.util.state import list_actors
 import dask.array as da
 from ray.cluster_utils import Cluster
@@ -110,7 +110,7 @@ def test_actor_placement(ray_multinode_cluster):
         scheduling_strategy=NodeAffinitySchedulingStrategy(node_id=worker_node_id, soft=False),
     )
     def make_client_and_return_ids():
-        c = Client(_node_id=None, scheduling_actor_cls=StubSchedulingActor)  # type:ignore
+        c = Bridge(_node_id=None, scheduling_actor_cls=StubSchedulingActor)  # type:ignore
         return (c.node_id, f"sched-{c.node_id}")
 
     client_node_id, sched_name = ray.get(make_client_and_return_ids.remote())
@@ -149,7 +149,7 @@ def test_actor_placement(ray_multinode_cluster):
 #         scheduling_strategy=NodeAffinitySchedulingStrategy(node_id=worker_node_id, soft=False),
 #     )
 #     def make_client_and_return_ids():
-#         c = Client(_node_id=None)  # type:ignore
+#         c = Bridge(_node_id=None)  # type:ignore
 #         return (c.node_id, f"sched-{c.node_id}")
 #
 #     # this should be blocking because we want the sim code to wait
@@ -171,7 +171,7 @@ def test_actor_placement(ray_multinode_cluster):
 #         scheduling_strategy=NodeAffinitySchedulingStrategy(node_id=worker_node_id, soft=False),
 #     )
 #     def make_client_and_return_ids():
-#         c = Client(_node_id=None, _init_retries=1)  # type:ignore
+#         c = Bridge(_node_id=None, _init_retries=1)  # type:ignore
 #         return (c.node_id, f"sched-{c.node_id}")
 #
 #     with pytest.raises(Exception):

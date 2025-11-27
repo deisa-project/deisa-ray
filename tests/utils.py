@@ -39,9 +39,9 @@ def simple_worker(
     dtype: np.dtype = np.int32,  # type: ignore
 ) -> None:
     """Worker node sending chunks of data"""
-    from deisa.ray.simulation_node import Client
+    from deisa.ray.bridge import Bridge
 
-    client = Client(_node_id=node_id)
+    client = Bridge(_node_id=node_id)
 
     array = (rank + 1) * np.ones(chunk_size, dtype=dtype)
 

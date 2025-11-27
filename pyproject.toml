@@ -31,6 +31,9 @@ dev = [
     "mkdocstrings[python]>=0.29.1",
     "pyright (>=1.1.397,<2.0.0)",
     "py-spy>=0.4.0",
+    "sphinx>=8.2.3",
+    "sphinx-autobuild>=2025.8.25",
+    "furo>=2025.9.25",
 ]
 
 [tool.ruff]

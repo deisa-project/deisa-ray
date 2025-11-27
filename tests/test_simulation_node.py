@@ -7,7 +7,7 @@ import pytest
 from ray.util.state import list_actors
 from tests.stubs import StubSchedulingActor
 
-from deisa.ray.simulation_node import Client
+from deisa.ray.bridge import Bridge
 
 
 def _actor_names_by_prefix(prefix="sched-"):
@@ -43,12 +43,12 @@ def test_stub_actor_basic(ray_cluster, inpt, inpt_doubled):
 
 def test_init(ray_cluster):
     fake_node_id = "FAKE-NODE-1"
-    c = Client(_node_id=fake_node_id, scheduling_actor_cls=StubSchedulingActor)
+    c = Bridge(_node_id=fake_node_id, scheduling_actor_cls=StubSchedulingActor)
     assert c.node_id == fake_node_id
     assert isinstance(c.scheduling_actor, ray.actor.ActorHandle)
     assert isinstance(c.preprocessing_callbacks, dict)
     assert callable(c.preprocessing_callbacks["default"]) and callable(c.preprocessing_callbacks["double"])
-    assert isinstance(c, Client)
+    assert isinstance(c, Bridge)
 
 
 @pytest.mark.parametrize("nb_nodes", [1, 2, 4])
@@ -57,10 +57,10 @@ def test_init_race_free(nb_nodes, ray_cluster):
     fake_node_ids = [f"FAKE-NODE-{n + 1}" for i in range(ranks_per_node) for n in range(nb_nodes)]
 
     def _mk(id):
-        Client(_node_id=id, scheduling_actor_cls=StubSchedulingActor)
+        Bridge(_node_id=id, scheduling_actor_cls=StubSchedulingActor)
         return True
 
-        # Start many in parallel (threads are fine; Client uses Ray for concurrency)
+        # Start many in parallel (threads are fine; Bridge uses Ray for concurrency)
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=32) as ex:
         results = list(ex.map(_mk, fake_node_ids))
@@ -79,13 +79,13 @@ def test_actor_dies_and_client_recovers(ray_cluster):
     fake_node_id = "CRASHY-NODE"
 
     # First client brings up the actor
-    Client(_node_id=fake_node_id, scheduling_actor_cls=StubSchedulingActor)
+    Bridge(_node_id=fake_node_id, scheduling_actor_cls=StubSchedulingActor)
     # Find the actor handle and kill it
     a = ray.get_actor(f"sched-{fake_node_id}", namespace="deisa_ray")
     ray.kill(a, no_restart=True)
 
-    # Now, creating another client should recover (thanks to retry in Client.__init__)
-    c2 = Client(_node_id=fake_node_id, scheduling_actor_cls=StubSchedulingActor, _init_retries=5)
+    # Now, creating another client should recover (thanks to retry in Bridge.__init__)
+    c2 = Bridge(_node_id=fake_node_id, scheduling_actor_cls=StubSchedulingActor, _init_retries=5)
     assert isinstance(c2.preprocessing_callbacks, dict)
 
     # Also check that a fresh actor exists with the same name

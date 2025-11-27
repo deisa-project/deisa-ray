@@ -1,16 +1,21 @@
 name: documentation
+
 on:
   release:
     types:
       - published
   workflow_dispatch:
+
 permissions:
   contents: write
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
+
       - name: Configure Git Credentials
         run: |
           git config user.name github-actions[bot]
@@ -22,8 +27,22 @@ jobs:
           version: "0.7.5"
           python-version: "3.12"
 
-      - name: Install Doreisa
+      - name: Install project (and docs deps)
         run: uv sync --locked --all-extras --all-groups
 
-      - name: Build and deploy documentation
-        run: uv run mkdocs gh-deploy --force
+      # Regenerate API .rst files for deisa/deisa.ray
+      - name: Generate Sphinx API sources
+        run: uv run sphinx-apidoc -f -e -o docs/source src/deisa
+
+      # Build the HTML docs
+      - name: Build Sphinx HTML
+        run: uv run sphinx-build -b html docs/source docs/build/html
+
+      # Deploy to GitHub Pages (gh-pages branch)
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs/build/html
+          publish_branch: gh-pages
+
