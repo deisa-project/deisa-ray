@@ -9,10 +9,12 @@ from dask.core import get_dependencies
 from doreisa._scheduling_actor import ChunkRef, ScheduledByOtherActor
 
 
-def random_partitioning(dsk, nb_scheduling_actors: int) -> dict[str, int]:
+def random_partitioning(dsk, scheduling_actors: dict) -> dict[str, int]:
     nb_tasks = len({k for k, v in dsk.items() if not isinstance(v, ChunkRef)})
+    nb_scheduling_actors = len(scheduling_actors)
+    actor_names = list(scheduling_actors.keys())
 
-    actors = [i % nb_scheduling_actors for i in range(nb_tasks)]
+    actors = [actor_names[i % nb_scheduling_actors] for i in range(nb_tasks)]
     random.shuffle(actors)
 
     partition = {}
@@ -26,8 +28,9 @@ def random_partitioning(dsk, nb_scheduling_actors: int) -> dict[str, int]:
     return partition
 
 
-def greedy_partitioning(dsk, nb_scheduling_actors: int) -> dict[str, int]:
+def greedy_partitioning(dsk, scheduling_actors: dict) -> dict[str, int]:
     partition = {k: -1 for k in dsk.keys()}
+    actor_names = list(scheduling_actors.keys())
 
     def explore(k) -> int:
         if partition[k] != -1:
@@ -42,7 +45,7 @@ def greedy_partitioning(dsk, nb_scheduling_actors: int) -> dict[str, int]:
 
             if not actors_dependencies:
                 # The task is a leaf, we use a random actor
-                partition[k] = random.randint(0, nb_scheduling_actors - 1)
+                partition[k] = random.choice(actor_names)
             else:
                 partition[k] = Counter(actors_dependencies).most_common(1)[0][0]
 
@@ -83,12 +86,13 @@ def doreisa_get(dsk, keys, **kwargs):
 
     # Find the scheduling actors
     scheduling_actors = ray.get(head_node.list_scheduling_actors.remote())
+    assert isinstance(scheduling_actors, dict)
 
-    partition = partitioning_strategy(dsk, len(scheduling_actors))
+    partition = partitioning_strategy(dsk, scheduling_actors)
 
     log("2. Graph partitioning done", debug_logs_path)
 
-    partitioned_graphs: dict[int, dict] = {actor_id: {} for actor_id in range(len(scheduling_actors))}
+    partitioned_graphs: dict[int, dict] = {actor_id: {} for actor_id in scheduling_actors}
 
     for k, v in dsk.items():
         actor_id = partition[k]
@@ -103,7 +107,7 @@ def doreisa_get(dsk, keys, **kwargs):
 
     graph_id = random.randint(0, 2**128 - 1)
 
-    for id, actor in enumerate(scheduling_actors):
+    for id, actor in scheduling_actors.items():
         if partitioned_graphs[id]:
             actor.schedule_graph.remote(graph_id, partitioned_graphs[id])
 
