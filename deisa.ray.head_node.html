@@ -3,10 +3,10 @@
   <head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Analytics" href="analytics.html">
+<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="deisa.ray.window_api module" href="deisa.ray.window_api.html"><link rel="prev" title="deisa.ray.bridge module" href="deisa.ray.bridge.html">
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.09.25 -->
-        <title>deisa-ray documentation</title>
+        <title>deisa.ray.head_node module - deisa-ray documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=d111a655" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=580074bf" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="#"><div class="brand">deisa-ray  documentation</div></a>
+      <a href="index.html"><div class="brand">deisa-ray  documentation</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -172,7 +172,7 @@
           <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
         </button>
       </div>
-      <label class="toc-overlay-icon toc-header-icon no-toc" for="__toc">
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
         <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
       </label>
     </div>
@@ -180,7 +180,7 @@
   <aside class="sidebar-drawer">
     <div class="sidebar-container">
       
-      <div class="sidebar-sticky"><a class="sidebar-brand" href="#">
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
   <span class="sidebar-brand-text">deisa-ray  documentation</span>
   
@@ -195,10 +195,10 @@
 <li class="toctree-l1"><a class="reference internal" href="analytics.html">Analytics</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
-<ul>
-<li class="toctree-l1 has-children"><a class="reference internal" href="deisa.ray.html">deisa.ray package</a><input aria-label="Toggle navigation of deisa.ray package" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<ul class="current">
+<li class="toctree-l1 current has-children"><a class="reference internal" href="deisa.ray.html">deisa.ray package</a><input aria-label="Toggle navigation of deisa.ray package" checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.bridge.html">deisa.ray.bridge module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="deisa.ray.head_node.html">deisa.ray.head_node module</a></li>
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">deisa.ray.head_node module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.window_api.html">deisa.ray.window_api module</a></li>
 </ul>
 </li>
@@ -222,7 +222,7 @@
         </a>
         <div class="content-icon-container">
           <div class="view-this-page">
-  <a class="muted-link" href="_sources/index.rst.txt" title="View this page">
+  <a class="muted-link" href="_sources/deisa.ray.head_node.rst.txt" title="View this page">
     <svg><use href="#svg-eye"></use></svg>
     <span class="visually-hidden">View this page</span>
   </a>
@@ -235,23 +235,104 @@
               <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
             </button>
           </div>
-          <label class="toc-overlay-icon toc-content-icon no-toc" for="__toc">
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
             <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
           </label>
         </div>
         <article role="main" id="furo-main-content">
-          <section id="deisa-documentation">
-<h1>DEISA documentation<a class="headerlink" href="#deisa-documentation" title="Link to this heading">¶</a></h1>
-<p>In Situ Data Analytics library built on top of Ray and Dask.</p>
-<p>This documentation includes:</p>
-<ul class="simple">
-<li><p>A short guide showing how to write analytics callbacks.</p></li>
-<li><p>A full API reference for the <a class="reference internal" href="deisa.ray.html#module-deisa.ray" title="deisa.ray"><code class="xref py py-mod docutils literal notranslate"><span class="pre">deisa.ray</span></code></a> package.</p></li>
+          <section id="module-deisa.ray.head_node">
+<span id="deisa-ray-head-node-module"></span><h1>deisa.ray.head_node module<a class="headerlink" href="#module-deisa.ray.head_node" title="Link to this heading">¶</a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="deisa.ray.head_node.ArrayDefinition">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">deisa.ray.head_node.</span></span><span class="sig-name descname"><span class="pre">ArrayDefinition</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name:</span> <span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">preprocess:</span> <span class="pre">~typing.Callable</span> <span class="pre">=</span> <span class="pre">&lt;function</span> <span class="pre">ArrayDefinition.&lt;lambda&gt;&gt;</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/deisa/ray/head_node.html#ArrayDefinition"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#deisa.ray.head_node.ArrayDefinition" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Description of a Dask array given by the user.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>name</strong> (<em>str</em>) – The name of the array.</p></li>
+<li><p><strong>preprocess</strong> (<em>Callable</em><em>, </em><em>optional</em>) – A preprocessing function to apply to chunks of this array before
+they are sent to the analytics. The function should take a numpy
+array and return a processed numpy array. Default is the identity
+function (no preprocessing).</p></li>
 </ul>
-<div class="toctree-wrapper compound">
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">def</span><span class="w"> </span><span class="nf">normalize</span><span class="p">(</span><span class="n">arr</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="k">return</span> <span class="n">arr</span> <span class="o">/</span> <span class="n">arr</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">array_def</span> <span class="o">=</span> <span class="n">ArrayDefinition</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;temperature&quot;</span><span class="p">,</span> <span class="n">preprocess</span><span class="o">=</span><span class="n">normalize</span><span class="p">)</span>
+</pre></div>
 </div>
-<div class="toctree-wrapper compound">
-</div>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="deisa.ray.head_node.ArrayDefinition.name">
+<span class="sig-name descname"><span class="pre">name</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#deisa.ray.head_node.ArrayDefinition.name" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="deisa.ray.head_node.ArrayDefinition.preprocess">
+<span class="sig-name descname"><span class="pre">preprocess</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#deisa.ray.head_node.ArrayDefinition.preprocess" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="deisa.ray.head_node.get_head_actor_options">
+<span class="sig-prename descclassname"><span class="pre">deisa.ray.head_node.</span></span><span class="sig-name descname"><span class="pre">get_head_actor_options</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/deisa/ray/head_node.html#get_head_actor_options"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#deisa.ray.head_node.get_head_actor_options" title="Link to this definition">¶</a></dt>
+<dd><p>Return the options that should be used to start the head actor.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Dictionary of Ray actor options including:
+- name: “simulation_head”
+- namespace: “deisa_ray”
+- scheduling_strategy: NodeAffinitySchedulingStrategy for the head node
+- max_concurrency: Very high value to prevent blocking
+- lifetime: “detached” to persist beyond function scope
+- enable_task_events: False for performance</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>dict</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>The head actor is scheduled on the head node with a detached lifetime
+to ensure it persists. High concurrency is set to prevent the actor
+from being blocked when gathering many references.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="deisa.ray.head_node.get_head_node_id">
+<span class="sig-prename descclassname"><span class="pre">deisa.ray.head_node.</span></span><span class="sig-name descname"><span class="pre">get_head_node_id</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="_modules/deisa/ray/head_node.html#get_head_node_id"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#deisa.ray.head_node.get_head_node_id" title="Link to this definition">¶</a></dt>
+<dd><p>Get the node ID of the Ray cluster head node.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The node ID of the head node.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>str</p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>AssertionError</strong> – If there is not exactly one head node in the cluster.</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>This function queries Ray’s state API to find the head node. It assumes
+there is exactly one head node in the cluster.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="deisa.ray.head_node.init">
+<span class="sig-prename descclassname"><span class="pre">deisa.ray.head_node.</span></span><span class="sig-name descname"><span class="pre">init</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/deisa/ray/head_node.html#init"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#deisa.ray.head_node.init" title="Link to this definition">¶</a></dt>
+<dd><p>Initialize Ray and configure Dask to use the Deisa-Ray scheduler.</p>
+<p>This function initializes Ray if it hasn’t been initialized yet, and
+configures Dask to use the Deisa-Ray custom scheduler with task-based
+shuffling.</p>
+<p class="rubric">Notes</p>
+<p>Ray is initialized with automatic address detection, logging to driver
+disabled, and error-level logging. Dask is configured to use the
+<cite>deisa_ray_get</cite> scheduler with task-based shuffling.</p>
+</dd></dl>
+
 </section>
 
         </article>
@@ -259,16 +340,26 @@
       <footer>
         
         <div class="related-pages">
-          <a class="next-page" href="analytics.html">
+          <a class="next-page" href="deisa.ray.window_api.html">
               <div class="page-info">
                 <div class="context">
                   <span>Next</span>
                 </div>
-                <div class="title">Analytics</div>
+                <div class="title">deisa.ray.window_api module</div>
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>
-          
+          <a class="prev-page" href="deisa.ray.bridge.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">deisa.ray.bridge module</div>
+                
+              </div>
+            </a>
         </div>
         <div class="bottom-of-page">
           <div class="left-details">
@@ -287,8 +378,34 @@
         
       </footer>
     </div>
-    <aside class="toc-drawer no-toc">
+    <aside class="toc-drawer">
       
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">deisa.ray.head_node module</a><ul>
+<li><a class="reference internal" href="#deisa.ray.head_node.ArrayDefinition"><code class="docutils literal notranslate"><span class="pre">ArrayDefinition</span></code></a><ul>
+<li><a class="reference internal" href="#deisa.ray.head_node.ArrayDefinition.name"><code class="docutils literal notranslate"><span class="pre">ArrayDefinition.name</span></code></a></li>
+<li><a class="reference internal" href="#deisa.ray.head_node.ArrayDefinition.preprocess"><code class="docutils literal notranslate"><span class="pre">ArrayDefinition.preprocess()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#deisa.ray.head_node.get_head_actor_options"><code class="docutils literal notranslate"><span class="pre">get_head_actor_options()</span></code></a></li>
+<li><a class="reference internal" href="#deisa.ray.head_node.get_head_node_id"><code class="docutils literal notranslate"><span class="pre">get_head_node_id()</span></code></a></li>
+<li><a class="reference internal" href="#deisa.ray.head_node.init"><code class="docutils literal notranslate"><span class="pre">init()</span></code></a></li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
       
       
     </aside>
