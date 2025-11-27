@@ -1,14 +1,14 @@
 [project]
-name = "doreisa"
-version = "0.3.4"
-description = ""
+name = "deisa-ray"
+version = "0.0.1"
+description = "In Situ Analytics with Ray backend"
 authors = [{ name = "Adrien Vannson", email = "adrien.vannson@protonmail.com" }]
 requires-python = ">=3.12"
 readme = "README.md"
 dependencies = [
     "dask[dataframe] (==2024.6.0)",
     "ray[default] (==2.47.1)",
-    "numpy", # TODO this was pinned for PDI, remove the pinning?
+    "numpy"
 ]
 
 [build-system]
