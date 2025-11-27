@@ -2,3 +2,6 @@ output
 .venv
 __pycache__
 *.ipynb
+.direnv/
+shell.nix
+.envrc
