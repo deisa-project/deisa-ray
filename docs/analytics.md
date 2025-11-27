@@ -3,8 +3,8 @@
 ## Simple example
 
 ```python
-from doreisa.head_node import init
-from doreisa.window_api import ArrayDefinition, run_simulation
+from deisa.ray.head_node import init
+from deisa.ray.window_api import ArrayDefinition, run_simulation
 
 init()
 
@@ -21,8 +21,8 @@ run_simulation(
 ## Several arrays
 
 ```python
-from doreisa.head_node import init
-from doreisa.window_api import ArrayDefinition, run_simulation
+from deisa.ray.head_node import init
+from deisa.ray.window_api import ArrayDefinition, run_simulation
 
 init()
 
@@ -40,8 +40,8 @@ run_simulation(
 If the analysis requires access to several iterations (for example, to compute time derivative), it is possible to use the `window_size` parameter.
 
 ```python
-from doreisa.head_node import init
-from doreisa.window_api import ArrayDefinition, run_simulation
+from deisa.ray.head_node import init
+from deisa.ray.window_api import ArrayDefinition, run_simulation
 
 init()
 
@@ -67,8 +67,8 @@ run_simulation(
 Dask's `persist` is supported:
 
 ```python
-from doreisa.head_node import init
-from doreisa.window_api import ArrayDefinition, run_simulation
+from deisa.ray.head_node import init
+from deisa.ray.window_api import ArrayDefinition, run_simulation
 
 init()
 
@@ -93,8 +93,8 @@ run_simulation(
 A preprocessing callback is a function that is applied on each chunk of data. The function is executed locally, on the machine where the data is produced as soon as it is available.
 
 ```python
-from doreisa.head_node import init
-from doreisa.window_api import ArrayDefinition, run_simulation
+from deisa.ray.head_node import init
+from deisa.ray.window_api import ArrayDefinition, run_simulation
 
 init()
 
@@ -116,8 +116,8 @@ This is particularly useful when combined with Dask's persist API: since the pre
 In most situations, this is negligible, but it can start to matter with simulations running on hundreds of nodes, with task graphs composed of thousands of tasks.
 
 ```python
-from doreisa.head_node import init
-from doreisa.window_api import ArrayDefinition, run_simulation
+from deisa.ray.head_node import init
+from deisa.ray.window_api import ArrayDefinition, run_simulation
 
 init()
 

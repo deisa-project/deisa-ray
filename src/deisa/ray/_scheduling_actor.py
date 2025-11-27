@@ -9,8 +9,8 @@ import ray
 import ray.actor
 import ray.util.dask.scheduler
 
-from doreisa import Timestep
-from doreisa._async_dict import AsyncDict
+from deisa.ray import Timestep
+from deisa.ray._async_dict import AsyncDict
 
 
 @dataclass
@@ -144,7 +144,7 @@ class SchedulingActor:
         self.actor_id = actor_id
         self.actor_handle = ray.get_runtime_context().current_actor
 
-        self.head = get_ready_actor_with_retry(name="simulation_head", namespace="doreisa")
+        self.head = get_ready_actor_with_retry(name="simulation_head", namespace="deisa_ray")
         await self.head.register_scheduling_actor.remote(actor_id, self.actor_handle)
         self.scheduling_actors: list[ray.actor.ActorHandle] = []
 

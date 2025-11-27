@@ -13,8 +13,8 @@ NB_ITERATIONS = 100  # Should be enough to saturate the memory in case the chunk
 @ray.remote(max_retries=0)
 def head_script() -> None:
     """The head node checks that the values are correct"""
-    from doreisa.head_node import init
-    from doreisa.window_api import ArrayDefinition, run_simulation
+    from deisa.ray.head_node import init
+    from deisa.ray.window_api import ArrayDefinition, run_simulation
 
     init()
 
@@ -30,7 +30,7 @@ def head_script() -> None:
 
 @pytest.fixture
 def ray_spilling_cluster():
-    spilling_path = f"/tmp/doreisa_spilling_test_{random.randint(0, 2**128 - 1)}"
+    spilling_path = f"/tmp/deisa_ray_spilling_test_{random.randint(0, 2**128 - 1)}"
 
     ray.init(object_store_memory=100 * 1024 * 1024, object_spilling_directory=spilling_path)
     yield spilling_path

@@ -6,9 +6,9 @@ import dask
 import dask.array as da
 import ray
 
-from doreisa._scheduler import doreisa_get
-from doreisa.head_node import ArrayDefinition as HeadArrayDefinition
-from doreisa.head_node import SimulationHead, get_head_actor_options
+from deisa.ray._scheduler import deisa_ray_get
+from deisa.ray.head_node import ArrayDefinition as HeadArrayDefinition
+from deisa.ray.head_node import SimulationHead, get_head_actor_options
 
 
 @dataclass
@@ -31,7 +31,7 @@ def _call_prepare_iteration(prepare_iteration: Callable, array: da.Array, timest
     Returns:
         The result of the prepare_iteration function.
     """
-    dask.config.set(scheduler=doreisa_get, shuffle="tasks")
+    dask.config.set(scheduler=deisa_ray_get, shuffle="tasks")
     return prepare_iteration(array, timestep=timestep)
 
 

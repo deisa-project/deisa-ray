@@ -5,7 +5,7 @@ import numpy as np
 import ray
 import ray.actor
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
-from doreisa._scheduling_actor import SchedulingActor as _RealSchedulingActor
+from deisa.ray._scheduling_actor import SchedulingActor as _RealSchedulingActor
 
 
 class Client:
@@ -37,7 +37,7 @@ class Client:
 
         self.node_id = _node_id or ray.get_runtime_context().get_node_id()
         name = f"sched-{self.node_id}"
-        namespace = "doreisa"
+        namespace = "deisa_ray"
 
         # NOTE: now lifetime is detached, otherwise at the end of the init, it will get killed
         # NOTE: get_if_exists prevents race conditions
@@ -65,7 +65,7 @@ class Client:
                 # first rank to arrive here will try to create scheduling actor. Ray will guarantee
                 # that only one wil be created bc of get_if_exists. No need to use async events
                 # creates actor with:
-                # name: "sched-{node_id}", namespace: "doreisa", node_id: {node_id}
+                # name: "sched-{node_id}", namespace: "deisa_ray", node_id: {node_id}
                 self.scheduling_actor: ray.actor.ActorHandle = scheduling_actor_cls.options(
                     **scheduling_actor_options
                 ).remote(actor_id=self.node_id)  # type: ignore

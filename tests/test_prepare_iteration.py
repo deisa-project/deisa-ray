@@ -9,8 +9,8 @@ NB_ITERATIONS = 100
 @ray.remote(max_retries=0)
 def head_script() -> None:
     """The head node checks that the values are correct"""
-    from doreisa.head_node import init
-    from doreisa.window_api import ArrayDefinition, run_simulation
+    from deisa.ray.head_node import init
+    from deisa.ray.window_api import ArrayDefinition, run_simulation
 
     init()
 

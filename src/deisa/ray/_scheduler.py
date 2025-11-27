@@ -6,7 +6,7 @@ from typing import Callable
 import ray
 from dask.core import get_dependencies
 
-from doreisa._scheduling_actor import ChunkRef, ScheduledByOtherActor
+from deisa.ray._scheduling_actor import ChunkRef, ScheduledByOtherActor
 
 
 def random_partitioning(dsk, scheduling_actors: dict) -> dict[str, int]:
@@ -57,8 +57,8 @@ def greedy_partitioning(dsk, scheduling_actors: dict) -> dict[str, int]:
     return partition
 
 
-def doreisa_get(dsk, keys, **kwargs):
-    debug_logs_path: str | None = kwargs.get("doreisa_debug_logs", None)
+def deisa_ray_get(dsk, keys, **kwargs):
+    debug_logs_path: str | None = kwargs.get("deisa_ray_debug_logs", None)
 
     def log(message: str, debug_logs_path: str | None) -> None:
         if debug_logs_path is not None:
@@ -66,7 +66,7 @@ def doreisa_get(dsk, keys, **kwargs):
                 f.write(f"{time.time()} {message}\n")
 
     partitioning_strategy: Callable = {"random": random_partitioning, "greedy": greedy_partitioning}[
-        kwargs.get("doreisa_partitioning_strategy", "greedy")
+        kwargs.get("deisa_ray_partitioning_strategy", "greedy")
     ]
 
     log("1. Begin Doreisa scheduler", debug_logs_path)
@@ -74,7 +74,7 @@ def doreisa_get(dsk, keys, **kwargs):
     # Sort the graph by keys to make scheduling deterministic
     dsk = {k: v for k, v in sorted(dsk.items())}
 
-    head_node = ray.get_actor("simulation_head", namespace="doreisa")  # noqa: F841
+    head_node = ray.get_actor("simulation_head", namespace="deisa_ray")  # noqa: F841
 
     # TODO this will not work all the time
     assert isinstance(keys, list) and len(keys) == 1

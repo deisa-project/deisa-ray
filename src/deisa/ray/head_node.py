@@ -12,16 +12,16 @@ import ray.actor
 from dask.highlevelgraph import HighLevelGraph
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 
-from doreisa import Timestep
-from doreisa._scheduler import doreisa_get
-from doreisa._scheduling_actor import ChunkRef
+from deisa.ray import Timestep
+from deisa.ray._scheduler import deisa_ray_get
+from deisa.ray._scheduling_actor import ChunkRef
 
 
 def init():
     if not ray.is_initialized():
         ray.init(address="auto", log_to_driver=False, logging_level=logging.ERROR)
 
-    dask.config.set(scheduler=doreisa_get, shuffle="tasks")
+    dask.config.set(scheduler=deisa_ray_get, shuffle="tasks")
 
 
 @dataclass
@@ -179,7 +179,7 @@ def get_head_actor_options() -> dict:
     return dict(
         # The workers will be able to access to this actor using its name
         name="simulation_head",
-        namespace="doreisa",
+        namespace="deisa_ray",
         # Schedule the actor on this node
         scheduling_strategy=NodeAffinitySchedulingStrategy(
             node_id=get_head_node_id(),

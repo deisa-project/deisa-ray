@@ -2,7 +2,7 @@ import pytest
 import ray
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 from tests.stubs import StubSchedulingActor
-from doreisa.simulation_node import Client
+from deisa.ray.simulation_node import Client
 from ray.util.state import list_actors
 import dask.array as da
 from ray.cluster_utils import Cluster
@@ -59,7 +59,7 @@ def test_fake_cluster(ray_multinode_cluster):
     assert set(ids.values()) == live_ids
 
 
-NAMESPACE = "doreisa"
+NAMESPACE = "deisa_ray"
 
 
 def actor_node_id_by_name(name: str, namespace: str = NAMESPACE) -> str:
@@ -84,7 +84,7 @@ def test_actor_placement(ray_multinode_cluster):
     )
     def head_script() -> None:
         """The head node checks that the values are correct"""
-        from doreisa.window_api import ArrayDefinition, run_simulation
+        from deisa.ray.window_api import ArrayDefinition, run_simulation
 
         def simulation_callback(array: da.Array, timestep: int):
             return True
@@ -129,7 +129,7 @@ def test_actor_placement(ray_multinode_cluster):
 #     )
 #     def head_script() -> None:
 #         """The head node checks that the values are correct"""
-#         from doreisa.window_api import ArrayDefinition, run_simulation
+#         from deisa.ray.window_api import ArrayDefinition, run_simulation
 #
 #         time.sleep(sleep_t)
 #

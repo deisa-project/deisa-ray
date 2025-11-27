@@ -10,17 +10,17 @@ NB_ITERATIONS = 10
 @ray.remote(max_retries=0)
 def head_script(partitioning_strategy: str) -> None:
     """The head node checks that the values are correct"""
-    from doreisa.head_node import init
-    from doreisa.window_api import ArrayDefinition, run_simulation
+    from deisa.ray.head_node import init
+    from deisa.ray.window_api import ArrayDefinition, run_simulation
 
     init()
 
     def simulation_callback(array: da.Array, timestep: int):
-        x = array.sum().compute(doreisa_partitioning_strategy=partitioning_strategy)
+        x = array.sum().compute(deisa_ray_partitioning_strategy=partitioning_strategy)
         assert x == 10 * timestep
 
         # Test with a full Dask computation
-        assert da.ones((2, 2), chunks=(1, 1)).sum().compute(doreisa_partitioning_strategy=partitioning_strategy) == 4
+        assert da.ones((2, 2), chunks=(1, 1)).sum().compute(deisa_ray_partitioning_strategy=partitioning_strategy) == 4
 
     run_simulation(
         simulation_callback,

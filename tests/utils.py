@@ -18,7 +18,7 @@ def wait_for_head_node() -> None:
     """Wait until the head node is ready"""
     while True:
         try:
-            a = ray.get_actor("simulation_head", namespace="doreisa")
+            a = ray.get_actor("simulation_head", namespace="deisa_ray")
             ray.get(a.ready.remote())
             return
         except ValueError:
@@ -39,7 +39,7 @@ def simple_worker(
     dtype: np.dtype = np.int32,  # type: ignore
 ) -> None:
     """Worker node sending chunks of data"""
-    from doreisa.simulation_node import Client
+    from deisa.ray.simulation_node import Client
 
     client = Client(_node_id=node_id)
 

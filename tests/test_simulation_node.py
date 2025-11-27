@@ -7,7 +7,7 @@ import pytest
 from ray.util.state import list_actors
 from tests.stubs import StubSchedulingActor
 
-from doreisa.simulation_node import Client
+from deisa.ray.simulation_node import Client
 
 
 def _actor_names_by_prefix(prefix="sched-"):
@@ -16,7 +16,7 @@ def _actor_names_by_prefix(prefix="sched-"):
     for a in actors:
         name = a.get("name")
         ns = a.get("ray_namespace")
-        if name and ns == "doreisa" and name.startswith(prefix):
+        if name and ns == "deisa_ray" and name.startswith(prefix):
             names.append(name)
     return set(names)
 
@@ -31,7 +31,7 @@ def _actor_names_by_prefix(prefix="sched-"):
 )
 def test_stub_actor_basic(ray_cluster, inpt, inpt_doubled):
     a = StubSchedulingActor.options(
-        name="stub-alone", namespace="doreisa", lifetime="detached", get_if_exists=True
+        name="stub-alone", namespace="deisa_ray", lifetime="detached", get_if_exists=True
     ).remote("node-X")
     ref = ray.get(a.preprocessing_callbacks.remote())
     assert isinstance(ref, ray.ObjectRef)
@@ -81,7 +81,7 @@ def test_actor_dies_and_client_recovers(ray_cluster):
     # First client brings up the actor
     Client(_node_id=fake_node_id, scheduling_actor_cls=StubSchedulingActor)
     # Find the actor handle and kill it
-    a = ray.get_actor(f"sched-{fake_node_id}", namespace="doreisa")
+    a = ray.get_actor(f"sched-{fake_node_id}", namespace="deisa_ray")
     ray.kill(a, no_restart=True)
 
     # Now, creating another client should recover (thanks to retry in Client.__init__)
@@ -89,5 +89,5 @@ def test_actor_dies_and_client_recovers(ray_cluster):
     assert isinstance(c2.preprocessing_callbacks, dict)
 
     # Also check that a fresh actor exists with the same name
-    a2 = ray.get_actor(f"sched-{fake_node_id}", namespace="doreisa")
+    a2 = ray.get_actor(f"sched-{fake_node_id}", namespace="deisa_ray")
     assert a2 is not None
