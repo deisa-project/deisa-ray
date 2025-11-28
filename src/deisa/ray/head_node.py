@@ -12,9 +12,6 @@ from deisa.ray import Timestep
 from deisa.ray._scheduler import deisa_ray_get
 from deisa.ray.types import HeadArrayDefinition, DaskArrayData
 
-
-
-
 def init():
     """
     Initialize Ray and configure Dask to use the Deisa-Ray scheduler.
@@ -147,7 +144,7 @@ class SimulationHead:
         array_name: str,
         dtype: np.dtype,
         nb_chunks_per_dim: tuple[int, ...],
-        chunks: list[tuple[tuple[int, ...], tuple[int, ...]]],  # [(chunk position, chunk size), ...]
+        chunks: list[tuple[int,tuple[int, ...], tuple[int, ...]]],  # [(chunk position, chunk size), ...]
     ):
         """
         Register which chunks are owned by a scheduling actor.
@@ -162,7 +159,7 @@ class SimulationHead:
             The numpy dtype of the chunks.
         nb_chunks_per_dim : tuple[int, ...]
             Number of chunks per dimension in the array decomposition.
-        chunks : list[tuple[tuple[int, ...], tuple[int, ...]]]
+        chunks : list[int, tuple[tuple[int, ...], tuple[int, ...]]]
             List of tuples, each containing (chunk_position, chunk_size).
             The chunk_position is a tuple of indices, and chunk_size is a
             tuple of sizes along each dimension.
@@ -175,8 +172,8 @@ class SimulationHead:
         """
         array = self.arrays[array_name]
 
-        for position, size in chunks:
-            array.set_chunk_owner(nb_chunks_per_dim, dtype, position, size, scheduling_actor_id)
+        for bridge_id, position, size in chunks:
+            array.set_chunk_owner(nb_chunks_per_dim, dtype, position, size, scheduling_actor_id, bridge_id)
 
     async def chunks_ready(self, array_name: str, timestep: Timestep, all_chunks_ref: list[ray.ObjectRef]) -> None:
         """

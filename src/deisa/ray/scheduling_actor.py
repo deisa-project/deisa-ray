@@ -3,9 +3,12 @@ import numpy as np
 import ray
 import ray.actor
 from deisa.ray._async_dict import AsyncDict
-from deisa.ray.types import ChunkRef, ScheduledByOtherActor, GraphInfo, ArrayTimestep, Array
+from deisa.ray.types import ChunkRef, ScheduledByOtherActor, GraphInfo, ArrayPerTimestep, Array
 from deisa.ray.utils import get_ready_actor_with_retry
 from deisa.ray.ray_patch import remote_ray_dask_get
+from deisa.ray.errors import ContractError
+from typing import Dict
+
 
 @ray.remote
 class SchedulingActor:
@@ -51,7 +54,7 @@ class SchedulingActor:
     with other actors for distributed execution.
     """
 
-    async def __init__(self, actor_id: int) -> None:
+    async def __init__(self, actor_id: int, arrays_metadata: Dict[str, Dict] = {}) -> None:
         self.actor_id = actor_id
         self.actor_handle = ray.get_runtime_context().current_actor
 
@@ -64,6 +67,29 @@ class SchedulingActor:
 
         # For scheduling
         self.graph_infos: AsyncDict[int, GraphInfo] = AsyncDict()
+        
+    async def register_chunk(self, bridge_id, array_name, chunk_shape, nb_chunks_per_dim, nb_chunks_of_node, dtype, chunk_position):
+        #NOTE: im worried about race conditions here
+        if array_name not in self.arrays:
+            self.arrays[array_name] = Array()
+            self.nb_chunks_of_node = nb_chunks_of_node
+
+        array = self.arrays[array_name]
+
+        array.owned_chunks.add((bridge_id, chunk_position, chunk_shape))
+
+        if len(array.owned_chunks) == nb_chunks_of_node:
+            await self.head.set_owned_chunks.options(enable_task_events=False).remote(
+                    self.actor_id,
+                    array_name,
+                    dtype,
+                    nb_chunks_per_dim,
+                    list(array.owned_chunks),
+                )
+            array.ready_event.set()
+            array.ready_event.clear()
+        else:
+            await array.ready_event.wait()
 
     def preprocessing_callbacks(self) -> ray.ObjectRef:
         """
@@ -133,16 +159,15 @@ class SchedulingActor:
         """
         return refs[0]
 
-    async def add_chunk(
+    async def send(
         self,
+        bridge_id: int,
         array_name: str,
+        chunk_ref: list[ray.ObjectRef],
         timestep: int,
-        chunk_position: tuple[int, ...],
-        dtype: np.dtype,
-        nb_chunks_per_dim: tuple[int, ...],
-        nb_chunks_of_node: int,
-        chunk: list[ray.ObjectRef],
-        chunk_shape: tuple[int, ...],
+        chunked: bool = True,
+        *args,
+        **kwargs
     ) -> None:
         """
         Add a chunk of data to this scheduling actor.
@@ -154,22 +179,7 @@ class SchedulingActor:
 
         Parameters
         ----------
-        array_name : str
-            The name of the array this chunk belongs to.
-        timestep : int
-            The timestep this chunk belongs to.
-        chunk_position : tuple[int, ...]
-            The position of the chunk in the array decomposition.
-        dtype : np.dtype
-            The numpy dtype of the chunk.
-        nb_chunks_per_dim : tuple[int, ...]
-            Number of chunks per dimension in the array decomposition.
-        nb_chunks_of_node : int
-            Total number of chunks sent by the node for this timestep.
-        chunk : list[ray.ObjectRef]
-            List containing a single Ray object reference to the chunk data.
-        chunk_shape : tuple[int, ...]
-            The shape of the chunk along each dimension.
+        # TODO fill up
 
         Notes
         -----
@@ -187,43 +197,29 @@ class SchedulingActor:
         are ready, ensuring proper synchronization.
         """
         if array_name not in self.arrays:
-            self.arrays[array_name] = Array()
+            # respect contract at the beginning
+            raise ContractError(f"User requested to add chunk for {array_name} but this array has"  
+                f"not been described. Please call register_array({array_name}) before calling"
+                "add_chunk().")
         array = self.arrays[array_name]
 
         if timestep not in array.timesteps:
-            array.timesteps[timestep] = ArrayTimestep()
+            array.timesteps[timestep] = ArrayPerTimestep()
+
         array_timestep = array.timesteps[timestep]
+        array_timestep.local_chunks[bridge_id] = self.actor_handle._pack_object_ref.remote(chunk_ref)
 
-        assert chunk_position not in array_timestep.local_chunks
-        array_timestep.local_chunks[chunk_position] = self.actor_handle._pack_object_ref.remote(chunk)
-
-        array.owned_chunks.add((chunk_position, chunk_shape))
-
-        if len(array_timestep.local_chunks) == nb_chunks_of_node:
-            if not array.is_registered:
-                # Register the array with the head node
-                await self.head.set_owned_chunks.options(enable_task_events=False).remote(
-                    self.actor_id,
-                    array_name,
-                    dtype,
-                    nb_chunks_per_dim,
-                    list(array.owned_chunks),
-                )
-                array.is_registered = True
-
+        if len(array_timestep.local_chunks) == self.nb_chunks_of_node:
             chunks = []
-            for position, size in array.owned_chunks:
-                c = array_timestep.local_chunks[position]
-                assert isinstance(c, ray.ObjectRef)
-                chunks.append(c)
-                array_timestep.local_chunks[position] = pickle.dumps(c)
-
+            for bridge_id, ref in array_timestep.local_chunks._data.items():
+                assert isinstance(ref, ray.ObjectRef)
+                chunks.append(ref)
+                array_timestep.local_chunks[bridge_id] = pickle.dumps(ref)
             all_chunks_ref = ray.put(chunks)
 
             await self.head.chunks_ready.options(enable_task_events=False).remote(
                 array_name, timestep, [all_chunks_ref]
             )
-
             array_timestep.chunks_ready_event.set()
             array_timestep.chunks_ready_event.clear()
         else:
@@ -284,9 +280,13 @@ class SchedulingActor:
             if isinstance(val, ChunkRef):
                 assert val.actor_id == self.actor_id
 
+                # TODO: maybe awaiting is not necessary. When would the key not be present in the 
+                # AsyncDict?
                 array = await self.arrays.wait_for_key(val.array_name)
+
                 array_timestep = await array.timesteps.wait_for_key(val.timestep)
-                ref = await array_timestep.local_chunks.wait_for_key(val.position)
+
+                ref = await array_timestep.local_chunks.wait_for_key(val.bridge_id)
 
                 if isinstance(ref, bytes):  # This may not be the case depending on the asyncio scheduling order
                     ref = pickle.loads(ref)

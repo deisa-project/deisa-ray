@@ -10,8 +10,14 @@ import dask.array as da
 from deisa.ray._async_dict import AsyncDict
 
 
+class ArraysMeta:
+    """
+    Describe the metadata of the Arrays being shared
 
-class ArrayTimestep:
+    """
+    # should be used at the beginning of Bridge Init to describe an array.
+
+class ArrayPerTimestep:
     """
     Internal class tracking chunks for a specific array and timestep.
 
@@ -39,7 +45,7 @@ class ArrayTimestep:
         self.chunks_ready_event: asyncio.Event = asyncio.Event()
 
         # {position: chunk}
-        self.local_chunks: AsyncDict[tuple[int, ...], ray.ObjectRef | bytes] = AsyncDict()
+        self.local_chunks: AsyncDict[int, ray.ObjectRef | bytes] = AsyncDict()
 
 
 class Array:
@@ -67,16 +73,17 @@ class Array:
     and chunk ownership. Each array is registered once with the head node
     when the first timestep's chunks are ready.
     """
+    # TODO add types
 
     def __init__(self):
         # Indicates if set_owned_chunks method has been called for this array.
-        self.is_registered = False
+        self.ready_event = asyncio.Event()
 
         # Chunks owned by this actor for this array.
-        # {(chunk position, chunk size), ...}
-        self.owned_chunks: set[tuple[tuple[int, ...], tuple[int, ...]]] = set()
+        # {(bridge_id, chunk position, chunk size), ...}
+        self.owned_chunks: set[tuple[int, tuple[int, ...], tuple[int, ...]]] = set()
 
-        self.timesteps: AsyncDict[Timestep, ArrayTimestep] = AsyncDict()
+        self.timesteps: AsyncDict[Timestep, ArrayPerTimestep] = AsyncDict()
 
 @dataclass
 class ScheduledByOtherActor:
@@ -164,6 +171,7 @@ class ChunkRef:
     array_name: str  # The real name, without the timestep
     timestep: Timestep
     position: tuple[int, ...]
+    bridge_id: int
 
     # Set for one chunk only.
     _all_chunks: ray.ObjectRef | None = None
@@ -287,6 +295,7 @@ class DaskArrayData:
 
         # ID of the scheduling actor in charge of the chunk at each position
         self.scheduling_actors_id: dict[tuple[int, ...], int] = {}
+        self.position_to_bridgeID: dict[tuple, int] = {}
 
         # Number of scheduling actors owning chunks of this array.
         self.nb_scheduling_actors: int | None = None
@@ -306,6 +315,7 @@ class DaskArrayData:
         position: tuple[int, ...],
         size: tuple[int, ...],
         scheduling_actor_id: int,
+        bridge_id: int,
     ) -> None:
         """
         Register a scheduling actor as the owner of a chunk at a specific position.
@@ -349,6 +359,7 @@ class DaskArrayData:
             assert 0 <= pos < nb_chunks
 
         self.scheduling_actors_id[position] = scheduling_actor_id
+        self.position_to_bridgeID[position] = bridge_id
 
         for d in range(len(position)):
             if self.chunks_size[d][position[d]] is None:
@@ -445,6 +456,7 @@ class DaskArrayData:
                 self.definition.name,
                 timestep,
                 position,
+                self.position_to_bridgeID[position],
                 _all_chunks=all_chunks if it == 0 else None,
             )
             for it, (position, actor_id) in enumerate(self.scheduling_actors_id.items())

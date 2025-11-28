@@ -152,6 +152,19 @@ class Bridge:
                     **scheduling_actor_options
                 ).remote(actor_id=self.node_id)  # type: ignore
 
+                for array_name, meta in arrays_metadata.items():
+                    self.scheduling_actor.register_chunk.remote(
+                        bridge_id = self.id,
+                        array_name = array_name,
+                        chunk_shape = meta["chunk_shape"],
+                        nb_chunks_per_dim = meta["nb_chunks_per_dim"] ,
+                        nb_chunks_of_node = meta["nb_chunks_of_node"],
+                        dtype = meta["dtype"],
+                        chunk_position = meta["chunk_position"],
+                    )
+
+                # TODO: hide preprocessing_callbacks
+
                 # "Readiness" gate: first RPC must succeed. This means the scheduling_actor is
                 # created and operational. No need to have a "ready" method.
                 # NOTE: scheduling actor does head.preprocessing_callbacks.remote() which is a ref
@@ -190,10 +203,6 @@ class Bridge:
         chunk: np.ndarray,
         timestep: int,
         chunked: bool = True,
-        # TODO: DELETE LATER
-        chunk_position: tuple[int, ...],
-        nb_chunks_per_dim: tuple[int, ...],
-        nb_chunks_in_node: int,
         store_externally: bool = False,
         **kwargs
     ) -> None:
@@ -245,15 +254,13 @@ class Bridge:
         # Setting the owner allows keeping the reference when the simulation script terminates.
         ref = ray.put(chunk, _owner=self.scheduling_actor)
 
-        future: ray.ObjectRef = self.scheduling_actor.add_chunk.remote(
-            array_name,
-            timestep,
-            chunk_position,
-            chunk.dtype,
-            nb_chunks_per_dim,
-            nb_chunks_in_node,
-            [ref],
-            chunk.shape,
+        future: ray.ObjectRef = self.scheduling_actor.send.remote(
+            bridge_id = self.id,
+            array_name = array_name,
+            chunk_ref =  [ref],
+            timestep = timestep,
+            chunked = True,
+            store_externally=False,
         )  # type: ignore
 
         # Wait until the data is processed before returning to the simulation
