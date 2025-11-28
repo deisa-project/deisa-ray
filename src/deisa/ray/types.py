@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from typing import Callable
-from deisa.ray.scheduling_actor import ChunkRef
 from dask.highlevelgraph import HighLevelGraph
 import math
 import numpy as np
@@ -8,6 +7,166 @@ import asyncio
 import ray
 from deisa.ray import Timestep
 import dask.array as da
+from deisa.ray._async_dict import AsyncDict
+
+
+
+class ArrayTimestep:
+    """
+    Internal class tracking chunks for a specific array and timestep.
+
+    This class manages the collection of chunks for a particular array
+    at a specific timestep within a scheduling actor.
+
+    Attributes
+    ----------
+    chunks_ready_event : asyncio.Event
+        Event that is triggered when all chunks for this timestep are ready.
+    local_chunks : AsyncDict[tuple[int, ...], ray.ObjectRef | bytes]
+        Dictionary mapping chunk positions to their Ray object references
+        or pickled bytes. The chunks are stored as bytes after being sent
+        to the head node to free memory.
+
+    Notes
+    -----
+    This is an internal class used by SchedulingActor to track chunk
+    collection for arrays. Chunks are initially stored as ObjectRefs and
+    later converted to pickled bytes to free memory.
+    """
+
+    def __init__(self):
+        # Triggered when all the chunks are ready
+        self.chunks_ready_event: asyncio.Event = asyncio.Event()
+
+        # {position: chunk}
+        self.local_chunks: AsyncDict[tuple[int, ...], ray.ObjectRef | bytes] = AsyncDict()
+
+
+class Array:
+    """
+    Internal class tracking metadata and chunks for an array.
+
+    This class manages the registration state and chunk ownership information
+    for a specific array within a scheduling actor.
+
+    Attributes
+    ----------
+    is_registered : bool
+        Indicates whether the `set_owned_chunks` method has been called
+        for this array, registering it with the head node.
+    owned_chunks : set[tuple[tuple[int, ...], tuple[int, ...]]]
+        Set of tuples, each containing (chunk_position, chunk_size) for
+        chunks owned by this actor for this array.
+    timesteps : AsyncDict[Timestep, _ArrayTimestep]
+        Dictionary mapping timesteps to their _ArrayTimestep objects,
+        which track the chunks for each timestep.
+
+    Notes
+    -----
+    This is an internal class used by SchedulingActor to track array state
+    and chunk ownership. Each array is registered once with the head node
+    when the first timestep's chunks are ready.
+    """
+
+    def __init__(self):
+        # Indicates if set_owned_chunks method has been called for this array.
+        self.is_registered = False
+
+        # Chunks owned by this actor for this array.
+        # {(chunk position, chunk size), ...}
+        self.owned_chunks: set[tuple[tuple[int, ...], tuple[int, ...]]] = set()
+
+        self.timesteps: AsyncDict[Timestep, ArrayTimestep] = AsyncDict()
+
+@dataclass
+class ScheduledByOtherActor:
+    """
+    Represents a task that is scheduled by another actor.
+
+    This class is used as a placeholder in Dask task graphs to indicate
+    that a task should be scheduled by a different actor. When a task graph
+    is sent to an actor, tasks marked with this class will be delegated to
+    the specified actor.
+
+    Parameters
+    ----------
+    actor_id : int
+        The ID of the scheduling actor that should schedule this task.
+
+    Notes
+    -----
+    This is used to handle cross-actor task dependencies in distributed
+    Dask computations where different parts of the task graph are handled
+    by different scheduling actors.
+    """
+
+    actor_id: int
+
+class GraphInfo:
+    """
+    Information about graphs and their scheduling.
+
+    This class tracks the state and results of a Dask task graph that is
+    being scheduled by a scheduling actor.
+
+    Attributes
+    ----------
+    scheduled_event : asyncio.Event
+        Event that is set when the graph has been scheduled and all tasks
+        have been submitted.
+    refs : dict[str, ray.ObjectRef]
+        Dictionary mapping task keys to their Ray object references. These
+        references point to the results of the scheduled tasks.
+
+    Notes
+    -----
+    This class is used internally by SchedulingActor to track the progress
+    of graph scheduling and store the resulting object references for later
+    retrieval.
+    """
+
+    def __init__(self):
+        self.scheduled_event = asyncio.Event()
+        self.refs: dict[str, ray.ObjectRef] = {}
+
+@dataclass
+class ChunkRef:
+    """
+    Represents a chunk of an array in a Dask task graph.
+
+    This class is used as a placeholder in Dask task graphs to represent a
+    chunk of data. The task corresponding to this object must be scheduled
+    by the actor who has the actual data. This class is used since Dask
+    tends to inline simple tuples, which would prevent proper scheduling.
+
+    Parameters
+    ----------
+    actor_id : int
+        The ID of the scheduling actor that owns this chunk.
+    array_name : str
+        The real name of the array, without the timestep suffix.
+    timestep : Timestep
+        The timestep this chunk belongs to.
+    position : tuple[int, ...]
+        The position of the chunk in the array decomposition.
+    _all_chunks : ray.ObjectRef or None, optional
+        ObjectRef containing all chunks for this timestep. Set for one chunk
+        only to avoid duplication. Default is None.
+
+    Notes
+    -----
+    This class is used to prevent Dask from inlining simple tuples in the
+    task graph, which would break the scheduling mechanism. The behavior
+    may change in newer versions of Dask.
+    """
+
+    actor_id: int
+    array_name: str  # The real name, without the timestep
+    timestep: Timestep
+    position: tuple[int, ...]
+
+    # Set for one chunk only.
+    _all_chunks: ray.ObjectRef | None = None
 
 @dataclass
 class WindowArrayDefinition:

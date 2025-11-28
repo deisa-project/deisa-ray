@@ -2,12 +2,9 @@ import random
 import time
 from collections import Counter
 from typing import Callable
-
 import ray
 from dask.core import get_dependencies
-
 from deisa.ray.scheduling_actor import ChunkRef, ScheduledByOtherActor
-
 
 def random_partitioning(dsk, scheduling_actors: dict) -> dict[str, int]:
     """

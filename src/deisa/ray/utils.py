@@ -1,8 +1,62 @@
 from typing import Dict
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
+import time
+import ray
+import random
 
 def get_system_metadata()-> Dict: 
     return {}
+
+def get_ready_actor_with_retry(name, namespace, deadline_s=180):
+    """
+    Get a Ray actor by name with retry logic and readiness check.
+
+    This function attempts to retrieve a Ray actor by name and namespace,
+    checking that it is ready before returning. It implements exponential
+    backoff retry logic with a deadline.
+
+    Parameters
+    ----------
+    name : str
+        The name of the actor to retrieve.
+    namespace : str
+        The namespace of the actor.
+    deadline_s : float, optional
+        Maximum time in seconds to wait for the actor to become available.
+        Default is 180.
+
+    Returns
+    -------
+    ray.actor.ActorHandle
+        The handle to the ready actor.
+
+    Raises
+    ------
+    TimeoutError
+        If the actor is not found or not ready within the deadline.
+
+    Notes
+    -----
+    The function uses exponential backoff with jitter for retries. The delay
+    starts at 0.2 seconds and increases by a factor of 1.5 up to a maximum
+    of 5.0 seconds. A small random jitter (0-0.1 seconds) is added to avoid
+    thundering herd problems.
+    """
+    start, delay = time.time(), 0.2
+    while True:
+        try:
+            actor = ray.get_actor(name=name, namespace=namespace)
+            # ready gate
+            # TODO for even more reliability, in the future we should handle
+            # actor exists, but unavailable
+            # actor exists, crashed, need to recreate
+            ray.get(actor.ready.remote())
+            return actor
+        except ValueError:
+            if time.time() - start > deadline_s:
+                raise TimeoutError(f"{namespace}/{name} not found in {deadline_s}s")
+            time.sleep(delay + random.random() * 0.1)
+            delay = min(delay * 1.5, 5.0)
 
 def get_head_node_id() -> str:
     """
