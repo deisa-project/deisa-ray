@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from typing import Callable
-from deisa.ray._scheduling_actor import ChunkRef
+from deisa.ray.scheduling_actor import ChunkRef
 from dask.highlevelgraph import HighLevelGraph
 import math
 import numpy as np
