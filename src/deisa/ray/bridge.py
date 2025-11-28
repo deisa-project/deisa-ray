@@ -1,11 +1,11 @@
 import logging
-from typing import Callable, Type, Dict
+from typing import Callable, Type, Dict, Any
 
 import numpy as np
 import ray
 import ray.actor
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
-from deisa.ray._scheduling_actor import SchedulingActor as _RealSchedulingActor
+from deisa.ray.scheduling_actor import SchedulingActor as _RealSchedulingActor
 
 
 
@@ -108,9 +108,12 @@ class Bridge:
         node affinity scheduling when `_node_id` is None. The first remote call
         to the scheduling actor serves as a readiness check.
         """
+        self.id = id
+        self.arrays_metadata = arrays_metadata
+        self.system_metadata = system_metadata
+
         # check if ray.init has already been called.
         # Needed when starting ray cluster from python (mainly testing)
-
         if not ray.is_initialized():
             ray.init(address="auto", log_to_driver=False, logging_level=logging.ERROR)
 
@@ -180,15 +183,19 @@ class Bridge:
             # keep original error
             raise RuntimeError(f"Failed to create/ready scheduling actor for node {self.node_id}") from last_err
 
-    def add_chunk(
+    def send(
         self,
+        *args,
         array_name: str,
+        chunk: np.ndarray,
+        timestep: int,
+        chunked: bool = True,
+        # TODO: DELETE LATER
         chunk_position: tuple[int, ...],
         nb_chunks_per_dim: tuple[int, ...],
         nb_chunks_in_node: int,
-        timestep: int,
-        chunk: np.ndarray,
         store_externally: bool = False,
+        **kwargs
     ) -> None:
         """
         Make a chunk of data available to the analytic.
@@ -231,6 +238,8 @@ class Bridge:
             If `array_name` is not found in the preprocessing callbacks
             dictionary.
         """
+        if chunked:
+            pass
         chunk = self.preprocessing_callbacks[array_name](chunk)
 
         # Setting the owner allows keeping the reference when the simulation script terminates.
@@ -249,3 +258,53 @@ class Bridge:
 
         # Wait until the data is processed before returning to the simulation
         ray.get(future)
+    def get(*args, name: str, default : Any = None, chunked: bool = False, **kwargs)-> Any | None:
+        """
+        Retrieve information back from Analytics. 
+
+        Used for two cases: 
+        1) Retrieve a simple value that is set in the Analytics so that the simulation can react 
+        to some event that has been detected. This case is asynchronous.
+        2) Retrieve the same distributed array that has been modified somehow by the Analytics. 
+        This case is synchronous. 
+
+        Parameters
+        ----------
+        name : str
+            The name of the key that is being retrieved from the Analytics.
+        default : Any
+            The default value to return if the key has not been set or does not exist.
+        chunked : bool
+            Whether the value that is returned is distributed or not. Should be set to True, only if 
+            retrieving a distributed array that is handled by the Bridge.
+
+        Notes
+        -----
+        TODO: Fill notes
+        """
+        pass
+
+    def _delete(*args, name: str, **kwargs):
+        """
+        Delete a key from the information shared by Analytics. 
+
+        Should be called immediately after something has been shared. This is done so that the user 
+        is in charge of handling events and the simulation does not keep detecting the same 
+        event.
+
+        Parameters
+        ----------
+        name : str
+            The name of the key that is being retrieved from the Analytics.
+
+        Notes
+        -----
+        TODO: Should we make this private or allow user to handle it? For now, we decided that 
+        we will call it ourselves after every get, so error should never be raised.
+
+        Raises
+        ------
+        KeyError
+            If `name` does not exist among the keys that have been shared by analytics.
+        """
+        pass
