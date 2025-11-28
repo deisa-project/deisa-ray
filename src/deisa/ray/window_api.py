@@ -1,5 +1,4 @@
 import gc
-from dataclasses import dataclass
 from typing import Any, Callable
 
 import dask
@@ -7,43 +6,9 @@ import dask.array as da
 import ray
 
 from deisa.ray._scheduler import deisa_ray_get
-from deisa.ray.head_node import ArrayDefinition as HeadArrayDefinition
-from deisa.ray.head_node import SimulationHead, get_head_actor_options
-
-
-@dataclass
-class ArrayDefinition:
-    """
-    Description of an array with optional windowing support.
-
-    Parameters
-    ----------
-    name : str
-        The name of the array.
-    window_size : int or None, optional
-        If specified, creates a sliding window of arrays for this array name.
-        The window will contain the last `window_size` timesteps. If None,
-        only the current timestep array is provided. Default is None.
-    preprocess : Callable, optional
-        A preprocessing function to apply to chunks of this array before
-        they are sent to the analytics. The function should take a numpy
-        array and return a processed numpy array. Default is the identity
-        function (no preprocessing).
-
-    Examples
-    --------
-    >>> def normalize(arr):
-    ...     return arr / arr.max()
-    >>> # Array with windowing: last 5 timesteps
-    >>> array_def = ArrayDefinition(name="temperature", window_size=5, preprocess=normalize)
-    >>> # Array without windowing: current timestep only
-    >>> array_def = ArrayDefinition(name="pressure", window_size=None)
-    """
-
-    name: str
-    window_size: int | None = None
-    preprocess: Callable = lambda x: x
-
+from deisa.ray.head_node import SimulationHead
+from deisa.ray.utils import get_head_actor_options
+from deisa.ray.types import WindowArrayDefinition, HeadArrayDefinition
 
 @ray.remote(num_cpus=0, max_retries=0)
 def _call_prepare_iteration(prepare_iteration: Callable, array: da.Array, timestep: int):
@@ -81,7 +46,7 @@ def _call_prepare_iteration(prepare_iteration: Callable, array: da.Array, timest
 
 def run_simulation(
     simulation_callback: Callable,
-    arrays_description: list[ArrayDefinition],
+    arrays_description: list[WindowArrayDefinition],
     *,
     max_iterations=1000_000_000,
     prepare_iteration: Callable | None = None,
@@ -103,7 +68,7 @@ def run_simulation(
         arguments for each array (by name) and a `timestep` argument. If
         `prepare_iteration` is provided, it will also receive a
         `preparation_result` argument.
-    arrays_description : list[ArrayDefinition]
+    arrays_description : list[WindowArrayDefinition]
         List of array definitions describing the arrays to be processed. Each
         definition can specify a window size for sliding window access.
     max_iterations : int, optional
@@ -145,8 +110,8 @@ def run_simulation(
     ...     return result
     >>>
     >>> arrays = [
-    ...     ArrayDefinition(name="temperature", window_size=5),  # Last 5 timesteps
-    ...     ArrayDefinition(name="pressure"),  # Current timestep only
+    ...     WindowArrayDefinition(name="temperature", window_size=5),  # Last 5 timesteps
+    ...     WindowArrayDefinition(name="pressure"),  # Current timestep only
     ... ]
     >>> run_simulation(process_data, arrays, max_iterations=100)
     """

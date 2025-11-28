@@ -84,14 +84,15 @@ def test_actor_placement(ray_multinode_cluster):
     )
     def head_script() -> None:
         """The head node checks that the values are correct"""
-        from deisa.ray.window_api import ArrayDefinition, run_simulation
+        from deisa.ray.window_api import run_simulation
+        from deisa.ray.types import WindowArrayDefinition
 
         def simulation_callback(array: da.Array, timestep: int):
             return True
 
         run_simulation(
             simulation_callback,
-            [ArrayDefinition("array")],
+            [WindowArrayDefinition("array")],
             max_iterations=0,
         )
 
@@ -110,7 +111,11 @@ def test_actor_placement(ray_multinode_cluster):
         scheduling_strategy=NodeAffinitySchedulingStrategy(node_id=worker_node_id, soft=False),
     )
     def make_client_and_return_ids():
-        c = Bridge(_node_id=None, scheduling_actor_cls=StubSchedulingActor)  # type:ignore
+
+        from deisa.ray.utils import get_system_metadata
+        sys_md = get_system_metadata()
+        c = Bridge(id = 0, arrays_metadata= {}, system_metadata= sys_md, _node_id=None, scheduling_actor_cls=StubSchedulingActor)  # type:ignore
+
         return (c.node_id, f"sched-{c.node_id}")
 
     client_node_id, sched_name = ray.get(make_client_and_return_ids.remote())

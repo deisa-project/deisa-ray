@@ -11,7 +11,8 @@ NB_ITERATIONS = 10
 def head_script(partitioning_strategy: str) -> None:
     """The head node checks that the values are correct"""
     from deisa.ray.head_node import init
-    from deisa.ray.window_api import ArrayDefinition, run_simulation
+    from deisa.ray.window_api import run_simulation
+    from deisa.ray.types import WindowArrayDefinition
 
     init()
 
@@ -24,7 +25,7 @@ def head_script(partitioning_strategy: str) -> None:
 
     run_simulation(
         simulation_callback,
-        [ArrayDefinition("array")],
+        [WindowArrayDefinition("array")],
         max_iterations=NB_ITERATIONS,
     )
 

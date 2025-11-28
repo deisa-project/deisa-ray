@@ -5,12 +5,12 @@ from tests.utils import ray_cluster, simple_worker, wait_for_head_node  # noqa: 
 
 NB_ITERATIONS = 100
 
-
 @ray.remote(max_retries=0)
 def head_script() -> None:
     """The head node checks that the values are correct"""
     from deisa.ray.head_node import init
-    from deisa.ray.window_api import ArrayDefinition, run_simulation
+    from deisa.ray.window_api import run_simulation
+    from deisa.ray.types import WindowArrayDefinition
 
     init()
 
@@ -28,7 +28,7 @@ def head_script() -> None:
 
     run_simulation(
         simulation_callback,
-        [ArrayDefinition("array")],
+        [WindowArrayDefinition("array")],
         max_iterations=NB_ITERATIONS,
         prepare_iteration=prepare_iteration,
         preparation_advance=10,

@@ -10,7 +10,8 @@ NB_ITERATIONS = 10
 def head() -> None:
     """The head node checks that the values are correct"""
     from deisa.ray.head_node import init
-    from deisa.ray.window_api import ArrayDefinition, run_simulation
+    from deisa.ray.window_api import run_simulation
+    from deisa.ray.types import WindowArrayDefinition
 
     init()
 
@@ -33,8 +34,8 @@ def head() -> None:
     run_simulation(
         simulation_callback,
         [
-            ArrayDefinition("a", window_size=2),
-            ArrayDefinition("b", window_size=1, preprocess=lambda x: 2 * x),
+            WindowArrayDefinition("a", window_size=2),
+            WindowArrayDefinition("b", window_size=1, preprocess=lambda x: 2 * x),
         ],
         max_iterations=NB_ITERATIONS,
     )

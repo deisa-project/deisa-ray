@@ -40,8 +40,10 @@ def simple_worker(
 ) -> None:
     """Worker node sending chunks of data"""
     from deisa.ray.bridge import Bridge
+    from deisa.ray.utils import get_system_metadata
+    sys_md = get_system_metadata()
 
-    client = Bridge(_node_id=node_id)
+    client = Bridge(id = rank, arrays_metadata={}, system_metadata=sys_md, _node_id=node_id)
 
     array = (rank + 1) * np.ones(chunk_size, dtype=dtype)
 

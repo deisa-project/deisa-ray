@@ -1,11 +1,12 @@
 import logging
-from typing import Callable, Type
+from typing import Callable, Type, Dict
 
 import numpy as np
 import ray
 import ray.actor
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 from deisa.ray._scheduling_actor import SchedulingActor as _RealSchedulingActor
+
 
 
 class Bridge:
@@ -60,16 +61,29 @@ class Bridge:
 
     def __init__(
         self,
-        *,
+        id: int,
+        arrays_metadata: Dict[str, Dict],
+        system_metadata: Dict,
+        *args,
         _node_id: str | None = None,
         scheduling_actor_cls: Type = _RealSchedulingActor,
         _init_retries: int = 3,
+        **kwargs
     ) -> None:
         """
         Initialize the Bridge to connect MPI rank to Ray cluster.
 
         Parameters
         ----------
+        id : int
+            Unique identifier of this Bridge. 
+        arrays_metadata : Dict[str, Dict]
+            Dictionary that describes the arrays being shared by the simulation. Keys represent the 
+            name of the array while the values are dictionaries that must at least declare the 
+            global size of that array.
+        system_metadata : Dict 
+            System metadata such as address of Ray cluster, number of MPI ranks, and other general 
+            information that describes the system.
         _node_id : str or None, optional
             The ID of the node. If None, the ID is taken from the Ray runtime
             context. Useful for testing with several scheduling actors on a
