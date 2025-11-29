@@ -12,24 +12,6 @@ from deisa.ray import Timestep
 from deisa.ray._scheduler import deisa_ray_get
 from deisa.ray.types import HeadArrayDefinition, DaskArrayData
 
-def init():
-    """
-    Initialize Ray and configure Dask to use the Deisa-Ray scheduler.
-
-    This function initializes Ray if it hasn't been initialized yet, and
-    configures Dask to use the Deisa-Ray custom scheduler with task-based
-    shuffling.
-
-    Notes
-    -----
-    Ray is initialized with automatic address detection, logging to driver
-    disabled, and error-level logging. Dask is configured to use the
-    `deisa_ray_get` scheduler with task-based shuffling.
-    """
-    if not ray.is_initialized():
-        ray.init(address="auto", log_to_driver=False, logging_level=logging.ERROR)
-
-    dask.config.set(scheduler=deisa_ray_get, shuffle="tasks")
 
 @ray.remote
 class SimulationHead:
