@@ -44,148 +44,171 @@ def _call_prepare_iteration(prepare_iteration: Callable, array: da.Array, timest
     return prepare_iteration(array, timestep=timestep)
 
 
-def run_simulation(
-    simulation_callback: Callable,
-    arrays_description: list[WindowArrayDefinition],
-    *,
-    max_iterations=1000_000_000,
-    prepare_iteration: Callable | None = None,
-    preparation_advance: int = 3,
-) -> None:
-    """
-    Run a simulation that processes arrays from the Ray cluster with optional windowing.
+class Deisa:
 
-    This function coordinates the execution of a simulation callback that processes
-    arrays received from the Ray cluster. It supports sliding windows for arrays,
-    allowing the callback to access arrays from multiple timesteps. The function
-    manages array collection, windowing, memory cleanup, and optional preparation
-    callbacks.
+    def __init__(self,
+                 ):
+        """
+        Initialize Ray and configure Dask to use the Deisa-Ray scheduler.
 
-    Parameters
-    ----------
-    simulation_callback : Callable
-        The main simulation callback function. It will be called with keyword
-        arguments for each array (by name) and a `timestep` argument. If
-        `prepare_iteration` is provided, it will also receive a
-        `preparation_result` argument.
-    arrays_description : list[WindowArrayDefinition]
-        List of array definitions describing the arrays to be processed. Each
-        definition can specify a window size for sliding window access.
-    max_iterations : int, optional
-        Maximum number of iterations to run. Default is 1_000_000_000.
-    prepare_iteration : Callable or None, optional
-        Optional callback function that is called in advance for each timestep
-        to prepare data. The function receives a Dask array and timestep. The
-        result is passed to the simulation_callback as `preparation_result`.
-        Default is None.
-    preparation_advance : int, optional
-        Number of timesteps ahead to prepare. The prepare_iteration callback
-        will be called this many timesteps in advance. Default is 3.
+        This function initializes Ray if it hasn't been initialized yet, and
+        configures Dask to use the Deisa-Ray custom scheduler with task-based
+        shuffling.
 
-    Notes
-    -----
-    The function performs the following operations for each iteration:
+        Notes
+        -----
+        Ray is initialized with automatic address detection, logging to driver
+        disabled, and error-level logging. Dask is configured to use the
+        `deisa_ray_get` scheduler with task-based shuffling.
+        """
+        if not ray.is_initialized():
+            ray.init(address="auto", log_to_driver=False, logging_level=logging.ERROR)
 
-    1. Collects arrays from the head node until all required arrays for the
-       current iteration are available.
-    2. Constructs the arrays dictionary, applying windowing for arrays with
-       `window_size` specified.
-    3. Calls the simulation_callback with the arrays and timestep.
-    4. Cleans up old arrays that are no longer needed for the window.
-    5. Triggers garbage collection to free memory.
+        dask.config.set(scheduler=deisa_ray_get, shuffle="tasks")
 
-    For arrays with `window_size` set to `n`, the callback receives a list
-    of arrays containing the last `n` timesteps. For arrays without windowing,
-    the callback receives a single array for the current timestep.
-
-    The function manages memory by deleting arrays that are outside the window
-    and explicitly calling garbage collection to ensure Ray object references
-    are released promptly.
-
-    Examples
-    --------
-    >>> def process_data(temperature, pressure, timestep):
-    ...     # Process arrays for current timestep
-    ...     result = temperature + pressure
-    ...     return result
-    >>>
-    >>> arrays = [
-    ...     WindowArrayDefinition(name="temperature", window_size=5),  # Last 5 timesteps
-    ...     WindowArrayDefinition(name="pressure"),  # Current timestep only
-    ... ]
-    >>> run_simulation(process_data, arrays, max_iterations=100)
-    """
-    # Convert the definitions to the type expected by the head node
-    head_arrays_description = [
-        HeadArrayDefinition(name=definition.name, preprocess=definition.preprocess) for definition in arrays_description
-    ]
-
-    # Limit the advance the simulation can have over the analytics
-    max_pending_arrays = 2 * len(arrays_description)
-
-    head: Any = SimulationHead.options(**get_head_actor_options()).remote(head_arrays_description, max_pending_arrays)
-
-    arrays_by_iteration: dict[int, dict[str, da.Array]] = {}
-
-    if prepare_iteration is not None:
-        preparation_results: dict[int, ray.ObjectRef] = {}
-
-        for timestep in range(min(preparation_advance, max_iterations)):
-            # Get the next array from the head node
-            array: da.Array = ray.get(head.get_preparation_array.remote(arrays_description[0].name, timestep))
-            preparation_results[timestep] = _call_prepare_iteration.remote(prepare_iteration, array, timestep)
-
-    for iteration in range(max_iterations):
-        # Start preparing in advance
-        if iteration + preparation_advance < max_iterations and prepare_iteration is not None:
-            array = head.get_preparation_array.remote(arrays_description[0].name, iteration + preparation_advance)
-            preparation_results[iteration + preparation_advance] = _call_prepare_iteration.remote(
-                prepare_iteration, array, iteration + preparation_advance
-            )
-
-        # Get new arrays
-        while len(arrays_by_iteration.get(iteration, {})) < len(arrays_description):
-            name: str
-            timestep: int
-            array: da.Array
-            name, timestep, array = ray.get(head.get_next_array.remote())
-
-            if timestep not in arrays_by_iteration:
-                arrays_by_iteration[timestep] = {}
-
-            assert name not in arrays_by_iteration[timestep]
-            arrays_by_iteration[timestep][name] = array
-
-        # Compute the arrays to pass to the callback
-        all_arrays: dict[str, da.Array | list[da.Array]] = {}
-
-        for description in arrays_description:
-            if description.window_size is None:
-                all_arrays[description.name] = arrays_by_iteration[iteration][description.name]
-            else:
-                all_arrays[description.name] = [
-                    arrays_by_iteration[timestep][description.name]
-                    for timestep in range(max(iteration - description.window_size + 1, 0), iteration + 1)
-                ]
-
+    def register_callback(
+        self,
+        simulation_callback: Callable,
+        arrays_description: list[WindowArrayDefinition],
+        *,
+        max_iterations=1000_000_000,
+        prepare_iteration: Callable | None = None,
+        preparation_advance: int = 3,
+    ) -> None:
+        """
+        Run a simulation that processes arrays from the Ray cluster with optional windowing.
+    
+        This function coordinates the execution of a simulation callback that processes
+        arrays received from the Ray cluster. It supports sliding windows for arrays,
+        allowing the callback to access arrays from multiple timesteps. The function
+        manages array collection, windowing, memory cleanup, and optional preparation
+        callbacks.
+    
+        Parameters
+        ----------
+        simulation_callback : Callable
+            The main simulation callback function. It will be called with keyword
+            arguments for each array (by name) and a `timestep` argument. If
+            `prepare_iteration` is provided, it will also receive a
+            `preparation_result` argument.
+        arrays_description : list[WindowArrayDefinition]
+            List of array definitions describing the arrays to be processed. Each
+            definition can specify a window size for sliding window access.
+        max_iterations : int, optional
+            Maximum number of iterations to run. Default is 1_000_000_000.
+        prepare_iteration : Callable or None, optional
+            Optional callback function that is called in advance for each timestep
+            to prepare data. The function receives a Dask array and timestep. The
+            result is passed to the simulation_callback as `preparation_result`.
+            Default is None.
+        preparation_advance : int, optional
+            Number of timesteps ahead to prepare. The prepare_iteration callback
+            will be called this many timesteps in advance. Default is 3.
+    
+        Notes
+        -----
+        The function performs the following operations for each iteration:
+    
+        1. Collects arrays from the head node until all required arrays for the
+           current iteration are available.
+        2. Constructs the arrays dictionary, applying windowing for arrays with
+           `window_size` specified.
+        3. Calls the simulation_callback with the arrays and timestep.
+        4. Cleans up old arrays that are no longer needed for the window.
+        5. Triggers garbage collection to free memory.
+    
+        For arrays with `window_size` set to `n`, the callback receives a list
+        of arrays containing the last `n` timesteps. For arrays without windowing,
+        the callback receives a single array for the current timestep.
+    
+        The function manages memory by deleting arrays that are outside the window
+        and explicitly calling garbage collection to ensure Ray object references
+        are released promptly.
+    
+        Examples
+        --------
+        >>> def process_data(temperature, pressure, timestep):
+        ...     # Process arrays for current timestep
+        ...     result = temperature + pressure
+        ...     return result
+        >>>
+        >>> arrays = [
+        ...     WindowArrayDefinition(name="temperature", window_size=5),  # Last 5 timesteps
+        ...     WindowArrayDefinition(name="pressure"),  # Current timestep only
+        ... ]
+        >>> run_simulation(process_data, arrays, max_iterations=100)
+        """
+        # Convert the definitions to the type expected by the head node
+        head_arrays_description = [
+            HeadArrayDefinition(name=definition.name, preprocess=definition.preprocess) for definition in arrays_description
+        ]
+    
+        # Limit the advance the simulation can have over the analytics
+        max_pending_arrays = 2 * len(arrays_description)
+    
+        head: Any = SimulationHead.options(**get_head_actor_options()).remote(head_arrays_description, max_pending_arrays)
+    
+        arrays_by_iteration: dict[int, dict[str, da.Array]] = {}
+    
         if prepare_iteration is not None:
-            preparation_result = ray.get(preparation_results[iteration])
-            simulation_callback(**all_arrays, timestep=timestep, preparation_result=preparation_result)
-        else:
-            simulation_callback(**all_arrays, timestep=timestep)
-
-        del all_arrays
-
-        # Remove the oldest arrays
-        for description in arrays_description:
-            older_timestep = iteration - (description.window_size or 1) + 1
-            if older_timestep >= 0:
-                del arrays_by_iteration[older_timestep][description.name]
-
-                if not arrays_by_iteration[older_timestep]:
-                    del arrays_by_iteration[older_timestep]
-
-        # Free the memory used by the arrays now. Since an ObjectRef is a small object,
-        # Python may otherwise choose to keep it in memory for some time, preventing the
-        # actual data to be freed.
-        gc.collect()
+            preparation_results: dict[int, ray.ObjectRef] = {}
+    
+            for timestep in range(min(preparation_advance, max_iterations)):
+                # Get the next array from the head node
+                array: da.Array = ray.get(head.get_preparation_array.remote(arrays_description[0].name, timestep))
+                preparation_results[timestep] = _call_prepare_iteration.remote(prepare_iteration, array, timestep)
+    
+        for iteration in range(max_iterations):
+            # Start preparing in advance
+            if iteration + preparation_advance < max_iterations and prepare_iteration is not None:
+                array = head.get_preparation_array.remote(arrays_description[0].name, iteration + preparation_advance)
+                preparation_results[iteration + preparation_advance] = _call_prepare_iteration.remote(
+                    prepare_iteration, array, iteration + preparation_advance
+                )
+    
+            # Get new arrays
+            while len(arrays_by_iteration.get(iteration, {})) < len(arrays_description):
+                name: str
+                timestep: int
+                array: da.Array
+                name, timestep, array = ray.get(head.get_next_array.remote())
+    
+                if timestep not in arrays_by_iteration:
+                    arrays_by_iteration[timestep] = {}
+    
+                assert name not in arrays_by_iteration[timestep]
+                arrays_by_iteration[timestep][name] = array
+    
+            # Compute the arrays to pass to the callback
+            all_arrays: dict[str, da.Array | list[da.Array]] = {}
+    
+            for description in arrays_description:
+                if description.window_size is None:
+                    all_arrays[description.name] = arrays_by_iteration[iteration][description.name]
+                else:
+                    all_arrays[description.name] = [
+                        arrays_by_iteration[timestep][description.name]
+                        for timestep in range(max(iteration - description.window_size + 1, 0), iteration + 1)
+                    ]
+    
+            if prepare_iteration is not None:
+                preparation_result = ray.get(preparation_results[iteration])
+                simulation_callback(**all_arrays, timestep=timestep, preparation_result=preparation_result)
+            else:
+                simulation_callback(**all_arrays, timestep=timestep)
+    
+            del all_arrays
+    
+            # Remove the oldest arrays
+            for description in arrays_description:
+                older_timestep = iteration - (description.window_size or 1) + 1
+                if older_timestep >= 0:
+                    del arrays_by_iteration[older_timestep][description.name]
+    
+                    if not arrays_by_iteration[older_timestep]:
+                        del arrays_by_iteration[older_timestep]
+    
+            # Free the memory used by the arrays now. Since an ObjectRef is a small object,
+            # Python may otherwise choose to keep it in memory for some time, preventing the
+            # actual data to be freed.
+            gc.collect()

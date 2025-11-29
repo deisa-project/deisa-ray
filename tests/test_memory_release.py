@@ -14,15 +14,15 @@ NB_ITERATIONS = 100  # Should be enough to saturate the memory in case the chunk
 def head_script() -> None:
     """The head node checks that the values are correct"""
     from deisa.ray.head_node import init
-    from deisa.ray.window_api import run_simulation
+    from deisa.ray.window_api import Deisa
     from deisa.ray.types import WindowArrayDefinition
 
-    init()
+    deisa = Deisa()
 
     def simulation_callback(array: da.Array, timestep: int):
         pass
 
-    run_simulation(
+    deisa.register_callback(
         simulation_callback,
         [WindowArrayDefinition("array")],
         max_iterations=NB_ITERATIONS,

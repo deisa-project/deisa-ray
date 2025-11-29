@@ -84,13 +84,15 @@ def test_actor_placement(ray_multinode_cluster):
     )
     def head_script() -> None:
         """The head node checks that the values are correct"""
-        from deisa.ray.window_api import run_simulation
+        from deisa.ray.window_api import Deisa
         from deisa.ray.types import WindowArrayDefinition
+
+        deisa = Deisa()
 
         def simulation_callback(array: da.Array, timestep: int):
             return True
 
-        run_simulation(
+        deisa.register_callback(
             simulation_callback,
             [WindowArrayDefinition("array")],
             max_iterations=0,

@@ -10,10 +10,10 @@ NB_ITERATIONS = 10
 def head() -> None:
     """The head node checks that the values are correct"""
     from deisa.ray.head_node import init
-    from deisa.ray.window_api import run_simulation
+    from deisa.ray.window_api import Deisa
     from deisa.ray.types import WindowArrayDefinition
 
-    init()
+    deisa = Deisa()
 
     def simulation_callback(array: list[da.Array], timestep: int):
         if timestep == 0:
@@ -27,7 +27,7 @@ def head() -> None:
         # This checks that they are defined with different names.
         assert (array[1] - array[0]).sum().compute() == 10
 
-    run_simulation(
+    deisa.register_callback(
         simulation_callback,
         [
             WindowArrayDefinition("array", window_size=2),

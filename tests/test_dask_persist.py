@@ -8,10 +8,10 @@ NB_ITERATIONS = 10
 def head_script() -> None:
     """The head node checks that the values are correct"""
     from deisa.ray.head_node import init
-    from deisa.ray.window_api import run_simulation
+    from deisa.ray.window_api import Deisa
     from deisa.ray.types import WindowArrayDefinition
 
-    init()
+    deisa = Deisa()
 
     def simulation_callback(array: da.Array, timestep: int):
         # This is the standard dask task graph
@@ -28,7 +28,7 @@ def head_script() -> None:
         x_final = x.compute()
         assert x_final == 10 * timestep
 
-    run_simulation(
+    deisa.register_callback(
         simulation_callback,
         [WindowArrayDefinition("array")],
         max_iterations=NB_ITERATIONS,
