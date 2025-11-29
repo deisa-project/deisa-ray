@@ -66,6 +66,7 @@ class Deisa:
 
         dask.config.set(scheduler=deisa_ray_get, shuffle="tasks")
         self.head: Any = HeadNodeActor.options(**get_head_actor_options()).remote()
+        self.feedback_non_chunked = {}
 
     def set(self,
             *args,
@@ -74,9 +75,13 @@ class Deisa:
             chunked: bool = False,
             **kwargs
             )->None:
-        pass
+        if not chunked:
+            self.feedback_non_chunked[key] = value
+        else:
+            # TODO: implement chunked version
+            raise NotImplementedError()
 
-    # TODO: should this really exist? Maybe Analytics should just be able to set events and 
+    # TODO: should this really exist? Maybe Analytics should just be able to set and 
     # thats it. Then, sim should be in charge of deleting them.
     def delete(
         self,
@@ -84,7 +89,7 @@ class Deisa:
         key: Hashable,
         **kwargs,
     )->None:
-        pass
+        self.feedback_non_chunked.pop(key, None)
 
     def unregister_callback(
         self,
