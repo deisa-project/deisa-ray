@@ -1,5 +1,5 @@
 import gc
-from typing import Any, Callable
+from typing import Any, Callable, Hashable
 
 import dask
 import dask.array as da
@@ -65,6 +65,31 @@ class Deisa:
             ray.init(address="auto", log_to_driver=False, logging_level=logging.ERROR)
 
         dask.config.set(scheduler=deisa_ray_get, shuffle="tasks")
+
+    def set(self,
+            *args,
+            key: Hashable,
+            value: Any,
+            chunked: bool = False,
+            **kwargs
+            )->None:
+        pass
+
+    # TODO: should this really exist? Maybe Analytics should just be able to set events and 
+    # thats it. Then, sim should be in charge of deleting them.
+    def delete(
+        self,
+        *args,
+        key: Hashable,
+        **kwargs,
+    )->None:
+        pass
+
+    def unregister_callback(
+        self,
+        simulation_callback: Callable,
+    )->None:
+        pass
 
     def register_callback(
         self,
