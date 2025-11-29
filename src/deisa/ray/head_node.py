@@ -1,20 +1,17 @@
 import asyncio
-import logging
 from typing import Callable
 
-import dask
 import dask.array as da
 import numpy as np
 import ray
 import ray.actor
 
 from deisa.ray import Timestep
-from deisa.ray._scheduler import deisa_ray_get
 from deisa.ray.types import HeadArrayDefinition, DaskArrayData
 
 
 @ray.remote
-class SimulationHead:
+class HeadNodeActor:
     """
     Ray remote actor that coordinates array construction from simulation chunks.
 
@@ -53,7 +50,10 @@ class SimulationHead:
     and analytics that consume the constructed arrays.
     """
 
-    def __init__(self, arrays_definitions: list[HeadArrayDefinition], max_pending_arrays: int = 1_000_000_000) -> None:
+    # TODO: Discuss if max_pending_arrays should be here or in register callback. In that case, what 
+    # should happen when the freqs are diff and max_pending_arrays are diff too? When does the sim 
+    # stop?''
+    def __init__(self, max_pending_arrays: int = 1_000_000_000) -> None:
         # For each ID of a simulation node, the corresponding scheduling actor
         self.scheduling_actors: dict[str, ray.actor.ActorHandle] = {}
 
@@ -63,12 +63,13 @@ class SimulationHead:
 
         self.new_array_created = asyncio.Event()
 
+        # All the newly created arrays
+        self.arrays_ready: asyncio.Queue[tuple[str, Timestep, da.Array]] = asyncio.Queue()
+
+    def register_arrays(self, arrays_definitions: list[HeadArrayDefinition])->None:
         self.arrays: dict[str, DaskArrayData] = {
             definition.name: DaskArrayData(definition) for definition in arrays_definitions
         }
-
-        # All the newly created arrays
-        self.arrays_ready: asyncio.Queue[tuple[str, Timestep, da.Array]] = asyncio.Queue()
 
     def list_scheduling_actors(self) -> list[ray.actor.ActorHandle]:
         """

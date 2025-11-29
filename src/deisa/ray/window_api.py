@@ -6,7 +6,7 @@ import dask.array as da
 import ray
 
 from deisa.ray._scheduler import deisa_ray_get
-from deisa.ray.head_node import SimulationHead
+from deisa.ray.head_node import HeadNodeActor
 from deisa.ray.utils import get_head_actor_options
 from deisa.ray.types import WindowArrayDefinition, HeadArrayDefinition
 
@@ -65,6 +65,7 @@ class Deisa:
             ray.init(address="auto", log_to_driver=False, logging_level=logging.ERROR)
 
         dask.config.set(scheduler=deisa_ray_get, shuffle="tasks")
+        self.head: Any = HeadNodeActor.options(**get_head_actor_options()).remote()
 
     def set(self,
             *args,
@@ -168,10 +169,7 @@ class Deisa:
             HeadArrayDefinition(name=definition.name, preprocess=definition.preprocess) for definition in arrays_description
         ]
     
-        # Limit the advance the simulation can have over the analytics
-        max_pending_arrays = 2 * len(arrays_description)
-    
-        head: Any = SimulationHead.options(**get_head_actor_options()).remote(head_arrays_description, max_pending_arrays)
+        ray.get(self.head.register_arrays.remote(head_arrays_description))
     
         arrays_by_iteration: dict[int, dict[str, da.Array]] = {}
     
@@ -180,13 +178,13 @@ class Deisa:
     
             for timestep in range(min(preparation_advance, max_iterations)):
                 # Get the next array from the head node
-                array: da.Array = ray.get(head.get_preparation_array.remote(arrays_description[0].name, timestep))
+                array: da.Array = ray.get(self.head.get_preparation_array.remote(arrays_description[0].name, timestep))
                 preparation_results[timestep] = _call_prepare_iteration.remote(prepare_iteration, array, timestep)
     
         for iteration in range(max_iterations):
             # Start preparing in advance
             if iteration + preparation_advance < max_iterations and prepare_iteration is not None:
-                array = head.get_preparation_array.remote(arrays_description[0].name, iteration + preparation_advance)
+                array = self.head.get_preparation_array.remote(arrays_description[0].name, iteration + preparation_advance)
                 preparation_results[iteration + preparation_advance] = _call_prepare_iteration.remote(
                     prepare_iteration, array, iteration + preparation_advance
                 )
@@ -196,7 +194,7 @@ class Deisa:
                 name: str
                 timestep: int
                 array: da.Array
-                name, timestep, array = ray.get(head.get_next_array.remote())
+                name, timestep, array = ray.get(self.head.get_next_array.remote())
     
                 if timestep not in arrays_by_iteration:
                     arrays_by_iteration[timestep] = {}
