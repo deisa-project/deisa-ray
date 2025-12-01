@@ -8,7 +8,8 @@ import ray
 from deisa.ray._scheduler import deisa_ray_get
 from deisa.ray.head_node import HeadNodeActor
 from deisa.ray.utils import get_head_actor_options
-from deisa.ray.types import WindowArrayDefinition, HeadArrayDefinition
+from deisa.ray.types import WindowArrayDefinition, HeadArrayDefinition, _CallbackConfig
+
 
 @ray.remote(num_cpus=0, max_retries=0)
 def _call_prepare_iteration(prepare_iteration: Callable, array: da.Array, timestep: int):
@@ -67,6 +68,7 @@ class Deisa:
         dask.config.set(scheduler=deisa_ray_get, shuffle="tasks")
         self.head: Any = HeadNodeActor.options(**get_head_actor_options()).remote()
         self.feedback_non_chunked = {}
+        self.registered_callbacks: list[_CallbackConfig] = []
 
     def set(self,
             *args,
@@ -106,69 +108,35 @@ class Deisa:
         prepare_iteration: Callable | None = None,
         preparation_advance: int = 3,
     ) -> None:
-        """
-        Run a simulation that processes arrays from the Ray cluster with optional windowing.
-    
-        This function coordinates the execution of a simulation callback that processes
-        arrays received from the Ray cluster. It supports sliding windows for arrays,
-        allowing the callback to access arrays from multiple timesteps. The function
-        manages array collection, windowing, memory cleanup, and optional preparation
-        callbacks.
-    
-        Parameters
-        ----------
-        simulation_callback : Callable
-            The main simulation callback function. It will be called with keyword
-            arguments for each array (by name) and a `timestep` argument. If
-            `prepare_iteration` is provided, it will also receive a
-            `preparation_result` argument.
-        arrays_description : list[WindowArrayDefinition]
-            List of array definitions describing the arrays to be processed. Each
-            definition can specify a window size for sliding window access.
-        max_iterations : int, optional
-            Maximum number of iterations to run. Default is 1_000_000_000.
-        prepare_iteration : Callable or None, optional
-            Optional callback function that is called in advance for each timestep
-            to prepare data. The function receives a Dask array and timestep. The
-            result is passed to the simulation_callback as `preparation_result`.
-            Default is None.
-        preparation_advance : int, optional
-            Number of timesteps ahead to prepare. The prepare_iteration callback
-            will be called this many timesteps in advance. Default is 3.
-    
-        Notes
-        -----
-        The function performs the following operations for each iteration:
-    
-        1. Collects arrays from the head node until all required arrays for the
-           current iteration are available.
-        2. Constructs the arrays dictionary, applying windowing for arrays with
-           `window_size` specified.
-        3. Calls the simulation_callback with the arrays and timestep.
-        4. Cleans up old arrays that are no longer needed for the window.
-        5. Triggers garbage collection to free memory.
-    
-        For arrays with `window_size` set to `n`, the callback receives a list
-        of arrays containing the last `n` timesteps. For arrays without windowing,
-        the callback receives a single array for the current timestep.
-    
-        The function manages memory by deleting arrays that are outside the window
-        and explicitly calling garbage collection to ensure Ray object references
-        are released promptly.
-    
-        Examples
-        --------
-        >>> def process_data(temperature, pressure, timestep):
-        ...     # Process arrays for current timestep
-        ...     result = temperature + pressure
-        ...     return result
-        >>>
-        >>> arrays = [
-        ...     WindowArrayDefinition(name="temperature", window_size=5),  # Last 5 timesteps
-        ...     WindowArrayDefinition(name="pressure"),  # Current timestep only
-        ... ]
-        >>> run_simulation(process_data, arrays, max_iterations=100)
-        """
+        cfg = _CallbackConfig(
+            simulation_callback=simulation_callback,
+            arrays_description=arrays_description,
+            max_iterations=max_iterations,
+            prepare_iteration=prepare_iteration,
+            preparation_advance=preparation_advance,
+        )
+        self.registered_callbacks.append(cfg)
+
+    def execute_callbacks(
+        self,
+    ) -> None:
+        if not self.registered_callbacks:
+            return
+
+        if len(self.registered_callbacks) > 1:
+            raise RuntimeError(
+                "execute_callbacks currently supports exactly one registered "
+                "callback. Multiple-callback execution will be implemented later."
+            )
+
+        cfg = self.registered_callbacks[0]
+        simulation_callback = cfg.simulation_callback
+        arrays_description = cfg.arrays_description
+        max_iterations = cfg.max_iterations
+        prepare_iteration = cfg.prepare_iteration
+        preparation_advance = cfg.preparation_advance
+
+
         # Convert the definitions to the type expected by the head node
         head_arrays_description = [
             HeadArrayDefinition(name=definition.name, preprocess=definition.preprocess) for definition in arrays_description

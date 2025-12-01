@@ -234,6 +234,14 @@ class HeadArrayDefinition:
     name: str
     preprocess: Callable = lambda x: x
 
+@dataclass
+class _CallbackConfig:
+    simulation_callback: Callable
+    arrays_description: list[WindowArrayDefinition]
+    max_iterations: int
+    prepare_iteration: Callable | None
+    preparation_advance: int
+
 class DaskArrayData:
     """
     Information about a Dask array being built.

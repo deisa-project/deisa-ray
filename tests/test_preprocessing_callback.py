@@ -23,6 +23,7 @@ def head_script() -> None:
         [WindowArrayDefinition("array", preprocess=lambda arr: 10 * arr)],
         max_iterations=NB_ITERATIONS,
     )
+    deisa.execute_callbacks()
 
 
 def test_preprocessing_callback(ray_cluster) -> None:  # noqa: F811

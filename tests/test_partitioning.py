@@ -27,6 +27,7 @@ def head_script(partitioning_strategy: str) -> None:
         [WindowArrayDefinition("array")],
         max_iterations=NB_ITERATIONS,
     )
+    deisa.execute_callbacks()
 
 
 @pytest.mark.parametrize("partitioning_strategy", ["random", "greedy"])

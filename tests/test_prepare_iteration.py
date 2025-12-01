@@ -32,6 +32,7 @@ def head_script() -> None:
         prepare_iteration=prepare_iteration,
         preparation_advance=10,
     )
+    deisa.execute_callbacks()
 
 
 def test_prepare_iteration(ray_cluster) -> None:  # noqa: F811

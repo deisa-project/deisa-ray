@@ -33,6 +33,7 @@ def head() -> None:
         ],
         max_iterations=NB_ITERATIONS,
     )
+    deisa.execute_callbacks()
 
 
 def test_sliding_window(ray_cluster) -> None:  # noqa: F811

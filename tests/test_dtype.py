@@ -21,6 +21,7 @@ def head_script() -> None:
         [WindowArrayDefinition("array")],
         max_iterations=1,
     )
+    deisa.execute_callbacks()
 
 
 def test_dtype(ray_cluster) -> None:  # noqa: F811

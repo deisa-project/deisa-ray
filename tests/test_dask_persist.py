@@ -32,6 +32,7 @@ def head_script() -> None:
         [WindowArrayDefinition("array")],
         max_iterations=NB_ITERATIONS,
     )
+    deisa.execute_callbacks()
 
 
 def test_dask_persist(ray_cluster) -> None:  # noqa: F811

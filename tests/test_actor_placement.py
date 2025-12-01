@@ -97,6 +97,7 @@ def test_actor_placement(ray_multinode_cluster):
             [WindowArrayDefinition("array")],
             max_iterations=0,
         )
+        deisa.execute_callbacks()
 
     # submit head script (analogous to submitting analytics to head node)
     ray.get(head_script.remote())
