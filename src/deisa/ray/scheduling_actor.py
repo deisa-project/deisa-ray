@@ -1,5 +1,4 @@
 import pickle
-import numpy as np
 import ray
 import ray.actor
 from deisa.ray._async_dict import AsyncDict
@@ -7,7 +6,7 @@ from deisa.ray.types import ChunkRef, ScheduledByOtherActor, GraphInfo, ArrayPer
 from deisa.ray.utils import get_ready_actor_with_retry
 from deisa.ray.ray_patch import remote_ray_dask_get
 from deisa.ray.errors import ContractError
-from typing import Dict
+from typing import Dict, Hashable, Any
 
 
 @ray.remote
@@ -67,6 +66,40 @@ class SchedulingActor:
 
         # For scheduling
         self.graph_infos: AsyncDict[int, GraphInfo] = AsyncDict()
+        self.feedback_non_chunked = {}
+
+    def set(self,
+            *args,
+            key: Hashable,
+            value: Any,
+            chunked: bool = False,
+            **kwargs
+            )->None:
+        if not chunked:
+            self.feedback_non_chunked[key] = value
+        else:
+            # TODO: implement chunked version
+            raise NotImplementedError()
+
+    def get(self,
+            key, 
+            default = None,
+            chunked = False,
+            )->Any:
+        if not chunked:
+            return self.feedback_non_chunked.get(key, default)
+        else:
+            raise NotImplementedError()
+        
+
+    def delete(
+        self,
+        *args,
+        key: Hashable,
+        **kwargs,
+    )->None:
+        self.feedback_non_chunked.pop(key, None)
+
         
     async def register_chunk(self, bridge_id, array_name, chunk_shape, nb_chunks_per_dim, nb_chunks_of_node, dtype, chunk_position):
         #NOTE: im worried about race conditions here

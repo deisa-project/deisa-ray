@@ -265,7 +265,8 @@ class Bridge:
 
         # Wait until the data is processed before returning to the simulation
         ray.get(future)
-    def get(*args, name: str, default : Any = None, chunked: bool = False, **kwargs)-> Any | None:
+
+    def get(self,*args, name: str, default : Any = None, chunked: bool = False, **kwargs)-> Any | None:
         """
         Retrieve information back from Analytics. 
 
@@ -289,9 +290,13 @@ class Bridge:
         -----
         TODO: Fill notes
         """
-        pass
+        if not chunked:
+            return ray.get(self.scheduling_actor.get.remote(name, default, chunked))
+        else:
+            raise NotImplementedError()
 
-    def _delete(*args, name: str, **kwargs):
+
+    def _delete(self,*args, name: str, **kwargs):
         """
         Delete a key from the information shared by Analytics. 
 

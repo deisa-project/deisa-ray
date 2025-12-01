@@ -67,7 +67,7 @@ class Deisa:
 
         dask.config.set(scheduler=deisa_ray_get, shuffle="tasks")
         self.head: Any = HeadNodeActor.options(**get_head_actor_options()).remote()
-        self.feedback_non_chunked = {}
+        self.node_actors = {}
         self.registered_callbacks: list[_CallbackConfig] = []
 
     def set(self,
@@ -77,21 +77,18 @@ class Deisa:
             chunked: bool = False,
             **kwargs
             )->None:
+        if not self.node_actors:
+            # retrieve node actors at least once
+            self.node_actors = ray.get(self.head.list_scheduling_actors.remote())
+
         if not chunked:
-            self.feedback_non_chunked[key] = value
+            for _, handle in self.node_actors.items():
+                # set the value inside each node actor
+                # TODO: does it need to be blocking? 
+                handle.set.remote(key,value,chunked)
         else:
             # TODO: implement chunked version
             raise NotImplementedError()
-
-    # TODO: should this really exist? Maybe Analytics should just be able to set and 
-    # thats it. Then, sim should be in charge of deleting them.
-    def delete(
-        self,
-        *args,
-        key: Hashable,
-        **kwargs,
-    )->None:
-        self.feedback_non_chunked.pop(key, None)
 
     def unregister_callback(
         self,
