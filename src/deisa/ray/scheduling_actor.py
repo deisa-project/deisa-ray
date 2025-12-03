@@ -8,49 +8,40 @@ from deisa.ray.ray_patch import remote_ray_dask_get
 from deisa.ray.errors import ContractError
 from typing import Dict, Hashable, Any
 
-
-@ray.remote
-class SchedulingActor:
+class NodeBase:
     """
-    Actor responsible for gathering chunks and scheduling Dask task graphs.
+    Actor responsible for gathering chunks and exchanging data with analytics.
 
-    Each SchedulingActor is associated with a specific node and is responsible
-    for:
-    - Collecting chunks of arrays sent by simulation nodes (via Bridge)
-    - Registering with the head node
-    - Scheduling Dask task graphs that operate on the collected chunks
-    - Coordinating with other scheduling actors for cross-actor dependencies
+    Each node actor is associated with a specific node and is responsible for:
+
+    - Collecting chunks of arrays sent by simulation nodes (via :class:`Bridge`)
+    - Registering its owned chunks with the head node
+    - Providing a small key/value channel (``set``, ``get``, ``delete``) for
+      non-chunked feedback between analytics and simulation.
+
+    The :class:`SchedulingActor` subclass adds graph-scheduling behaviour on
+    top of this base functionality.
 
     Parameters
     ----------
     actor_id : int
-        Unique identifier for this scheduling actor, typically the node ID.
+        Unique identifier for this node actor, typically derived from the node
+        ID.
 
     Attributes
     ----------
     actor_id : int
-        The unique identifier for this scheduling actor.
+        The unique identifier for this node actor.
     actor_handle : ray.actor.ActorHandle
         Handle to this actor instance.
     head : ray.actor.ActorHandle
-        Handle to the SimulationHead actor.
-    scheduling_actors : list[ray.actor.ActorHandle]
-        List of all scheduling actor handles, populated when first graph
-        is scheduled.
-    arrays : AsyncDict[str, _Array]
-        Dictionary mapping array names to their _Array objects, which track
-        chunks and timesteps.
-    graph_infos : AsyncDict[int, GraphInfo]
-        Dictionary mapping graph IDs to their GraphInfo objects, which track
-        graph scheduling state and results.
-
-    Notes
-    -----
-    This is a Ray remote actor that must be created with specific options
-    (see Bridge class). The actor registers itself with the head node during
-    initialization and waits for chunks to be added via the `add_chunk` method.
-    When task graphs are submitted, the actor schedules them and coordinates
-    with other actors for distributed execution.
+        Handle to the :class:`SimulationHead` actor.
+    arrays : AsyncDict[str, Array]
+        Dictionary mapping array names to their :class:`Array` instances,
+        which track chunks and timesteps.
+    feedback_non_chunked : dict
+        Dictionary for storing non-chunked feedback values shared between
+        analytics and simulation.
     """
 
     async def __init__(self, actor_id: int, arrays_metadata: Dict[str, Dict] = {}) -> None:
@@ -59,14 +50,12 @@ class SchedulingActor:
 
         self.head = get_ready_actor_with_retry(name="simulation_head", namespace="deisa_ray")
         await self.head.register_scheduling_actor.remote(actor_id, self.actor_handle)
-        self.scheduling_actors: list[ray.actor.ActorHandle] = []
 
         # For collecting chunks
         self.arrays: AsyncDict[str, Array] = AsyncDict()
-
-        # For scheduling
-        self.graph_infos: AsyncDict[int, GraphInfo] = AsyncDict()
-        self.feedback_non_chunked = {}
+        
+        # For non-chunked feedback between analytics and simulation
+        self.feedback_non_chunked: Dict[Hashable, Any] = {}
 
     def set(self,
             *args,
@@ -139,7 +128,7 @@ class SchedulingActor:
         This method returns an ObjectRef rather than the actual dictionary
         to avoid blocking. The callbacks are retrieved from the head node
         and used by Bridge instances to preprocess chunks before sending
-        them to this scheduling actor.
+        them to this node actor.
         """
         # return obect ref
         p_clbs = self.head.preprocessing_callbacks.remote()
@@ -148,7 +137,7 @@ class SchedulingActor:
 
     def ready(self) -> None:
         """
-        Check if the scheduling actor is ready.
+        Check if the node actor is ready.
 
         Returns
         -------
@@ -203,12 +192,11 @@ class SchedulingActor:
         **kwargs
     ) -> None:
         """
-        Add a chunk of data to this scheduling actor.
+        Add a chunk of data to this node actor.
 
         This method is called by Bridge instances to send chunks of arrays
-        to this scheduling actor. When all chunks from a node are received,
-        the actor registers the array with the head node (if not already
-        registered) and notifies the head node that chunks are ready.
+        to this node actor. When all chunks from a node are received,
+        the actor notifies the head node that chunks are ready.
 
         Parameters
         ----------
@@ -258,6 +246,58 @@ class SchedulingActor:
         else:
             await array_timestep.chunks_ready_event.wait()
 
+@ray.remote
+class NodeActor(NodeBase):
+    """
+    Actor responsible for gathering chunks and exchanging data with analytics.
+
+    This is a Ray actor. Shared logic is implemented in NodeBase.
+    """
+
+    async def __init__(self, actor_id: int, arrays_metadata: Dict[str, Dict] = {}) -> None:
+        # Initialise the shared base part
+        await NodeBase.__init__(self, actor_id=actor_id, arrays_metadata=arrays_metadata)
+        # Optionally: NodeActor-specific init here
+
+
+@ray.remote
+class SchedulingActor(NodeBase):
+    """
+    Node actor with additional Dask graph scheduling behaviour.
+
+    This actor inherits all chunk-collection and feedback mechanisms from
+    :class:`NodeActor` and adds graph scheduling capabilities used by the
+    custom Dask-on-Ray scheduler. When using a :class:`SchedulingActor`, the
+    custom scheduler distributes Dask task graphs across multiple actors.
+    When using a plain :class:`NodeActor`, standard Dask scheduling is used.
+
+    Parameters
+    ----------
+    actor_id : int
+        Unique identifier for this scheduling actor, typically the node ID.
+    arrays_metadata : dict[str, dict], optional
+        Currently unused but reserved for future extensions where the actor
+        may need array-level metadata at construction time.
+
+    Attributes
+    ----------
+    scheduling_actors : list[ray.actor.ActorHandle]
+        List of all scheduling actor handles, populated lazily when first
+        graph is scheduled.
+    graph_infos : AsyncDict[int, GraphInfo]
+        Dictionary mapping graph IDs to their :class:`GraphInfo` objects,
+        which track graph scheduling state and results.
+    """
+
+    async def __init__(self, actor_id: int, arrays_metadata: Dict[str, Dict] = {}) -> None:
+        # Delegate initialization to NodeActor, which sets up head node
+        # registration, arrays, and feedback mechanisms.
+        await super().__init__(actor_id=actor_id, arrays_metadata=arrays_metadata)
+        
+        # Scheduling-specific state (not needed for plain NodeActor)
+        self.scheduling_actors: list[ray.actor.ActorHandle] = []
+        self.graph_infos: AsyncDict[int, GraphInfo] = AsyncDict()
+
     async def schedule_graph(self, graph_id: int, dsk: dict) -> None:
         """
         Schedule a Dask task graph for execution.
@@ -296,10 +336,11 @@ class SchedulingActor:
         the appropriate scheduling actors. Chunk references are retrieved
         asynchronously from the local chunks storage.
         """
-        # Find the scheduling actors
+        # Find the scheduling actors (lazy initialization)
         if not self.scheduling_actors:
             self.scheduling_actors = await self.head.list_scheduling_actors.options(enable_task_events=False).remote()
 
+        # Create and store graph info for tracking this graph's execution
         info = GraphInfo()
         self.graph_infos[graph_id] = info
 
