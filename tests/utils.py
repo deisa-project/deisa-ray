@@ -19,7 +19,22 @@ def wait_for_head_node() -> None:
     while True:
         try:
             a = ray.get_actor("simulation_head", namespace="deisa_ray")
+            print(f"WAITING simulation_head = {a}", flush=True)
             ray.get(a.ready.remote())
+            print("Done", flush=True)
+            return
+        except ValueError:
+            time.sleep(0.1)
+
+
+def wait_for_central_scheduler() -> None:
+    """Wait until the central scheduler is ready"""
+    while True:
+        try:
+            a = ray.get_actor("sched-central", namespace="deisa_ray")
+            print(f"WAITING sched-central = {a}", flush=True)
+            ray.get(a.ready.remote())
+            print("Done", flush=True)
             return
         except ValueError:
             time.sleep(0.1)
@@ -52,10 +67,12 @@ def simple_worker(
         }
     }
 
-    client = Bridge(id = rank, arrays_metadata=arrays_md, system_metadata=sys_md, _node_id=node_id)
+    client = Bridge(id=rank, arrays_metadata=arrays_md,
+                    system_metadata=sys_md, _node_id=node_id)
 
     array = (rank + 1) * np.ones(chunk_size, dtype=dtype)
 
     for i in range(nb_iterations):
         chunk = i*array
-        client.send(array_name = array_name, chunk = chunk, timestep = i, chunked = True)
+        client.send(array_name=array_name, chunk=chunk,
+                    timestep=i, chunked=True)

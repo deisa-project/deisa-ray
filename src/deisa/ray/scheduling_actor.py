@@ -3,7 +3,6 @@ import ray
 import ray.actor
 from deisa.ray._async_dict import AsyncDict
 from deisa.ray.types import ChunkRef, ScheduledByOtherActor, GraphInfo, ArrayPerTimestep, Array
-from deisa.ray.utils import get_ready_actor_with_retry
 from deisa.ray.ray_patch import remote_ray_dask_get
 from deisa.ray.errors import ContractError
 from typing import Dict, Hashable, Any
@@ -53,12 +52,11 @@ class SchedulingActor:
     with other actors for distributed execution.
     """
 
-    async def __init__(self, actor_id: int, arrays_metadata: Dict[str, Dict] = {}) -> None:
+    def __init__(self, actor_id: int, head: ray.actor.ActorHandle, arrays_metadata: Dict[str, Dict] = {}) -> None:
         self.actor_id = actor_id
         self.actor_handle = ray.get_runtime_context().current_actor
 
-        self.head = get_ready_actor_with_retry(name="simulation_head", namespace="deisa_ray")
-        await self.head.register_scheduling_actor.remote(actor_id, self.actor_handle)
+        self.head = head
         self.scheduling_actors: list[ray.actor.ActorHandle] = []
 
         # For collecting chunks
@@ -74,7 +72,7 @@ class SchedulingActor:
             value: Any,
             chunked: bool = False,
             **kwargs
-            )->None:
+            ) -> None:
         if not chunked:
             self.feedback_non_chunked[key] = value
         else:
@@ -82,27 +80,25 @@ class SchedulingActor:
             raise NotImplementedError()
 
     def get(self,
-            key, 
-            default = None,
-            chunked = False,
-            )->Any:
+            key,
+            default=None,
+            chunked=False,
+            ) -> Any:
         if not chunked:
             return self.feedback_non_chunked.get(key, default)
         else:
             raise NotImplementedError()
-        
 
     def delete(
         self,
         *args,
         key: Hashable,
         **kwargs,
-    )->None:
+    ) -> None:
         self.feedback_non_chunked.pop(key, None)
 
-        
     async def register_chunk(self, bridge_id, array_name, chunk_shape, nb_chunks_per_dim, nb_chunks_of_node, dtype, chunk_position):
-        #NOTE: im worried about race conditions here
+        # NOTE: im worried about race conditions here
         if array_name not in self.arrays:
             self.arrays[array_name] = Array()
             self.nb_chunks_of_node = nb_chunks_of_node
@@ -113,12 +109,12 @@ class SchedulingActor:
 
         if len(array.owned_chunks) == nb_chunks_of_node:
             await self.head.set_owned_chunks.options(enable_task_events=False).remote(
-                    self.actor_id,
-                    array_name,
-                    dtype,
-                    nb_chunks_per_dim,
-                    list(array.owned_chunks),
-                )
+                self.actor_id,
+                array_name,
+                dtype,
+                nb_chunks_per_dim,
+                list(array.owned_chunks),
+            )
             array.ready_event.set()
             array.ready_event.clear()
         else:
@@ -231,8 +227,9 @@ class SchedulingActor:
         """
         if array_name not in self.arrays:
             # respect contract at the beginning
-            raise ContractError(f"User requested to add chunk for {array_name} but this array has"  
-                f"not been described. Please call register_array({array_name}) before calling"
+            raise ContractError(f"User requested to add chunk for {array_name} but this array has"
+                                f"not been described. Please call register_array({
+                array_name}) before calling"
                 "add_chunk().")
         array = self.arrays[array_name]
 
@@ -240,8 +237,12 @@ class SchedulingActor:
             array.timesteps[timestep] = ArrayPerTimestep()
 
         array_timestep = array.timesteps[timestep]
-        array_timestep.local_chunks[bridge_id] = self.actor_handle._pack_object_ref.remote(chunk_ref)
+        array_timestep.local_chunks[bridge_id] = self.actor_handle._pack_object_ref.remote(
+            chunk_ref)
+        print("FLAG5", flush=True)
 
+        print(f"TEST : {len(array_timestep.local_chunks)} EQUAL? {
+              self.nb_chunks_of_node}", flush=True)
         if len(array_timestep.local_chunks) == self.nb_chunks_of_node:
             chunks = []
             for bridge_id, ref in array_timestep.local_chunks._data.items():
@@ -253,6 +254,7 @@ class SchedulingActor:
             await self.head.chunks_ready.options(enable_task_events=False).remote(
                 array_name, timestep, [all_chunks_ref]
             )
+            print("FLAG6", flush=True)
             array_timestep.chunks_ready_event.set()
             array_timestep.chunks_ready_event.clear()
         else:
@@ -307,13 +309,14 @@ class SchedulingActor:
             # Adapt external keys
             if isinstance(val, ScheduledByOtherActor):
                 actor = self.scheduling_actors[val.actor_id]
-                dsk[key] = actor.get_value.options(enable_task_events=False).remote(graph_id, key)
+                dsk[key] = actor.get_value.options(
+                    enable_task_events=False).remote(graph_id, key)
 
             # Replace the false chunks by the real ObjectRefs
             if isinstance(val, ChunkRef):
                 assert val.actor_id == self.actor_id
 
-                # TODO: maybe awaiting is not necessary. When would the key not be present in the 
+                # TODO: maybe awaiting is not necessary. When would the key not be present in the
                 # AsyncDict?
                 array = await self.arrays.wait_for_key(val.array_name)
 
@@ -321,10 +324,12 @@ class SchedulingActor:
 
                 ref = await array_timestep.local_chunks.wait_for_key(val.bridge_id)
 
-                if isinstance(ref, bytes):  # This may not be the case depending on the asyncio scheduling order
+                # This may not be the case depending on the asyncio scheduling order
+                if isinstance(ref, bytes):
                     ref = pickle.loads(ref)
                 else:
-                    ref = pickle.loads(pickle.dumps(ref))  # To free the memory automatically
+                    # To free the memory automatically
+                    ref = pickle.loads(pickle.dumps(ref))
 
                 dsk[key] = ref
 

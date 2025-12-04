@@ -6,7 +6,7 @@ import ray
 import ray.actor
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 from deisa.ray.scheduling_actor import SchedulingActor as _RealSchedulingActor
-
+from deisa.ray.utils import get_ready_actor_with_retry
 
 
 class Bridge:
@@ -66,7 +66,6 @@ class Bridge:
         system_metadata: Dict,
         *args,
         _node_id: str | None = None,
-        scheduling_actor_cls: Type = _RealSchedulingActor,
         _init_retries: int = 3,
         **kwargs
     ) -> None:
@@ -108,93 +107,57 @@ class Bridge:
         node affinity scheduling when `_node_id` is None. The first remote call
         to the scheduling actor serves as a readiness check.
         """
+        print("FLAG0", flush=True)
         self.id = id
         self.arrays_metadata = arrays_metadata
         self.system_metadata = system_metadata
+        print("FLAG1", flush=True)
+        self.scheduling_actor: ray.actor.ActorHandle = ray.get_actor(
+            "sched-central", namespace="deisa_ray")
+        self.head: ray.actor.ActorHandle = get_ready_actor_with_retry(
+            name="simulation_head", namespace="deisa_ray")
+        print("FLAG2", flush=True)
+        ray.get(self.head.ready.remote())
+        print("FLAG3", flush=True)
 
         # check if ray.init has already been called.
         # Needed when starting ray cluster from python (mainly testing)
         if not ray.is_initialized():
-            ray.init(address="auto", log_to_driver=False, logging_level=logging.ERROR)
+            ray.init(address="auto", log_to_driver=False,
+                     logging_level=logging.ERROR)
 
         self.node_id = _node_id or ray.get_runtime_context().get_node_id()
-        name = f"sched-{self.node_id}"
-        namespace = "deisa_ray"
 
-        # NOTE: now lifetime is detached, otherwise at the end of the init, it will get killed
-        # NOTE: get_if_exists prevents race conditions
-        scheduling_actor_options = {
-            "name": name,
-            "namespace": namespace,
-            "lifetime": "detached",
-            "get_if_exists": True,
-            # WARNING: be careful - if not using async actor (has at least one async method)
-            # this will make OS try to spawn 1 billion threads and it will blow up
-            # StubSchedulingActor is async because of this.
-            "max_concurrency": 1000_000_000,
-            "num_cpus": 0,
-            "enable_task_events": False,
-        }
-
-        if _node_id is None:
-            scheduling_actor_options["scheduling_strategy"] = NodeAffinitySchedulingStrategy(
-                node_id=self.node_id, soft=False
+        for array_name, meta in arrays_metadata.items():
+            self.scheduling_actor.register_chunk.remote(
+                bridge_id=self.id,
+                array_name=array_name,
+                chunk_shape=meta["chunk_shape"],
+                nb_chunks_per_dim=meta["nb_chunks_per_dim"],
+                nb_chunks_of_node=meta["nb_chunks_of_node"],
+                dtype=meta["dtype"],
+                chunk_position=meta["chunk_position"],
             )
 
-        last_err = None
-        for _ in range(max(1, _init_retries)):
-            try:
-                # first rank to arrive here will try to create scheduling actor. Ray will guarantee
-                # that only one wil be created bc of get_if_exists. No need to use async events
-                # creates actor with:
-                # name: "sched-{node_id}", namespace: "deisa_ray", node_id: {node_id}
-                self.scheduling_actor: ray.actor.ActorHandle = scheduling_actor_cls.options(
-                    **scheduling_actor_options
-                ).remote(actor_id=self.node_id)  # type: ignore
+        # TODO: hide preprocessing_callbacks
 
-                for array_name, meta in arrays_metadata.items():
-                    self.scheduling_actor.register_chunk.remote(
-                        bridge_id = self.id,
-                        array_name = array_name,
-                        chunk_shape = meta["chunk_shape"],
-                        nb_chunks_per_dim = meta["nb_chunks_per_dim"] ,
-                        nb_chunks_of_node = meta["nb_chunks_of_node"],
-                        dtype = meta["dtype"],
-                        chunk_position = meta["chunk_position"],
-                    )
+        # "Readiness" gate: first RPC must succeed. This means the scheduling_actor is
+        # created and operational. No need to have a "ready" method.
+        # NOTE: scheduling actor does head.preprocessing_callbacks.remote() which is a ref
+        # we don't need the actual data there.
+        # scheduling_actor.preprocessing_callbacks.remote() gives back another ref. The
+        # first ray.get() is to get the result of the remote call. the second ray.get() is
+        # to dereference the original ref.
+        self.preprocessing_callbacks: dict[str, Callable] = ray.get(
+            ray.get(
+                self.scheduling_actor.preprocessing_callbacks.remote()  # type: ignore
+            )
+        )
 
-                # TODO: hide preprocessing_callbacks
-
-                # "Readiness" gate: first RPC must succeed. This means the scheduling_actor is
-                # created and operational. No need to have a "ready" method.
-                # NOTE: scheduling actor does head.preprocessing_callbacks.remote() which is a ref
-                # we don't need the actual data there.
-                # scheduling_actor.preprocessing_callbacks.remote() gives back another ref. The
-                # first ray.get() is to get the result of the remote call. the second ray.get() is
-                # to dereference the original ref.
-                self.preprocessing_callbacks: dict[str, Callable] = ray.get(
-                    ray.get(
-                        self.scheduling_actor.preprocessing_callbacks.remote()  # type: ignore
-                    )
-                )
-
-                # assert we have a dict for the preprocessing callbacks
-                # TODO: preprocessing_callbacks are static for now. In the future it could be nice
-                # to support ability to change them
-                assert isinstance(self.preprocessing_callbacks, dict)
-
-                break  # success
-            except Exception as e:  # ray.exceptions.RayActorError and friends
-                last_err = e
-
-                # Try to re-create a fresh actor instance (same name will resolve to existing or new one)
-                # Small backoff; no sleep needed for tests, but harmless if added.
-                continue
-        # `else:` clause belongs to for loop, and is only executed if it finishes normally without
-        # a encountering a `break` statement (in our case it means the actor was never created).
-        else:
-            # keep original error
-            raise RuntimeError(f"Failed to create/ready scheduling actor for node {self.node_id}") from last_err
+        # assert we have a dict for the preprocessing callbacks
+        # TODO: preprocessing_callbacks are static for now. In the future it could be nice
+        # to support ability to change them
+        assert isinstance(self.preprocessing_callbacks, dict)
 
     def send(
         self,
@@ -255,18 +218,19 @@ class Bridge:
         ref = ray.put(chunk, _owner=self.scheduling_actor)
 
         future: ray.ObjectRef = self.scheduling_actor.send.remote(
-            bridge_id = self.id,
-            array_name = array_name,
-            chunk_ref =  [ref],
-            timestep = timestep,
-            chunked = True,
+            bridge_id=self.id,
+            array_name=array_name,
+            chunk_ref=[ref],
+            timestep=timestep,
+            chunked=True,
             store_externally=False,
         )  # type: ignore
+        print("FLAG4", flush=True)
 
         # Wait until the data is processed before returning to the simulation
         ray.get(future)
 
-    def get(self,*args, name: str, default : Any = None, chunked: bool = False, **kwargs)-> Any | None:
+    def get(self, *args, name: str, default: Any = None, chunked: bool = False, **kwargs) -> Any | None:
         """
         Retrieve information back from Analytics. 
 
@@ -295,8 +259,7 @@ class Bridge:
         else:
             raise NotImplementedError()
 
-
-    def _delete(self,*args, name: str, **kwargs):
+    def _delete(self, *args, name: str, **kwargs):
         """
         Delete a key from the information shared by Analytics. 
 

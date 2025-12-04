@@ -4,8 +4,10 @@ import time
 import ray
 import random
 
-def get_system_metadata()-> Dict: 
+
+def get_system_metadata() -> Dict:
     return {}
+
 
 def get_ready_actor_with_retry(name, namespace, deadline_s=180):
     """
@@ -45,18 +47,24 @@ def get_ready_actor_with_retry(name, namespace, deadline_s=180):
     start, delay = time.time(), 0.2
     while True:
         try:
-            actor = ray.get_actor(name=name, namespace=namespace)
+            print(f"look for actor : name = {
+                  name}, namespace = {namespace}", flush=True)
+            actor = ray.get_actor(name, namespace=namespace)
             # ready gate
             # TODO for even more reliability, in the future we should handle
             # actor exists, but unavailable
             # actor exists, crashed, need to recreate
+            print("WAIT FOR RDY", flush=True)
             ray.get(actor.ready.remote())
+            print(actor, flush=True)
             return actor
         except ValueError:
             if time.time() - start > deadline_s:
-                raise TimeoutError(f"{namespace}/{name} not found in {deadline_s}s")
+                raise TimeoutError(
+                    f"{namespace}/{name} not found in {deadline_s}s")
             time.sleep(delay + random.random() * 0.1)
             delay = min(delay * 1.5, 5.0)
+
 
 def get_head_node_id() -> str:
     """
@@ -123,4 +131,3 @@ def get_head_actor_options() -> dict:
         # Disabled for performance reasons
         enable_task_events=False,
     )
-

@@ -47,7 +47,7 @@ def test_sliding_window(ray_cluster) -> None:  # noqa: F811
                 rank=rank,
                 position=(rank // 2, rank % 2),
                 chunks_per_dim=(2, 2),
-                nb_chunks_of_node=1,
+                nb_chunks_of_node=4,
                 chunk_size=(1, 1),
                 nb_iterations=NB_ITERATIONS,
                 node_id=f"node_{rank}",

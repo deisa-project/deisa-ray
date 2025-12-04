@@ -63,10 +63,11 @@ class Deisa:
         `deisa_ray_get` scheduler with task-based shuffling.
         """
         if not ray.is_initialized():
-            ray.init(address="auto", log_to_driver=False, logging_level=logging.ERROR)
+            ray.init(address="auto", log_to_driver=False)
 
         dask.config.set(scheduler=deisa_ray_get, shuffle="tasks")
-        self.head: Any = HeadNodeActor.options(**get_head_actor_options()).remote()
+        self.head: Any = HeadNodeActor.options(
+            **get_head_actor_options()).remote()
         self.node_actors = {}
         self.registered_callbacks: list[_CallbackConfig] = []
 
@@ -76,16 +77,17 @@ class Deisa:
             value: Any,
             chunked: bool = False,
             **kwargs
-            )->None:
+            ) -> None:
         if not self.node_actors:
             # retrieve node actors at least once
-            self.node_actors = ray.get(self.head.list_scheduling_actors.remote())
+            self.node_actors = ray.get(
+                self.head.list_scheduling_actors.remote())
 
         if not chunked:
             for _, handle in self.node_actors.items():
                 # set the value inside each node actor
-                # TODO: does it need to be blocking? 
-                handle.set.remote(key,value,chunked)
+                # TODO: does it need to be blocking?
+                handle.set.remote(key, value, chunked)
         else:
             # TODO: implement chunked version
             raise NotImplementedError()
@@ -93,7 +95,7 @@ class Deisa:
     def unregister_callback(
         self,
         simulation_callback: Callable,
-    )->None:
+    ) -> None:
         pass
 
     def register_callback(
@@ -133,48 +135,51 @@ class Deisa:
         prepare_iteration = cfg.prepare_iteration
         preparation_advance = cfg.preparation_advance
 
-
         # Convert the definitions to the type expected by the head node
         head_arrays_description = [
             HeadArrayDefinition(name=definition.name, preprocess=definition.preprocess) for definition in arrays_description
         ]
-    
+
         ray.get(self.head.register_arrays.remote(head_arrays_description))
-    
+
         arrays_by_iteration: dict[int, dict[str, da.Array]] = {}
-    
+
         if prepare_iteration is not None:
             preparation_results: dict[int, ray.ObjectRef] = {}
-    
+
             for timestep in range(min(preparation_advance, max_iterations)):
                 # Get the next array from the head node
-                array: da.Array = ray.get(self.head.get_preparation_array.remote(arrays_description[0].name, timestep))
-                preparation_results[timestep] = _call_prepare_iteration.remote(prepare_iteration, array, timestep)
-    
+                array: da.Array = ray.get(self.head.get_preparation_array.remote(
+                    arrays_description[0].name, timestep))
+                preparation_results[timestep] = _call_prepare_iteration.remote(
+                    prepare_iteration, array, timestep)
+
         for iteration in range(max_iterations):
             # Start preparing in advance
             if iteration + preparation_advance < max_iterations and prepare_iteration is not None:
-                array = self.head.get_preparation_array.remote(arrays_description[0].name, iteration + preparation_advance)
+                array = self.head.get_preparation_array.remote(
+                    arrays_description[0].name, iteration + preparation_advance)
                 preparation_results[iteration + preparation_advance] = _call_prepare_iteration.remote(
                     prepare_iteration, array, iteration + preparation_advance
                 )
-    
+
             # Get new arrays
             while len(arrays_by_iteration.get(iteration, {})) < len(arrays_description):
                 name: str
                 timestep: int
                 array: da.Array
-                name, timestep, array = ray.get(self.head.get_next_array.remote())
-    
+                name, timestep, array = ray.get(
+                    self.head.get_next_array.remote())
+
                 if timestep not in arrays_by_iteration:
                     arrays_by_iteration[timestep] = {}
-    
+
                 assert name not in arrays_by_iteration[timestep]
                 arrays_by_iteration[timestep][name] = array
-    
+
             # Compute the arrays to pass to the callback
             all_arrays: dict[str, da.Array | list[da.Array]] = {}
-    
+
             for description in arrays_description:
                 if description.window_size is None:
                     all_arrays[description.name] = arrays_by_iteration[iteration][description.name]
@@ -183,24 +188,25 @@ class Deisa:
                         arrays_by_iteration[timestep][description.name]
                         for timestep in range(max(iteration - description.window_size + 1, 0), iteration + 1)
                     ]
-    
+
             if prepare_iteration is not None:
                 preparation_result = ray.get(preparation_results[iteration])
-                simulation_callback(**all_arrays, timestep=timestep, preparation_result=preparation_result)
+                simulation_callback(
+                    **all_arrays, timestep=timestep, preparation_result=preparation_result)
             else:
                 simulation_callback(**all_arrays, timestep=timestep)
-    
+
             del all_arrays
-    
+
             # Remove the oldest arrays
             for description in arrays_description:
                 older_timestep = iteration - (description.window_size or 1) + 1
                 if older_timestep >= 0:
                     del arrays_by_iteration[older_timestep][description.name]
-    
+
                     if not arrays_by_iteration[older_timestep]:
                         del arrays_by_iteration[older_timestep]
-    
+
             # Free the memory used by the arrays now. Since an ObjectRef is a small object,
             # Python may otherwise choose to keep it in memory for some time, preventing the
             # actual data to be freed.

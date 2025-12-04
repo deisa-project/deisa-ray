@@ -5,6 +5,7 @@ from tests.utils import ray_cluster, simple_worker, wait_for_head_node  # noqa: 
 
 NB_ITERATIONS = 10
 
+
 @ray.remote(max_retries=0)
 def head_script() -> None:
     """The head node checks that the values are correct"""
@@ -37,7 +38,7 @@ def test_preprocessing_callback(ray_cluster) -> None:  # noqa: F811
                 rank=rank,
                 position=(rank // 2, rank % 2),
                 chunks_per_dim=(2, 2),
-                nb_chunks_of_node=1,
+                nb_chunks_of_node=4,
                 chunk_size=(1, 1),
                 nb_iterations=NB_ITERATIONS,
                 node_id=f"node_{rank}",

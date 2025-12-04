@@ -34,7 +34,8 @@ def head() -> None:
         simulation_callback,
         [
             WindowArrayDefinition("a", window_size=2),
-            WindowArrayDefinition("b", window_size=1, preprocess=lambda x: 2 * x),
+            WindowArrayDefinition("b", window_size=1,
+                                  preprocess=lambda x: 2 * x),
         ],
         max_iterations=NB_ITERATIONS,
     )
@@ -52,7 +53,7 @@ def test_several_arrays(ray_cluster) -> None:  # noqa: F811
                 rank=rank,
                 position=(rank // 2, rank % 2),
                 chunks_per_dim=(2, 2),
-                nb_chunks_of_node=1,
+                nb_chunks_of_node=4,
                 chunk_size=(1, 1),
                 nb_iterations=NB_ITERATIONS,
                 node_id=f"node_{rank}",
@@ -66,7 +67,7 @@ def test_several_arrays(ray_cluster) -> None:  # noqa: F811
                 rank=rank,
                 position=(rank // 2, rank % 2),
                 chunks_per_dim=(2, 2),
-                nb_chunks_of_node=1,
+                nb_chunks_of_node=4,
                 chunk_size=(1, 1),
                 nb_iterations=NB_ITERATIONS,
                 node_id=f"node_{rank}",

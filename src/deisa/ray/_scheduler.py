@@ -6,6 +6,7 @@ import ray
 from dask.core import get_dependencies
 from deisa.ray.scheduling_actor import ChunkRef, ScheduledByOtherActor
 
+
 def random_partitioning(dsk, scheduling_actors: dict) -> dict[str, int]:
     """
     Partition a Dask task graph randomly across scheduling actors.
@@ -116,13 +117,15 @@ def greedy_partitioning(dsk, scheduling_actors: dict) -> dict[str, int]:
         if isinstance(val, ChunkRef):
             partition[k] = val.actor_id
         else:
-            actors_dependencies = [explore(dep) for dep in get_dependencies(dsk, k)]
+            actors_dependencies = [explore(dep)
+                                   for dep in get_dependencies(dsk, k)]
 
             if not actors_dependencies:
                 # The task is a leaf, we use a random actor
                 partition[k] = random.choice(actor_names)
             else:
-                partition[k] = Counter(actors_dependencies).most_common(1)[0][0]
+                partition[k] = Counter(
+                    actors_dependencies).most_common(1)[0][0]
 
         return partition[k]
 
@@ -208,6 +211,7 @@ def deisa_ray_get(dsk, keys, **kwargs):
     ... )
     """
     debug_logs_path: str | None = kwargs.get("deisa_ray_debug_logs", None)
+    print("FLAG7", flush=True)
 
     def log(message: str, debug_logs_path: str | None) -> None:
         if debug_logs_path is not None:
@@ -241,7 +245,8 @@ def deisa_ray_get(dsk, keys, **kwargs):
 
     log("2. Graph partitioning done", debug_logs_path)
 
-    partitioned_graphs: dict[int, dict] = {actor_id: {} for actor_id in scheduling_actors}
+    partitioned_graphs: dict[int, dict] = {
+        actor_id: {} for actor_id in scheduling_actors}
 
     for k, v in dsk.items():
         actor_id = partition[k]
@@ -250,7 +255,8 @@ def deisa_ray_get(dsk, keys, **kwargs):
 
         for dep in get_dependencies(dsk, k):
             if partition[dep] != actor_id:
-                partitioned_graphs[actor_id][dep] = ScheduledByOtherActor(partition[dep])
+                partitioned_graphs[actor_id][dep] = ScheduledByOtherActor(
+                    partition[dep])
 
     log("3. Partitioned graphs created", debug_logs_path)
 
@@ -259,6 +265,7 @@ def deisa_ray_get(dsk, keys, **kwargs):
     for id, actor in scheduling_actors.items():
         if partitioned_graphs[id]:
             actor.schedule_graph.remote(graph_id, partitioned_graphs[id])
+    print("FLAG8", flush=True)
 
     log("4. Graph scheduled", debug_logs_path)
 
@@ -272,6 +279,7 @@ def deisa_ray_get(dsk, keys, **kwargs):
     res = ray.get(ray.get(res_ref))
 
     log("5. End Doreisa scheduler", debug_logs_path)
+    print("FLAG9", flush=True)
 
     if isinstance(keys[0], list):
         return [[res]]

@@ -1,5 +1,5 @@
 import asyncio
-from typing import Callable
+from typing import Callable, Type
 
 import dask.array as da
 import numpy as np
@@ -8,6 +8,8 @@ import ray.actor
 
 from deisa.ray import Timestep
 from deisa.ray.types import HeadArrayDefinition, DaskArrayData
+from deisa.ray.scheduling_actor import SchedulingActor as _RealSchedulingActor
+from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 
 
 @ray.remote
@@ -50,23 +52,54 @@ class HeadNodeActor:
     and analytics that consume the constructed arrays.
     """
 
-    # TODO: Discuss if max_pending_arrays should be here or in register callback. In that case, what 
-    # should happen when the freqs are diff and max_pending_arrays are diff too? When does the sim 
+    # TODO: Discuss if max_pending_arrays should be here or in register callback. In that case, what
+    # should happen when the freqs are diff and max_pending_arrays are diff too? When does the sim
     # stop?''
-    def __init__(self, max_pending_arrays: int = 1_000_000_000) -> None:
+    def __init__(self, max_pending_arrays: int = 1_000_000_000,
+                 scheduling_actor_cls: Type = _RealSchedulingActor) -> None:
         # For each ID of a simulation node, the corresponding scheduling actor
+        self.node_id = ray.get_runtime_context().get_node_id()
         self.scheduling_actors: dict[str, ray.actor.ActorHandle] = {}
-
         # Must be used before creating a new array, to prevent the simulation from being
         # too many iterations in advance of the analytics.
-        self.new_pending_array_semaphore = asyncio.Semaphore(max_pending_arrays)
+        self.new_pending_array_semaphore = asyncio.Semaphore(
+            max_pending_arrays)
 
         self.new_array_created = asyncio.Event()
 
         # All the newly created arrays
-        self.arrays_ready: asyncio.Queue[tuple[str, Timestep, da.Array]] = asyncio.Queue()
+        self.arrays_ready: asyncio.Queue[tuple[str,
+                                               Timestep, da.Array]] = asyncio.Queue()
+        # NOTE: now lifetime is detached, otherwise at the end of the init, it will get killed
+        # NOTE: get_if_exists prevents race conditions
+        scheduling_actor_options = {
+            "name": "sched-central",
+            "namespace": "deisa_ray",
+            "lifetime": "detached",
+            "get_if_exists": True,
+            # WARNING: be careful - if not using async actor (has at least one async method)
+            # this will make OS try to spawn 1 billion threads and it will blow up
+            # StubSchedulingActor is async because of this.
+            "max_concurrency": 1000_000_000,
+            "num_cpus": 0,
+            "enable_task_events": False,
+        }
+        scheduling_actor_options["scheduling_strategy"] = NodeAffinitySchedulingStrategy(
+            node_id=self.node_id, soft=False
+        )
 
-    def register_arrays(self, arrays_definitions: list[HeadArrayDefinition])->None:
+        central_scheduler: ray.actor.ActorHandle = scheduling_actor_cls.options(
+            **scheduling_actor_options
+        ).remote(actor_id=self.node_id, head=ray.get_runtime_context().current_actor)
+        ray.get(central_scheduler.ready.remote())
+
+        self.register_scheduling_actor(self.node_id, central_scheduler)
+        print(f"ICI : {central_scheduler}", flush=True)
+
+    def get_head_node_id(self):
+        return self.node_id
+
+    def register_arrays(self, arrays_definitions: list[HeadArrayDefinition]) -> None:
         self.arrays: dict[str, DaskArrayData] = {
             definition.name: DaskArrayData(definition) for definition in arrays_definitions
         }
@@ -82,7 +115,7 @@ class HeadNodeActor:
         """
         return self.scheduling_actors
 
-    async def register_scheduling_actor(self, actor_id: str, actor_handle: ray.actor.ActorHandle):
+    def register_scheduling_actor(self, actor_id: str, actor_handle: ray.actor.ActorHandle):
         """
         Register a scheduling actor that has been created.
 
@@ -127,7 +160,8 @@ class HeadNodeActor:
         array_name: str,
         dtype: np.dtype,
         nb_chunks_per_dim: tuple[int, ...],
-        chunks: list[tuple[int,tuple[int, ...], tuple[int, ...]]],  # [(chunk position, chunk size), ...]
+        # [(chunk position, chunk size), ...]
+        chunks: list[tuple[int, tuple[int, ...], tuple[int, ...]]],
     ):
         """
         Register which chunks are owned by a scheduling actor.
@@ -156,7 +190,8 @@ class HeadNodeActor:
         array = self.arrays[array_name]
 
         for bridge_id, position, size in chunks:
-            array.set_chunk_owner(nb_chunks_per_dim, dtype, position, size, scheduling_actor_id, bridge_id)
+            array.set_chunk_owner(nb_chunks_per_dim, dtype,
+                                  position, size, scheduling_actor_id, bridge_id)
 
     async def chunks_ready(self, array_name: str, timestep: Timestep, all_chunks_ref: list[ray.ObjectRef]) -> None:
         """
@@ -188,7 +223,8 @@ class HeadNodeActor:
         array = self.arrays[array_name]
 
         while timestep not in array.chunk_refs:
-            t1 = asyncio.create_task(self.new_pending_array_semaphore.acquire())
+            t1 = asyncio.create_task(
+                self.new_pending_array_semaphore.acquire())
             t2 = asyncio.create_task(self.new_array_created.wait())
 
             done, pending = await asyncio.wait([t1, t2], return_when=asyncio.FIRST_COMPLETED)
