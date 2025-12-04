@@ -28,3 +28,6 @@ class StubSchedulingActor:
     async def send(self, *args, **kwargs):
         # No-op; we don't test add_chunk here
         return True
+
+    def ready(self):
+        pass
