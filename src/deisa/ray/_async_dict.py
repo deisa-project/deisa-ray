@@ -10,6 +10,9 @@ class AsyncDict(Generic[K, V]):
         self._data: dict[K, V] = {}
         self._new_key_event = asyncio.Event()
 
+    def keys(self)->list[K]:
+        return self._data.keys()
+
     def __setitem__(self, key: K, value: V):
         self._data[key] = value
         self._new_key_event.set()

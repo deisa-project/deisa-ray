@@ -121,13 +121,13 @@ class HeadNodeActor:
         """
         return {name: array.definition.preprocess for name, array in self.arrays.items()}
 
-    def set_owned_chunks(
+    def register_partial_array(
         self,
-        scheduling_actor_id: int,
+        actor_id_who_owns: int,
         array_name: str,
         dtype: np.dtype,
         nb_chunks_per_dim: tuple[int, ...],
-        chunks: list[tuple[int,tuple[int, ...], tuple[int, ...]]],  # [(chunk position, chunk size), ...]
+        chunks_meta: list[tuple[int,tuple[int, ...], tuple[int, ...]]],  # [(chunk position, chunk size), ...]
     ):
         """
         Register which chunks are owned by a scheduling actor.
@@ -155,8 +155,8 @@ class HeadNodeActor:
         """
         array = self.arrays[array_name]
 
-        for bridge_id, position, size in chunks:
-            array.set_chunk_owner(nb_chunks_per_dim, dtype, position, size, scheduling_actor_id, bridge_id)
+        for bridge_id, position, size in chunks_meta:
+            array.update_meta(nb_chunks_per_dim, dtype, position, size, actor_id_who_owns, bridge_id)
 
     async def chunks_ready(self, array_name: str, timestep: Timestep, all_chunks_ref: list[ray.ObjectRef]) -> None:
         """

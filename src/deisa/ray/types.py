@@ -48,7 +48,7 @@ class ArrayPerTimestep:
         self.local_chunks: AsyncDict[int, ray.ObjectRef | bytes] = AsyncDict()
 
 
-class Array:
+class PartialArray:
     """
     Internal class tracking metadata and chunks for an array.
 
@@ -76,14 +76,14 @@ class Array:
     # TODO add types
 
     def __init__(self):
-        # Indicates if set_owned_chunks method has been called for this array.
+        # Indicates if register_partial_array method has been called for this array.
         self.ready_event = asyncio.Event()
 
         # Chunks owned by this actor for this array.
         # {(bridge_id, chunk position, chunk size), ...}
-        self.owned_chunks: set[tuple[int, tuple[int, ...], tuple[int, ...]]] = set()
+        self.chunks_contained_meta: set[tuple[int, tuple[int, ...], tuple[int, ...]]] = set()
 
-        self.timesteps: AsyncDict[Timestep, ArrayPerTimestep] = AsyncDict()
+        self.per_timestep_arrays: AsyncDict[Timestep, ArrayPerTimestep] = AsyncDict()
 
 @dataclass
 class ScheduledByOtherActor:
@@ -316,7 +316,7 @@ class DaskArrayData:
         # global reference is added to the Dask graph. Then, the list is cleared.
         self.chunk_refs: dict[Timestep, list[ray.ObjectRef]] = {}
 
-    def set_chunk_owner(
+    def update_meta(
         self,
         nb_chunks_per_dim: tuple[int, ...],
         dtype: np.dtype,

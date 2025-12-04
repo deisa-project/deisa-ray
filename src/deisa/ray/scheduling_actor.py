@@ -1,8 +1,7 @@
 import pickle
 import ray
-import ray.actor
 from deisa.ray._async_dict import AsyncDict
-from deisa.ray.types import ChunkRef, ScheduledByOtherActor, GraphInfo, ArrayPerTimestep, Array
+from deisa.ray.types import ChunkRef, ScheduledByOtherActor, GraphInfo, ArrayPerTimestep, PartialArray
 from deisa.ray.utils import get_ready_actor_with_retry
 from deisa.ray.ray_patch import remote_ray_dask_get
 from deisa.ray.errors import ContractError
@@ -51,8 +50,9 @@ class NodeBase:
         self.head = get_ready_actor_with_retry(name="simulation_head", namespace="deisa_ray")
         await self.head.register_scheduling_actor.remote(actor_id, self.actor_handle)
 
-        # For collecting chunks
-        self.arrays: AsyncDict[str, Array] = AsyncDict()
+        # Keeps track of array metadata AND ref per timestep. 
+        # TODO: I think these two responsabilities could be separated.
+        self.partial_arrays: AsyncDict[str, PartialArray] = AsyncDict()
         
         # For non-chunked feedback between analytics and simulation
         self.feedback_non_chunked: Dict[Hashable, Any] = {}
@@ -89,29 +89,36 @@ class NodeBase:
     )->None:
         self.feedback_non_chunked.pop(key, None)
 
+    def _retrieve_partial_array(self,array_name, nb_chunks_of_node)->PartialArray:
+        if array_name not in self.partial_arrays:
+            self.partial_arrays[array_name] = PartialArray()
+            self.nb_chunks_of_node = nb_chunks_of_node
+        return self.partial_arrays[array_name]
         
     async def register_chunk(self, bridge_id, array_name, chunk_shape, nb_chunks_per_dim, nb_chunks_of_node, dtype, chunk_position):
-        #NOTE: im worried about race conditions here
-        if array_name not in self.arrays:
-            self.arrays[array_name] = Array()
-            self.nb_chunks_of_node = nb_chunks_of_node
+        partial_array = self._retrieve_partial_array(array_name, nb_chunks_of_node)
 
-        array = self.arrays[array_name]
+        # add metadata for this array 
+        partial_array.chunks_contained_meta.add((bridge_id, chunk_position, chunk_shape))
 
-        array.owned_chunks.add((bridge_id, chunk_position, chunk_shape))
-
-        if len(array.owned_chunks) == nb_chunks_of_node:
-            await self.head.set_owned_chunks.options(enable_task_events=False).remote(
+        # Technically, no race conditions should happen since its calls to the same actor method 
+        # happen synchrnously (in ray). Since the method is async, it will run the method one a at 
+        # a time, and give control to async runtime when it encounters await below. 
+        # HOWEVER - with certain implementation of MPI, there have been problems here. 
+        if len(partial_array.chunks_contained_meta) == nb_chunks_of_node:
+            await self.head.register_partial_array.options(enable_task_events=False).remote(
                     self.actor_id,
                     array_name,
                     dtype,
+                    # TODO I could figure this out from the global size and the chunk shape
                     nb_chunks_per_dim,
-                    list(array.owned_chunks),
+                    list(partial_array.chunks_contained_meta),
                 )
-            array.ready_event.set()
-            array.ready_event.clear()
+            # per array async event
+            partial_array.ready_event.set()
+            partial_array.ready_event.clear()
         else:
-            await array.ready_event.wait()
+            await partial_array.ready_event.wait()
 
     def preprocessing_callbacks(self) -> ray.ObjectRef:
         """
@@ -181,6 +188,7 @@ class NodeBase:
         """
         return refs[0]
 
+    # TODO: refactor from here
     async def send(
         self,
         bridge_id: int,
@@ -217,17 +225,16 @@ class NodeBase:
         The method blocks until all chunks for this timestep from this node
         are ready, ensuring proper synchronization.
         """
-        if array_name not in self.arrays:
+        if array_name not in self.partial_arrays:
             # respect contract at the beginning
             raise ContractError(f"User requested to add chunk for {array_name} but this array has"  
                 f"not been described. Please call register_array({array_name}) before calling"
                 "add_chunk().")
-        array = self.arrays[array_name]
+        partial_array = self.partial_arrays[array_name]
 
-        if timestep not in array.timesteps:
-            array.timesteps[timestep] = ArrayPerTimestep()
-
-        array_timestep = array.timesteps[timestep]
+        if timestep not in partial_array.per_timestep_arrays.keys():
+            partial_array.per_timestep_arrays[timestep] = ArrayPerTimestep()
+        array_timestep = partial_array.per_timestep_arrays[timestep]
         array_timestep.local_chunks[bridge_id] = self.actor_handle._pack_object_ref.remote(chunk_ref)
 
         if len(array_timestep.local_chunks) == self.nb_chunks_of_node:
@@ -356,9 +363,9 @@ class SchedulingActor(NodeBase):
 
                 # TODO: maybe awaiting is not necessary. When would the key not be present in the 
                 # AsyncDict?
-                array = await self.arrays.wait_for_key(val.array_name)
+                array = await self.partial_arrays.wait_for_key(val.array_name)
 
-                array_timestep = await array.timesteps.wait_for_key(val.timestep)
+                array_timestep = await array.per_timestep_arrays.wait_for_key(val.timestep)
 
                 ref = await array_timestep.local_chunks.wait_for_key(val.bridge_id)
 
