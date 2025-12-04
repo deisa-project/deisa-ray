@@ -205,6 +205,7 @@ class Bridge:
 
         # create node actor
         self.create_node_actor(scheduling_actor_cls, node_actor_options)
+        self.register_arrays()
 
     def validate_arrays_meta(
         self,
@@ -372,6 +373,29 @@ class Bridge:
                 f"system_metadata must be a mapping, got {type(system_meta).__name__}"
             )
         return dict(system_meta)
+    
+    def register_arrays(self,):
+       # register each array + chunk info with node actor
+
+       for array_name, meta in self.arrays_metadata.items():
+           self.node_actor.register_chunk.remote(
+               bridge_id = self.id,
+               array_name = array_name,
+               chunk_shape = meta["chunk_shape"],
+               nb_chunks_per_dim = meta["nb_chunks_per_dim"] ,
+               nb_chunks_of_node = meta["nb_chunks_of_node"],
+               dtype = meta["dtype"],
+               chunk_position = meta["chunk_position"],
+           )
+
+       # double ray.get because method returns a ref itself
+       self.preprocessing_callbacks: dict[str, Callable] = ray.get(
+           ray.get(
+               self.node_actor.preprocessing_callbacks.remote()  # type: ignore
+           )
+       )
+       assert isinstance(self.preprocessing_callbacks, dict)
+
 
     def create_node_actor(
         self,
@@ -410,27 +434,6 @@ class Bridge:
                 self.node_actor: ray.actor.ActorHandle = node_actor_cls.options(
                     **node_actor_options
                 ).remote(actor_id=self.node_id)  # type: ignore
-
-                # register each array + chunk info with node actor
-                for array_name, meta in self.arrays_metadata.items():
-                    self.node_actor.register_chunk.remote(
-                        bridge_id = self.id,
-                        array_name = array_name,
-                        chunk_shape = meta["chunk_shape"],
-                        nb_chunks_per_dim = meta["nb_chunks_per_dim"] ,
-                        nb_chunks_of_node = meta["nb_chunks_of_node"],
-                        dtype = meta["dtype"],
-                        chunk_position = meta["chunk_position"],
-                    )
-
-                # double ray.get because method returns a ref itself
-                self.preprocessing_callbacks: dict[str, Callable] = ray.get(
-                    ray.get(
-                        self.node_actor.preprocessing_callbacks.remote()  # type: ignore
-                    )
-                )
-                assert isinstance(self.preprocessing_callbacks, dict)
-
                 break  # success
             except Exception as e: 
                 last_err = e
