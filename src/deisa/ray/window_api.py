@@ -8,7 +8,8 @@ import ray
 from deisa.ray._scheduler import deisa_ray_get
 from deisa.ray.head_node import HeadNodeActor
 from deisa.ray.utils import get_head_actor_options
-from deisa.ray.types import WindowArrayDefinition, HeadArrayDefinition, _CallbackConfig
+from deisa.ray.types import WindowArrayDefinition, _CallbackConfig
+import logging
 
 
 @ray.remote(num_cpus=0, max_retries=0)
@@ -66,8 +67,11 @@ class Deisa:
             ray.init(address="auto", log_to_driver=False, logging_level=logging.ERROR)
 
         dask.config.set(scheduler=deisa_ray_get, shuffle="tasks")
+        # create HeadNodeActor that coordinates everything.
         self.head: Any = HeadNodeActor.options(**get_head_actor_options()).remote()
+        # store all node actors
         self.node_actors = {}
+        # store registered callbacks from user analytics
         self.registered_callbacks: list[_CallbackConfig] = []
 
     def set(self,
@@ -133,11 +137,8 @@ class Deisa:
         prepare_iteration = cfg.prepare_iteration
         preparation_advance = cfg.preparation_advance
 
-
         # Convert the definitions to the type expected by the head node
-        head_arrays_description = [
-            HeadArrayDefinition(name=definition.name, preprocess=definition.preprocess) for definition in arrays_description
-        ]
+        head_arrays_description = [(definition.name, definition.preprocess) for definition in arrays_description ]
     
         ray.get(self.head.register_arrays.remote(head_arrays_description))
     

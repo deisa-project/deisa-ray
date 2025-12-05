@@ -210,31 +210,6 @@ class WindowArrayDefinition:
     preprocess: Callable = lambda x: x
 
 @dataclass
-class HeadArrayDefinition:
-    """
-    Description of a Dask array given by the user.
-
-    Parameters
-    ----------
-    name : str
-        The name of the array.
-    preprocess : Callable, optional
-        A preprocessing function to apply to chunks of this array before
-        they are sent to the analytics. The function should take a numpy
-        array and return a processed numpy array. Default is the identity
-        function (no preprocessing).
-
-    Examples
-    --------
-    >>> def normalize(arr):
-    ...     return arr / arr.max()
-    >>> array_def = ArrayDefinition(name="temperature", preprocess=normalize)
-    """
-
-    name: str
-    preprocess: Callable = lambda x: x
-
-@dataclass
 class _CallbackConfig:
     simulation_callback: Callable
     arrays_description: list[WindowArrayDefinition]
@@ -285,8 +260,9 @@ class DaskArrayData:
         when the array is built.
     """
 
-    def __init__(self, definition: HeadArrayDefinition) -> None:
-        self.definition = definition
+    def __init__(self, name, f_preprocessing) -> None:
+        self.name = name
+        self.f_preprocessing = f_preprocessing
 
         # This will be set when we know, for each chunk, the scheduling actor in charge of it.
         self.fully_defined: asyncio.Event = asyncio.Event()
@@ -454,14 +430,14 @@ class DaskArrayData:
 
         # We need to add the timestep since the same name can be used several times for different
         # timesteps
-        dask_name = f"{self.definition.name}_{timestep}"
+        dask_name = f"{self.name}_{timestep}"
 
         graph = {
             # We need to repeat the name and position in the value since the key might be removed
             # by the Dask optimizer
             (dask_name,) + position: ChunkRef(
                 actor_id,
-                self.definition.name,
+                self.name,
                 timestep,
                 position,
                 self.position_to_bridgeID[position],

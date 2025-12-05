@@ -503,7 +503,7 @@ class Bridge:
         # Setting the owner allows keeping the reference when the simulation script terminates.
         ref = ray.put(chunk, _owner=self.node_actor)
 
-        future: ray.ObjectRef = self.node_actor.send.remote(
+        future: ray.ObjectRef = self.node_actor.add_chunk.remote(
             bridge_id=self.id,
             array_name=array_name,
             chunk_ref=[ref],

@@ -7,7 +7,7 @@ import ray
 import ray.actor
 
 from deisa.ray import Timestep
-from deisa.ray.types import HeadArrayDefinition, DaskArrayData
+from deisa.ray.types import DaskArrayData
 
 
 @ray.remote
@@ -54,31 +54,31 @@ class HeadNodeActor:
     # should happen when the freqs are diff and max_pending_arrays are diff too? When does the sim 
     # stop?''
     def __init__(self, max_pending_arrays: int = 1_000_000_000) -> None:
-        # For each ID of a simulation node, the corresponding scheduling actor
+        # For each ID of a actor_handle, the corresponding scheduling actor
         self.scheduling_actors: dict[str, ray.actor.ActorHandle] = {}
 
-        # Must be used before creating a new array, to prevent the simulation from being
-        # too many iterations in advance of the analytics.
+        # regulate how far ahead sim can go wrt to analytics
         self.new_pending_array_semaphore = asyncio.Semaphore(max_pending_arrays)
 
+        # TODO: document what this event signals and update documentation
         self.new_array_created = asyncio.Event()
 
         # All the newly created arrays
         self.arrays_ready: asyncio.Queue[tuple[str, Timestep, da.Array]] = asyncio.Queue()
 
-    def register_arrays(self, arrays_definitions: list[HeadArrayDefinition])->None:
+    def register_arrays(self, arrays_definitions: list[tuple[str, Callable]])->None:
         self.arrays: dict[str, DaskArrayData] = {
-            definition.name: DaskArrayData(definition) for definition in arrays_definitions
+            name: DaskArrayData(name, f_preprocessing) for (name, f_preprocessing) in arrays_definitions
         }
 
-    def list_scheduling_actors(self) -> list[ray.actor.ActorHandle]:
+    def list_scheduling_actors(self) -> dict[str, ray.actor.ActorHandle]:
         """
         Return the list of scheduling actors.
 
         Returns
         -------
-        list[ray.actor.ActorHandle]
-            List of actor handles for all registered scheduling actors.
+        Dict[ray.actor.ActorHandle]
+            Dictionary of actor_id to actor handles for all registered scheduling actors.
         """
         return self.scheduling_actors
 
@@ -119,7 +119,7 @@ class HeadNodeActor:
         provided during initialization. These callbacks are static and cannot
         be changed after initialization.
         """
-        return {name: array.definition.preprocess for name, array in self.arrays.items()}
+        return {name: array.f_preprocessing for name, array in self.arrays.items()}
 
     def register_partial_array(
         self,

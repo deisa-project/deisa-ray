@@ -80,7 +80,6 @@ class NodeBase:
         else:
             raise NotImplementedError()
         
-
     def delete(
         self,
         *args,
@@ -89,14 +88,25 @@ class NodeBase:
     )->None:
         self.feedback_non_chunked.pop(key, None)
 
-    def _retrieve_partial_array(self,array_name, nb_chunks_of_node)->PartialArray:
+    def _create_or_retrieve_partial_array(self,
+                                          array_name: str, 
+                                          nb_chunks_of_node: int
+                                          )->PartialArray:
         if array_name not in self.partial_arrays:
             self.partial_arrays[array_name] = PartialArray()
             self.nb_chunks_of_node = nb_chunks_of_node
         return self.partial_arrays[array_name]
         
-    async def register_chunk(self, bridge_id, array_name, chunk_shape, nb_chunks_per_dim, nb_chunks_of_node, dtype, chunk_position):
-        partial_array = self._retrieve_partial_array(array_name, nb_chunks_of_node)
+    async def register_chunk(self, 
+                             bridge_id: int, 
+                             array_name: str, 
+                             chunk_shape, 
+                             nb_chunks_per_dim, 
+                             nb_chunks_of_node: int, 
+                             dtype, 
+                             chunk_position
+                             )->None:
+        partial_array = self._create_or_retrieve_partial_array(array_name, nb_chunks_of_node)
 
         # add metadata for this array 
         partial_array.chunks_contained_meta.add((bridge_id, chunk_position, chunk_shape))
@@ -189,7 +199,7 @@ class NodeBase:
         return refs[0]
 
     # TODO: refactor from here
-    async def send(
+    async def add_chunk(
         self,
         bridge_id: int,
         array_name: str,
