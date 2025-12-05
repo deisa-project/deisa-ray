@@ -65,11 +65,11 @@ class HeadNodeActor:
 
         # All the newly created arrays
         self.arrays_ready: asyncio.Queue[tuple[str, Timestep, da.Array]] = asyncio.Queue()
+        self.registered_arrays: dict[str, DaskArrayData] = {}
 
     def register_arrays(self, arrays_definitions: list[tuple[str, Callable]])->None:
-        self.arrays: dict[str, DaskArrayData] = {
-            name: DaskArrayData(name, f_preprocessing) for (name, f_preprocessing) in arrays_definitions
-        }
+        for (name, f_preprocessing) in arrays_definitions:
+            self.registered_arrays[name] = DaskArrayData(name, f_preprocessing) 
 
     def list_scheduling_actors(self) -> dict[str, ray.actor.ActorHandle]:
         """
@@ -119,7 +119,7 @@ class HeadNodeActor:
         provided during initialization. These callbacks are static and cannot
         be changed after initialization.
         """
-        return {name: array.f_preprocessing for name, array in self.arrays.items()}
+        return {name: array.f_preprocessing for name, array in self.registered_arrays.items()}
 
     def register_partial_array(
         self,
@@ -153,7 +153,8 @@ class HeadNodeActor:
         which chunks they are responsible for. This information is used to
         track array construction progress.
         """
-        array = self.arrays[array_name]
+        # TODO no checks done for when all nodeactors have called this
+        array = self.registered_arrays[array_name]
 
         for bridge_id, position, size in chunks_meta:
             array.update_meta(nb_chunks_per_dim, dtype, position, size, actor_id_who_owns, bridge_id)
@@ -185,7 +186,7 @@ class HeadNodeActor:
         chunks for a timestep are ready, the full Dask array is constructed
         and added to the `arrays_ready` queue for collection by analytics.
         """
-        array = self.arrays[array_name]
+        array = self.registered_arrays[array_name]
 
         while timestep not in array.chunk_refs:
             t1 = asyncio.create_task(self.new_pending_array_semaphore.acquire())
@@ -286,5 +287,5 @@ class HeadNodeActor:
         are known) before returning. The returned array is suitable for
         preparation tasks that need array metadata but not the actual data.
         """
-        await self.arrays[array_name].fully_defined.wait()
-        return self.arrays[array_name].get_full_array(timestep, is_preparation=True)
+        await self.registered_arrays[array_name].fully_defined.wait()
+        return self.registered_arrays[array_name].get_full_array(timestep, is_preparation=True)

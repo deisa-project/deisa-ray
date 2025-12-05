@@ -336,7 +336,7 @@ class Bridge:
         chunk_position = meta["chunk_position"]
         if not (
             isinstance(chunk_position, (tuple, list))
-            and all(isinstance(n, int) for n in chunk_position)
+            and all(isinstance(pos, int) and 0<=pos<nb_chunks for pos, nb_chunks in zip(chunk_position, nb_chunks_per_dim))
         ):
             raise TypeError(
                 f"arrays_metadata['{name}']['chunk_position'] must be a "
@@ -395,7 +395,6 @@ class Bridge:
            )
        )
        assert isinstance(self.preprocessing_callbacks, dict)
-
 
     def create_node_actor(
         self,

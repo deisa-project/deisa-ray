@@ -278,7 +278,7 @@ class DaskArrayData:
         self.dtype: np.dtype | None = None
 
         # ID of the scheduling actor in charge of the chunk at each position
-        self.scheduling_actors_id: dict[tuple[int, ...], int] = {}
+        self.position_to_node_actorID: dict[tuple[int, ...], int] = {}
         self.position_to_bridgeID: dict[tuple, int] = {}
 
         # Number of scheduling actors owning chunks of this array.
@@ -298,7 +298,7 @@ class DaskArrayData:
         dtype: np.dtype,
         position: tuple[int, ...],
         size: tuple[int, ...],
-        scheduling_actor_id: int,
+        node_actor_id: int,
         bridge_id: int,
     ) -> None:
         """
@@ -328,6 +328,7 @@ class DaskArrayData:
             have inconsistent dimensions, dtype, or sizes compared to the
             first chunk.
         """
+        # TODO should be done just once
         if self.nb_chunks_per_dim is None:
             self.nb_chunks_per_dim = nb_chunks_per_dim
             self.nb_chunks = math.prod(nb_chunks_per_dim)
@@ -339,17 +340,14 @@ class DaskArrayData:
             assert self.dtype == dtype
             assert self.chunks_size is not None
 
-        for pos, nb_chunks in zip(position, nb_chunks_per_dim):
-            assert 0 <= pos < nb_chunks
-
-        self.scheduling_actors_id[position] = scheduling_actor_id
+        # TODO this actually should be done each time 
+        self.position_to_node_actorID[position] = node_actor_id
         self.position_to_bridgeID[position] = bridge_id
-
-        for d in range(len(position)):
-            if self.chunks_size[d][position[d]] is None:
-                self.chunks_size[d][position[d]] = size[d]
+        for i, pos in enumerate(position):
+            if self.chunks_size[i][pos] is None:
+                self.chunks_size[i][pos] = size[pos]
             else:
-                assert self.chunks_size[d][position[d]] == size[d]
+                assert self.chunks_size[i][pos] == size[pos]
 
     def add_chunk_ref(self, chunk_ref: ray.ObjectRef, timestep: Timestep) -> bool:
         """
@@ -377,11 +375,11 @@ class DaskArrayData:
         self.chunk_refs[timestep].append(chunk_ref)
 
         # We don't know all the owners yet
-        if len(self.scheduling_actors_id) != self.nb_chunks:
+        if len(self.position_to_node_actorID) != self.nb_chunks:
             return False
 
         if self.nb_scheduling_actors is None:
-            self.nb_scheduling_actors = len(set(self.scheduling_actors_id.values()))
+            self.nb_scheduling_actors = len(set(self.position_to_node_actorID.values()))
 
         return len(self.chunk_refs[timestep]) == self.nb_scheduling_actors
 
@@ -419,7 +417,7 @@ class DaskArrayData:
         The array name includes the timestep to allow the same array name
         to be used for different timesteps.
         """
-        assert len(self.scheduling_actors_id) == self.nb_chunks
+        assert len(self.position_to_node_actorID) == self.nb_chunks
         assert self.nb_chunks is not None and self.nb_chunks_per_dim is not None
 
         if is_preparation:
@@ -443,7 +441,7 @@ class DaskArrayData:
                 self.position_to_bridgeID[position],
                 _all_chunks=all_chunks if it == 0 else None,
             )
-            for it, (position, actor_id) in enumerate(self.scheduling_actors_id.items())
+            for it, (position, actor_id) in enumerate(self.position_to_node_actorID.items())
         }
 
         dsk = HighLevelGraph.from_collections(dask_name, graph, dependencies=())

@@ -7,7 +7,7 @@ from deisa.ray.ray_patch import remote_ray_dask_get
 from deisa.ray.errors import ContractError
 from typing import Dict, Hashable, Any
 
-class NodeBase:
+class NodeActorBase:
     """
     Actor responsible for gathering chunks and exchanging data with analytics.
 
@@ -106,6 +106,13 @@ class NodeBase:
                              dtype, 
                              chunk_position
                              )->None:
+        """
+        All bridges in the same node will call this method to register their individual chunk of data for an array.
+        Once all bridges call this (notified through an async event) the node registers the node-local partial array with 
+        the head actor.
+
+        # TODO fill in numpy doc
+        """
         partial_array = self._create_or_retrieve_partial_array(array_name, nb_chunks_of_node)
 
         # add metadata for this array 
@@ -264,7 +271,7 @@ class NodeBase:
             await array_timestep.chunks_ready_event.wait()
 
 @ray.remote
-class NodeActor(NodeBase):
+class NodeActor(NodeActorBase):
     """
     Actor responsible for gathering chunks and exchanging data with analytics.
 
@@ -273,12 +280,12 @@ class NodeActor(NodeBase):
 
     async def __init__(self, actor_id: int, arrays_metadata: Dict[str, Dict] = {}) -> None:
         # Initialise the shared base part
-        await NodeBase.__init__(self, actor_id=actor_id, arrays_metadata=arrays_metadata)
+        await NodeActorBase.__init__(self, actor_id=actor_id, arrays_metadata=arrays_metadata)
         # Optionally: NodeActor-specific init here
 
 
 @ray.remote
-class SchedulingActor(NodeBase):
+class SchedulingActor(NodeActorBase):
     """
     Node actor with additional Dask graph scheduling behaviour.
 
