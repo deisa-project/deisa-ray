@@ -270,19 +270,6 @@ class NodeActorBase:
         else:
             await array_timestep.chunks_ready_event.wait()
 
-@ray.remote
-class NodeActor(NodeActorBase):
-    """
-    Actor responsible for gathering chunks and exchanging data with analytics.
-
-    This is a Ray actor. Shared logic is implemented in NodeBase.
-    """
-
-    async def __init__(self, actor_id: int, arrays_metadata: Dict[str, Dict] = {}) -> None:
-        # Initialise the shared base part
-        await NodeActorBase.__init__(self, actor_id=actor_id, arrays_metadata=arrays_metadata)
-        # Optionally: NodeActor-specific init here
-
 
 @ray.remote
 class SchedulingActor(NodeActorBase):
@@ -435,3 +422,16 @@ class SchedulingActor(NodeActorBase):
 
         await graph_info.scheduled_event.wait()
         return await graph_info.refs[key]
+
+@ray.remote
+class NodeActor(NodeActorBase):
+    """
+    Actor responsible for gathering chunks and exchanging data with analytics.
+
+    This is a Ray actor. Shared logic is implemented in NodeBase.
+    """
+
+    async def __init__(self, actor_id: int, arrays_metadata: Dict[str, Dict] = {}) -> None:
+        # Initialise the shared base part
+        await NodeActorBase.__init__(self, actor_id=actor_id, arrays_metadata=arrays_metadata)
+        # Optionally: NodeActor-specific init here

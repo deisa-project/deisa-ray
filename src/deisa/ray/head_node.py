@@ -67,6 +67,7 @@ class HeadNodeActor:
         self.arrays_ready: asyncio.Queue[tuple[str, Timestep, da.Array]] = asyncio.Queue()
         self.registered_arrays: dict[str, DaskArrayData] = {}
 
+    # TODO rename or move creation of global container elsewhere
     def register_arrays(self, arrays_definitions: list[tuple[str, Callable]])->None:
         for (name, f_preprocessing) in arrays_definitions:
             self.registered_arrays[name] = DaskArrayData(name, f_preprocessing) 
@@ -154,6 +155,7 @@ class HeadNodeActor:
         track array construction progress.
         """
         # TODO no checks done for when all nodeactors have called this
+        # TODO missing check that analytics and sim have required/set same name of arrays, otherwise array is created and nothing happens
         array = self.registered_arrays[array_name]
 
         for bridge_id, position, size in chunks_meta:
@@ -188,7 +190,11 @@ class HeadNodeActor:
         """
         array = self.registered_arrays[array_name]
 
+        # long story short, this creates an empty array.chunk_refs[timestep] = []
         while timestep not in array.chunk_refs:
+            # TODO what happens if new_array_created for an array of a prev iter is set? 
+            # could it influence this iter?
+            # need to reason more about this condition
             t1 = asyncio.create_task(self.new_pending_array_semaphore.acquire())
             t2 = asyncio.create_task(self.new_array_created.wait())
 
@@ -206,7 +212,8 @@ class HeadNodeActor:
 
                     self.new_array_created.set()
                     self.new_array_created.clear()
-
+        # all_chunks_ref is [RayRef] st. ray.get(rayref) -> [ref_of_ref_chunk_i, ref_ref_chunk_i+1, ...] (belonging to actor that called it)
+        # so I unpack it and give this ray ref. 
         is_ready = array.add_chunk_ref(all_chunks_ref[0], timestep)
 
         if is_ready:
@@ -217,6 +224,7 @@ class HeadNodeActor:
                     array.get_full_array(timestep),
                 )
             )
+            # TODO Just used for preparation stuff
             array.fully_defined.set()
 
     def ready(self):
@@ -236,6 +244,7 @@ class HeadNodeActor:
         """
         return True
 
+    # TODO there is a single queue for all arrays. 
     async def get_next_array(self) -> tuple[str, Timestep, da.Array]:
         """
         Get the next ready array from the queue.

@@ -74,6 +74,7 @@ class Deisa:
         # store registered callbacks from user analytics
         self.registered_callbacks: list[_CallbackConfig] = []
 
+    # TODO add persist 
     def set(self,
             *args,
             key: Hashable,
@@ -81,6 +82,7 @@ class Deisa:
             chunked: bool = False,
             **kwargs
             )->None:
+        # TODO test
         if not self.node_actors:
             # retrieve node actors at least once
             self.node_actors = ray.get(self.head.list_scheduling_actors.remote())
@@ -98,7 +100,7 @@ class Deisa:
         self,
         simulation_callback: Callable,
     )->None:
-        pass
+        raise NotImplementedError("method not yet implemented.")
 
     def register_callback(
         self,
@@ -140,6 +142,7 @@ class Deisa:
         # Convert the definitions to the type expected by the head node
         head_arrays_description = [(definition.name, definition.preprocess) for definition in arrays_description ]
     
+        # TODO maybe this goes in the register callbacks
         ray.get(self.head.register_arrays.remote(head_arrays_description))
     
         arrays_by_iteration: dict[int, dict[str, da.Array]] = {}

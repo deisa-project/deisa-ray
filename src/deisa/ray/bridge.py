@@ -207,6 +207,98 @@ class Bridge:
         self.create_node_actor(scheduling_actor_cls, node_actor_options)
         self.register_arrays()
 
+    # TODO fix workflow with Hugo
+    def register_arrays(self,):
+       # register each array + chunk info with node actor
+
+       for array_name, meta in self.arrays_metadata.items():
+           self.node_actor.register_chunk.remote(
+               bridge_id = self.id,
+               array_name = array_name,
+               chunk_shape = meta["chunk_shape"],
+               nb_chunks_per_dim = meta["nb_chunks_per_dim"] ,
+               nb_chunks_of_node = meta["nb_chunks_of_node"],
+               dtype = meta["dtype"],
+               chunk_position = meta["chunk_position"],
+           )
+
+       # double ray.get because method returns a ref itself
+       self.preprocessing_callbacks: dict[str, Callable] = ray.get(
+           ray.get(
+               self.node_actor.preprocessing_callbacks.remote()  # type: ignore
+           )
+       )
+       assert isinstance(self.preprocessing_callbacks, dict)
+
+    def send(
+        self,
+        *args: Any,
+        array_name: str,
+        chunk: np.ndarray,
+        timestep: int,
+        chunked: bool = True,
+        store_externally: bool = False,
+        **kwargs: Any,
+    ) -> None:
+        """
+        Make a chunk of data available to the analytics.
+
+        This method applies the preprocessing callback associated with
+        ``array_name`` to the chunk, stores it in Ray's object store, and
+        sends a reference to the node actor. The method blocks until the
+        data is processed by the node actor.
+
+        Parameters
+        ----------
+        array_name : str
+            The name of the array this chunk belongs to.
+        chunk : numpy.ndarray
+            The chunk of data to be sent to the analytics.
+        timestep : int
+            The timestep index for this chunk of data.
+        chunked : bool, optional
+            Whether the chunk was produced by the internal chunking logic.
+            Currently reserved for future use. Default is True.
+        store_externally : bool, optional
+            If True, the data is stored externally. Not implemented yet.
+            Default is False.
+
+        Notes
+        -----
+        The chunk is first processed through the preprocessing callback
+        associated with ``array_name``. The processed chunk is then stored in
+        Ray's object store with the node actor as the owner, ensuring the
+        reference persists even after the simulation script terminates.
+        This method blocks until the node actor has processed the chunk.
+
+        Raises
+        ------
+        KeyError
+            If ``array_name`` is not found in the preprocessing callbacks
+            dictionary.
+        """
+        # ``chunked`` and additional args/kwargs are currently reserved for
+        # future extensions (e.g. multi-chunk sends). For now we only support
+        # sending a single chunk described by ``arrays_metadata``.
+        del args, kwargs  # explicitly unused
+
+        chunk = self.preprocessing_callbacks[array_name](chunk)
+
+        # Setting the owner allows keeping the reference when the simulation script terminates.
+        ref = ray.put(chunk, _owner=self.node_actor)
+
+        future: ray.ObjectRef = self.node_actor.add_chunk.remote(
+            bridge_id=self.id,
+            array_name=array_name,
+            chunk_ref=[ref],
+            timestep=timestep,
+            chunked=True,
+            store_externally=store_externally,
+        )  # type: ignore
+
+        # Wait until the data is processed before returning to the simulation
+        ray.get(future)
+
     def validate_arrays_meta(
         self,
         arrays_metadata: Mapping[str, Mapping[str, Any]],
@@ -374,28 +466,6 @@ class Bridge:
             )
         return dict(system_meta)
     
-    def register_arrays(self,):
-       # register each array + chunk info with node actor
-
-       for array_name, meta in self.arrays_metadata.items():
-           self.node_actor.register_chunk.remote(
-               bridge_id = self.id,
-               array_name = array_name,
-               chunk_shape = meta["chunk_shape"],
-               nb_chunks_per_dim = meta["nb_chunks_per_dim"] ,
-               nb_chunks_of_node = meta["nb_chunks_of_node"],
-               dtype = meta["dtype"],
-               chunk_position = meta["chunk_position"],
-           )
-
-       # double ray.get because method returns a ref itself
-       self.preprocessing_callbacks: dict[str, Callable] = ray.get(
-           ray.get(
-               self.node_actor.preprocessing_callbacks.remote()  # type: ignore
-           )
-       )
-       assert isinstance(self.preprocessing_callbacks, dict)
-
     def create_node_actor(
         self,
         node_actor_cls: Type = _RealSchedulingActor,
@@ -445,75 +515,6 @@ class Bridge:
                 f"Failed to create/ready scheduling actor for node {self.node_id}"
             ) from last_err
 
-    def send(
-        self,
-        *args: Any,
-        array_name: str,
-        chunk: np.ndarray,
-        timestep: int,
-        chunked: bool = True,
-        store_externally: bool = False,
-        **kwargs: Any,
-    ) -> None:
-        """
-        Make a chunk of data available to the analytics.
-
-        This method applies the preprocessing callback associated with
-        ``array_name`` to the chunk, stores it in Ray's object store, and
-        sends a reference to the node actor. The method blocks until the
-        data is processed by the node actor.
-
-        Parameters
-        ----------
-        array_name : str
-            The name of the array this chunk belongs to.
-        chunk : numpy.ndarray
-            The chunk of data to be sent to the analytics.
-        timestep : int
-            The timestep index for this chunk of data.
-        chunked : bool, optional
-            Whether the chunk was produced by the internal chunking logic.
-            Currently reserved for future use. Default is True.
-        store_externally : bool, optional
-            If True, the data is stored externally. Not implemented yet.
-            Default is False.
-
-        Notes
-        -----
-        The chunk is first processed through the preprocessing callback
-        associated with ``array_name``. The processed chunk is then stored in
-        Ray's object store with the node actor as the owner, ensuring the
-        reference persists even after the simulation script terminates.
-        This method blocks until the node actor has processed the chunk.
-
-        Raises
-        ------
-        KeyError
-            If ``array_name`` is not found in the preprocessing callbacks
-            dictionary.
-        """
-        # ``chunked`` and additional args/kwargs are currently reserved for
-        # future extensions (e.g. multi-chunk sends). For now we only support
-        # sending a single chunk described by ``arrays_metadata``.
-        del args, kwargs  # explicitly unused
-
-        chunk = self.preprocessing_callbacks[array_name](chunk)
-
-        # Setting the owner allows keeping the reference when the simulation script terminates.
-        ref = ray.put(chunk, _owner=self.node_actor)
-
-        future: ray.ObjectRef = self.node_actor.add_chunk.remote(
-            bridge_id=self.id,
-            array_name=array_name,
-            chunk_ref=[ref],
-            timestep=timestep,
-            chunked=True,
-            store_externally=store_externally,
-        )  # type: ignore
-
-        # Wait until the data is processed before returning to the simulation
-        ray.get(future)
-
     def get(
         self,
         *args: Any,
@@ -559,7 +560,6 @@ class Bridge:
             return ray.get(self.node_actor.get.remote(name, default, chunked))
 
         raise NotImplementedError("Retrieving chunked arrays via Bridge.get is not implemented yet.")
-
 
     def _delete(self, *args: Any, name: str, **kwargs: Any) -> None:
         """

@@ -375,12 +375,17 @@ class DaskArrayData:
         self.chunk_refs[timestep].append(chunk_ref)
 
         # We don't know all the owners yet
+        # TODO this method is useless now because we no longer "send" this data at every timestep. 
+        # before it was needed since the nb_chunks could in theory change and we were giving info about 
+        # array as well. This is no longer the case. Can someone confirm?
         if len(self.position_to_node_actorID) != self.nb_chunks:
             return False
 
         if self.nb_scheduling_actors is None:
             self.nb_scheduling_actors = len(set(self.position_to_node_actorID.values()))
 
+        # each actor produces a single ref - once I have as many refs as scheduling actors,
+        # I mark the array as ready to be formed.
         return len(self.chunk_refs[timestep]) == self.nb_scheduling_actors
 
     def get_full_array(self, timestep: Timestep, *, is_preparation: bool = False) -> da.Array:
