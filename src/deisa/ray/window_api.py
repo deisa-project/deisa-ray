@@ -139,11 +139,13 @@ class Deisa:
         prepare_iteration = cfg.prepare_iteration
         preparation_advance = cfg.preparation_advance
 
+        max_pending_arrays = 2 * len(arrays_description)
+
         # Convert the definitions to the type expected by the head node
         head_arrays_description = [(definition.name, definition.preprocess) for definition in arrays_description ]
     
         # TODO maybe this goes in the register callbacks
-        ray.get(self.head.register_arrays.remote(head_arrays_description))
+        ray.get(self.head.register_arrays.remote(head_arrays_description, max_pending_arrays))
     
         arrays_by_iteration: dict[int, dict[str, da.Array]] = {}
     

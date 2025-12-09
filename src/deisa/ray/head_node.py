@@ -53,12 +53,9 @@ class HeadNodeActor:
     # TODO: Discuss if max_pending_arrays should be here or in register callback. In that case, what 
     # should happen when the freqs are diff and max_pending_arrays are diff too? When does the sim 
     # stop?''
-    def __init__(self, max_pending_arrays: int = 1_000_000_000) -> None:
+    def __init__(self) -> None:
         # For each ID of a actor_handle, the corresponding scheduling actor
         self.scheduling_actors: dict[str, ray.actor.ActorHandle] = {}
-
-        # regulate how far ahead sim can go wrt to analytics
-        self.new_pending_array_semaphore = asyncio.Semaphore(max_pending_arrays)
 
         # TODO: document what this event signals and update documentation
         self.new_array_created = asyncio.Event()
@@ -68,7 +65,10 @@ class HeadNodeActor:
         self.registered_arrays: dict[str, DaskArrayData] = {}
 
     # TODO rename or move creation of global container elsewhere
-    def register_arrays(self, arrays_definitions: list[tuple[str, Callable]])->None:
+    def register_arrays(self, arrays_definitions: list[tuple[str, Callable]], max_pending_arrays: int = 1_000_000_000)->None:
+        # regulate how far ahead sim can go wrt to analytics
+        self.new_pending_array_semaphore = asyncio.Semaphore(max_pending_arrays)
+
         for (name, f_preprocessing) in arrays_definitions:
             self.registered_arrays[name] = DaskArrayData(name, f_preprocessing) 
 
