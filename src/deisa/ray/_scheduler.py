@@ -1,11 +1,14 @@
 import random
 import time
 from collections import Counter
-from typing import Callable
+from typing import Callable, Any
 import ray
 from dask.core import get_dependencies
 from deisa.ray.scheduling_actor import ChunkRef, ScheduledByOtherActor
+from deisa.ray.types import DoubleRef
 
+type ActorID = str
+type GraphKey = Any
 
 def random_partitioning(dsk, scheduling_actors: dict) -> dict[str, int]:
     """
@@ -134,8 +137,72 @@ def greedy_partitioning(dsk, scheduling_actors: dict) -> dict[str, int]:
 
     return partition
 
+def log(message: str, debug_logs_path: str | None) -> None:
+    if debug_logs_path is not None:
+        with open(debug_logs_path, "a") as f:
+            f.write(f"{time.time()} {message}\n")
 
-def deisa_ray_get(dsk, keys, **kwargs):
+def process_keys(keys_needed: list)-> list:
+    assert isinstance(keys_needed, list)
+
+    # unnest keys in case of non-aggregate operation
+    # TODO: keys are generally a list of needed keys. In case of a simple aggregation, this is a list of one element.
+    # however, when doing a non aggregating operation, the keys are wrapped in another list. For example, [[k0, k1], [k2,k3]]
+    # investigate whether this is associated to the number of nodes/actors or the chunking?
+    def unnest(keys: list)->list:
+        if len(keys) == 1:
+            if isinstance(keys[0], tuple):
+                return [keys[0]]
+            else:
+                return unnest(keys[0])
+        else:
+            if isinstance(keys, list):
+                res: list = []
+                for i in keys:
+                    if isinstance(i, list):
+                        for j in i:
+                            res.append(j)
+                    else:
+                        res.append(i)
+                return res
+
+    return unnest(keys_needed)
+
+def get_scheduling_actors_mapping():
+    head_node = ray.get_actor("simulation_head", namespace="deisa_ray")  # noqa: F841
+
+    # Find the scheduling actors
+    scheduling_actor_id_to_handle: dict[ActorID, ray.actor.ActorHandle] = ray.get(head_node.list_scheduling_actors.remote())
+    assert isinstance(scheduling_actor_id_to_handle, dict)
+
+    return scheduling_actor_id_to_handle
+
+def partition_and_schedule_graph(*, 
+                  full_dask_graph: dict, 
+                  graph_key_to_actor_id_map: dict[GraphKey, ActorID], 
+                  scheduling_actor_id_to_handle: dict[ActorID, ray.actor.ActorHandle],
+                  graph_id: int, 
+                  ):
+
+    partitioned_graphs: dict[ActorID, dict[GraphKey, Any]] = {
+        actor_id: {} for actor_id in scheduling_actor_id_to_handle}
+
+    for k, v in full_dask_graph.items():
+        actor_id = graph_key_to_actor_id_map[k]
+
+        partitioned_graphs[actor_id][k] = v
+
+        for dep in get_dependencies(full_dask_graph, k):
+            if graph_key_to_actor_id_map[dep] != actor_id:
+                partitioned_graphs[actor_id][dep] = ScheduledByOtherActor(
+                    graph_key_to_actor_id_map[dep])
+
+    for actorID, actor_handle in scheduling_actor_id_to_handle.items():
+        if partitioned_graphs[actorID]:
+            # give subgraph to actor for scheduling
+            actor_handle.schedule_graph.remote(graph_id, partitioned_graphs[actorID])
+
+def deisa_ray_get(full_dask_graph: dict, keys_needed: list, **kwargs):
     """
     Custom Dask scheduler that partitions and executes graphs on Ray actors.
 
@@ -212,103 +279,39 @@ def deisa_ray_get(dsk, keys, **kwargs):
     """
     debug_logs_path: str | None = kwargs.get("deisa_ray_debug_logs", None)
 
-    def log(message: str, debug_logs_path: str | None) -> None:
-        if debug_logs_path is not None:
-            with open(debug_logs_path, "a") as f:
-                f.write(f"{time.time()} {message}\n")
-
+    graph_id = random.randint(0, 2**128 - 1)
     partitioning_strategy: Callable = {"random": random_partitioning, "greedy": greedy_partitioning}[
         kwargs.get("deisa_ray_partitioning_strategy", "greedy")
     ]
 
-    log("1. Begin Doreisa scheduler", debug_logs_path)
+    scheduling_actor_id_to_handle: dict[ActorID, ray.actor.ActorHandle] = get_scheduling_actors_mapping()
 
-    # Sort the graph by keys to make scheduling deterministic
-    dsk = {k: v for k, v in sorted(dsk.items())}
+    full_dask_graph = {k: v for k, v in sorted(full_dask_graph.items())}
+    graph_key_to_actor_id_map: dict[GraphKey, ActorID] = partitioning_strategy(full_dask_graph, scheduling_actor_id_to_handle)
 
-    head_node = ray.get_actor("simulation_head", namespace="deisa_ray")  # noqa: F841
+    partition_and_schedule_graph(
+        full_dask_graph = full_dask_graph, 
+        graph_key_to_actor_id_map=graph_key_to_actor_id_map, 
+        scheduling_actor_id_to_handle=scheduling_actor_id_to_handle,
+        graph_id = graph_id
+        )
 
-    assert isinstance(keys, list)
-
-    # unnest keys in case of non-aggregate operation
-    def unnest(keys: list):
-        if len(keys) == 1:
-            if isinstance(keys[0], tuple):
-                return keys[0]
-            else:
-                return unnest(keys[0])
-        else:
-            if isinstance(keys, list):
-                res: list = []
-                for i in keys:
-                    if isinstance(i, list):
-                        for j in i:
-                            res.append(j)
-                    else:
-                        res.append(i)
-                return res
-            else:
-                return keys
-
-    keys = unnest(keys)
-
-    # Find the scheduling actors
-    scheduling_actors = ray.get(head_node.list_scheduling_actors.remote())
-    assert isinstance(scheduling_actors, dict)
-
-    partition = partitioning_strategy(dsk, scheduling_actors)
-
-    log("2. Graph partitioning done", debug_logs_path)
-
-    partitioned_graphs: dict[int, dict] = {
-        actor_id: {} for actor_id in scheduling_actors}
-
-    for k, v in dsk.items():
-        actor_id = partition[k]
-
-        partitioned_graphs[actor_id][k] = v
-
-        for dep in get_dependencies(dsk, k):
-            if partition[dep] != actor_id:
-                partitioned_graphs[actor_id][dep] = ScheduledByOtherActor(
-                    partition[dep])
-
-    log("3. Partitioned graphs created", debug_logs_path)
-
-    graph_id = random.randint(0, 2**128 - 1)
-
-    for id, actor in scheduling_actors.items():
-        if partitioned_graphs[id]:
-            actor.schedule_graph.remote(graph_id, partitioned_graphs[id])
-
-    log("4. Graph scheduled", debug_logs_path)
-    if not isinstance(keys, list):
-        keys = [keys]
+    keys_needed = process_keys(keys_needed)
 
     # repack keys in case of non-aggregate operation
-    res_refs = []
-    if len(keys) == 1:
-        res_refs = scheduling_actors[partition[keys[0]]].get_value.remote(
-            graph_id, keys[0])
-    else:
-        for key in keys:
-            res_refs.append(
-                scheduling_actors[partition[key]].get_value.remote(graph_id, key))
 
-    # NOTE : not sure ho to handle persist
+    result_refs: list[DoubleRef] = []
+
+    for key in keys_needed:
+        actor_id: ActorID = graph_key_to_actor_id_map[key]
+        actor_handle = scheduling_actor_id_to_handle[actor_id]
+        result_refs.append(actor_handle.get_value.remote(graph_id, key))
+
+    # NOTE : not sure how to handle persist
     if kwargs.get("ray_persist"):
-        if isinstance(keys[0], list):
-            return [[res_refs]]
-        return [res_refs]
+        return result_refs
 
     res = []
-    if isinstance(res_refs, list):
-        for ref in res_refs:
-            refff = ray.get(ray.get(ref))
-            res.append(refff)
-    else:
-        res = [ray.get(ray.get(res_refs))]
-
-    log("5. End Doreisa scheduler", debug_logs_path)
-
+    for double_ref in result_refs:
+        res.append(ray.get(ray.get(double_ref)))
     return [res]

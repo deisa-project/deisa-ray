@@ -1,11 +1,12 @@
 import pickle
 import ray
 from deisa.ray._async_dict import AsyncDict
-from deisa.ray.types import ChunkRef, ScheduledByOtherActor, GraphInfo, ArrayPerTimestep, PartialArray
+from deisa.ray.types import ChunkRef, ScheduledByOtherActor, GraphInfo, ArrayPerTimestep, PartialArray, DoubleRef
 from deisa.ray.utils import get_ready_actor_with_retry
 from deisa.ray.ray_patch import remote_ray_dask_get
 from deisa.ray.errors import ContractError
-from typing import Dict, Hashable, Any
+from ray.util.dask import ray_dask_get
+from typing import Dict, Hashable, Any, NewType
 
 class NodeActorBase:
     """
@@ -97,7 +98,7 @@ class NodeActorBase:
             self.nb_chunks_of_node = nb_chunks_of_node
         return self.partial_arrays[array_name]
         
-    async def register_chunk(self, 
+    async def register_chunk_meta(self, 
                              bridge_id: int, 
                              array_name: str, 
                              chunk_shape, 
@@ -252,6 +253,12 @@ class NodeActorBase:
         if timestep not in partial_array.per_timestep_arrays.keys():
             partial_array.per_timestep_arrays[timestep] = ArrayPerTimestep()
         array_timestep = partial_array.per_timestep_arrays[timestep]
+
+        # in this function, chunk_ref is a [rayref]. Doing ray.get(chunk_ref[0]) would get the data. 
+        # TODO why?
+        # the pack function returns chunk_ref[0] (the rayref to actual data). Note, I don't call it as self._pack_object_ref
+        # but rather, call it through the actor handle (so its a remote call). It memans that the local_chunk is a ref, s.t 
+        # ray.get(ref) returns ANOTHER ref to the data. So, a ref of a ref. 
         array_timestep.local_chunks[bridge_id] = self.actor_handle._pack_object_ref.remote(chunk_ref)
 
         if len(array_timestep.local_chunks) == self.nb_chunks_of_node:
@@ -260,8 +267,10 @@ class NodeActorBase:
                 assert isinstance(ref, ray.ObjectRef)
                 chunks.append(ref)
                 array_timestep.local_chunks[bridge_id] = pickle.dumps(ref)
+            # all_chunks_ref is a ref to a list of refs of refs. 
             all_chunks_ref = ray.put(chunks)
 
+            # TODO rename
             await self.head.chunks_ready.options(enable_task_events=False).remote(
                 array_name, timestep, [all_chunks_ref]
             )
@@ -269,7 +278,6 @@ class NodeActorBase:
             array_timestep.chunks_ready_event.clear()
         else:
             await array_timestep.chunks_ready_event.wait()
-
 
 @ray.remote
 class SchedulingActor(NodeActorBase):
@@ -371,26 +379,31 @@ class SchedulingActor(NodeActorBase):
 
                 array_timestep = await array.per_timestep_arrays.wait_for_key(val.timestep)
 
+                # should be pickled ref of ref
                 ref = await array_timestep.local_chunks.wait_for_key(val.bridge_id)
 
+                # TODO what does this mean?
                 if isinstance(ref, bytes):  # This may not be the case depending on the asyncio scheduling order
+                    # technically, here its an actual ray ref which is a ref of ref.
                     ref = pickle.loads(ref)
                 else:
                     ref = pickle.loads(pickle.dumps(ref))  # To free the memory automatically
 
+                # replace ChunkRef by actual ref (still ref of ref)
                 dsk[key] = ref
 
         # We will need the ObjectRefs of these keys
         keys_needed = list(dsk.keys())
 
         refs = await remote_ray_dask_get.remote(dsk, keys_needed)
-
         for key, ref in zip(keys_needed, refs):
             info.refs[key] = ref
 
         info.scheduled_event.set()
 
-    async def get_value(self, graph_id: int, key: str):
+    # this function does a 1 level unpacking of a ref of ref among other things.
+    # TODO rename
+    async def get_value(self, graph_id: int, key: str) -> ray.ObjectRef:
         """
         Get the result value for a specific key from a scheduled graph.
 
@@ -421,7 +434,18 @@ class SchedulingActor(NodeActorBase):
         graph_info = await self.graph_infos.wait_for_key(graph_id)
 
         await graph_info.scheduled_event.wait()
-        return await graph_info.refs[key]
+        # For tomorrow: I understood this - the await is similar to a ray.get() so it unpacks the ref once. 
+        # therefore, at the end all the refs are refs of refs (same leve). Then the patches dask task wrapper 
+        # is called and works the same way for all tasks (calls itself).
+        # Because of this, I also think I understand why we need a ref of ref: if you work directly with a ref of 
+        # data, then Actor1 could need a key from Actor2, and Actor2 a key from Actor1. Both call ray.get(refOwnedByOtherActor)
+        # and the cluster deadlocks. To fix this, I need to make it non-blocking. How can I do this? By making it a remote call. 
+        # However, to make the entire graph "coherent", I need to make leaf nodes refs of refs as well. Then it all becomes
+        # cohesive.
+        # I am missing why we need the pickling and how memory is released.
+        double_ref = graph_info.refs[key]
+        ref_to_result = await double_ref
+        return ref_to_result
 
 @ray.remote
 class NodeActor(NodeActorBase):

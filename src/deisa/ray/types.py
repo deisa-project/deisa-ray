@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Callable
+from typing import Callable, NewType
 from dask.highlevelgraph import HighLevelGraph
 import math
 import numpy as np
@@ -9,13 +9,7 @@ from deisa.ray import Timestep
 import dask.array as da
 from deisa.ray._async_dict import AsyncDict
 
-
-class ArraysMeta:
-    """
-    Describe the metadata of the Arrays being shared
-
-    """
-    # should be used at the beginning of Bridge Init to describe an array.
+DoubleRef  = NewType("DoubleRef", ray.ObjectRef)
 
 class ArrayPerTimestep:
     """
@@ -381,6 +375,7 @@ class DaskArrayData:
         if len(self.position_to_node_actorID) != self.nb_chunks:
             return False
 
+        # done once only and then never again - move it somewhere else?
         if self.nb_scheduling_actors is None:
             self.nb_scheduling_actors = len(set(self.position_to_node_actorID.values()))
 
@@ -429,6 +424,8 @@ class DaskArrayData:
             all_chunks = None
         else:
             all_chunks = ray.put(self.chunk_refs[timestep])
+            # TODO why is this done? is it so once array goes out of scope for user, everything is cleaned up? 
+            # is this the reason for the pickle dump in the beginning?
             del self.chunk_refs[timestep]
 
         # We need to add the timestep since the same name can be used several times for different
@@ -438,7 +435,7 @@ class DaskArrayData:
         graph = {
             # We need to repeat the name and position in the value since the key might be removed
             # by the Dask optimizer
-            (dask_name,) + position: ChunkRef(
+            (dask_name,) + position: ChunkRef( # note only first ChunkRef instance contains actual refs, the others contain only metadata.
                 actor_id,
                 self.name,
                 timestep,

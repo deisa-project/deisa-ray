@@ -184,8 +184,8 @@ class Bridge:
         self.id = id
         self._init_retries = _init_retries
 
-        self.arrays_metadata = self.validate_arrays_meta(arrays_metadata)
-        self.system_metadata = self.validate_system_meta(system_metadata)
+        self.arrays_metadata = self._validate_arrays_meta(arrays_metadata)
+        self.system_metadata = self._validate_system_meta(system_metadata)
 
         if not ray.is_initialized():
             ray.init(address="auto", log_to_driver=False, logging_level=logging.ERROR)
@@ -204,31 +204,37 @@ class Bridge:
             )
 
         # create node actor
-        self.create_node_actor(scheduling_actor_cls, node_actor_options)
-        self.register_arrays()
+        self._create_node_actor(scheduling_actor_cls, node_actor_options)
+        self._exchange_chunks_meta_with_node_actor()
 
-    # TODO fix workflow with Hugo
-    def register_arrays(self,):
-       # register each array + chunk info with node actor
+    def _exchange_chunks_meta_with_node_actor(self):
+        """
+        Send metadata to node actor for every array that is described in arrays metadata.
+        
+        :param self: TODO insert
+        """
+        # send metadata of each array chunk (both global and local chunk info) to node actor
 
-       for array_name, meta in self.arrays_metadata.items():
-           self.node_actor.register_chunk.remote(
-               bridge_id = self.id,
-               array_name = array_name,
-               chunk_shape = meta["chunk_shape"],
-               nb_chunks_per_dim = meta["nb_chunks_per_dim"] ,
-               nb_chunks_of_node = meta["nb_chunks_of_node"],
-               dtype = meta["dtype"],
-               chunk_position = meta["chunk_position"],
-           )
+        for array_name, meta in self.arrays_metadata.items():
+            self.node_actor.register_chunk_meta.remote(
+                # global info of array (same across bridges)
+                array_name = array_name,
+                chunk_shape = meta["chunk_shape"],
+                nb_chunks_per_dim = meta["nb_chunks_per_dim"] ,
+                nb_chunks_of_node = meta["nb_chunks_of_node"],
+                dtype = meta["dtype"],
+                # local info of array specific to bridge
+                bridge_id = self.id,
+                chunk_position = meta["chunk_position"],
+            )
 
-       # double ray.get because method returns a ref itself
-       self.preprocessing_callbacks: dict[str, Callable] = ray.get(
-           ray.get(
-               self.node_actor.preprocessing_callbacks.remote()  # type: ignore
-           )
-       )
-       assert isinstance(self.preprocessing_callbacks, dict)
+        # double ray.get because method returns a ref itself
+        self.preprocessing_callbacks: dict[str, Callable] = ray.get(
+            ray.get(
+                self.node_actor.preprocessing_callbacks.remote()  # type: ignore
+            )
+        )
+        assert isinstance(self.preprocessing_callbacks, dict)
 
     def send(
         self,
@@ -299,7 +305,7 @@ class Bridge:
         # Wait until the data is processed before returning to the simulation
         ray.get(future)
 
-    def validate_arrays_meta(
+    def _validate_arrays_meta(
         self,
         arrays_metadata: Mapping[str, Mapping[str, Any]],
     ) -> dict[str, dict[str, Any]]:
@@ -441,7 +447,7 @@ class Bridge:
                 f"same length as 'chunk_shape'"
             )
 
-    def validate_system_meta(self, system_meta: Mapping[str, Any]) -> dict[str, Any]:
+    def _validate_system_meta(self, system_meta: Mapping[str, Any]) -> dict[str, Any]:
         """
         Validate and normalize the ``system_metadata`` argument.
 
@@ -466,7 +472,7 @@ class Bridge:
             )
         return dict(system_meta)
     
-    def create_node_actor(
+    def _create_node_actor(
         self,
         node_actor_cls: Type = _RealSchedulingActor,
         node_actor_options: Mapping[str, Any] | None = None,
@@ -515,6 +521,7 @@ class Bridge:
                 f"Failed to create/ready scheduling actor for node {self.node_id}"
             ) from last_err
 
+    # TODO feedback needs testing
     def get(
         self,
         *args: Any,
