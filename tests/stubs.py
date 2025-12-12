@@ -25,6 +25,9 @@ class StubSchedulingActor:
     def preprocessing_callbacks(self) -> ray.ObjectRef:
         return self._callbacks_ref
 
-    async def add_chunk(self, *args, **kwargs):
+    async def register_chunk(self, *args, **kwargs):
         # No-op; we don't test add_chunk here
         return True
+
+    def ready(self):
+        pass

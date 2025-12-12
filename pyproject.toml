@@ -1,19 +1,25 @@
 [project]
-name = "doreisa"
-version = "0.3.4"
-description = ""
+name = "deisa-ray"
+version = "0.0.1"
+description = "In Situ Analytics with Ray backend"
 authors = [{ name = "Adrien Vannson", email = "adrien.vannson@protonmail.com" }]
 requires-python = ">=3.12"
 readme = "README.md"
 dependencies = [
     "dask[dataframe] (==2024.6.0)",
     "ray[default] (==2.47.1)",
-    "numpy", # TODO this was pinned for PDI, remove the pinning?
+    "numpy"
 ]
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.sdist]
+packages = ["src/deisa"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/deisa"]
 
 [dependency-groups]
 dev = [
@@ -25,6 +31,9 @@ dev = [
     "mkdocstrings[python]>=0.29.1",
     "pyright (>=1.1.397,<2.0.0)",
     "py-spy>=0.4.0",
+    "sphinx>=8.2.3",
+    "sphinx-autobuild>=2025.8.25",
+    "furo>=2025.9.25",
 ]
 
 [tool.ruff]
@@ -34,7 +43,7 @@ exclude = ["build", "dist", ".venv"]
 [tool.poe.tasks]
 test = "pytest ."
 check = "ruff check"
-typecheck = "pyright doreisa head.py"
+typecheck = "pyright src/deisa head.py"
 _format = "ruff format"
 _sort-imports = "ruff check --select I --fix"
 

@@ -9,10 +9,10 @@ NB_ITERATIONS = 100
 @ray.remote(max_retries=0)
 def head_script() -> None:
     """The head node checks that the values are correct"""
-    from doreisa.head_node import init
-    from doreisa.window_api import ArrayDefinition, run_simulation
+    from deisa.ray.window_api import Deisa
+    from deisa.ray.types import WindowArrayDefinition
 
-    init()
+    deisa = Deisa()
 
     def simulation_callback(array: da.Array, *, timestep: int, preparation_result: da.Array):
         # We still have a dask array
@@ -26,13 +26,14 @@ def head_script() -> None:
         # We can't use compute here since the data is not available yet
         return array.sum().persist()
 
-    run_simulation(
+    deisa.register_callback(
         simulation_callback,
-        [ArrayDefinition("array")],
+        [WindowArrayDefinition("array")],
         max_iterations=NB_ITERATIONS,
         prepare_iteration=prepare_iteration,
         preparation_advance=10,
     )
+    deisa.execute_callbacks()
 
 
 def test_prepare_iteration(ray_cluster) -> None:  # noqa: F811

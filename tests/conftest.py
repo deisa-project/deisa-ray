@@ -1,2 +1,1 @@
-# tests/conftest.py
-from tests.utils import ray_cluster  # noqa: F401
+from .utils import ray_cluster  # noqa: F401

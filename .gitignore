@@ -2,3 +2,10 @@ output
 .venv
 __pycache__
 *.ipynb
+.direnv/
+shell.nix
+.envrc
+docs/build/
+docs/source/.doctrees/
+docs/source/deisa*.rst
+docs/source/ray*.rst

@@ -6,6 +6,6 @@ repos:
     rev: v0.9.3
     hooks:
       - id: ruff-format
-        args: ["--diff", "doreisa", "tests"]
+        args: ["--diff", "src/deisa/ray", "tests"]
       - id: ruff
-        args: ["doreisa", "tests"]
+        args: ["src/deisa/ray", "tests"]

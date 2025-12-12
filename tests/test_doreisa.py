@@ -10,25 +10,26 @@ NB_ITERATIONS = 10
 @ray.remote(max_retries=0)
 def head_script() -> None:
     """The head node checks that the values are correct"""
-    from doreisa.head_node import init
-    from doreisa.window_api import ArrayDefinition, run_simulation
+    from deisa.ray.window_api import Deisa
+    from deisa.ray.types import WindowArrayDefinition
 
-    init()
+    deisa = Deisa()
 
     def simulation_callback(array: da.Array, timestep: int):
         x = array.sum().compute()
 
         assert x == 10 * timestep
 
-    run_simulation(
+    deisa.register_callback(
         simulation_callback,
-        [ArrayDefinition("array")],
+        [WindowArrayDefinition("array")],
         max_iterations=NB_ITERATIONS,
     )
+    deisa.execute_callbacks()
 
 
 @pytest.mark.parametrize("nb_nodes", [1, 2, 4])
-def test_doreisa(nb_nodes: int, ray_cluster) -> None:  # noqa: F811
+def test_deisa_ray(nb_nodes: int, ray_cluster) -> None:  # noqa: F811
     head_ref = head_script.remote()
     wait_for_head_node()
 
@@ -49,5 +50,5 @@ def test_doreisa(nb_nodes: int, ray_cluster) -> None:  # noqa: F811
     ray.get([head_ref] + worker_refs)
 
     # Check that the right number of scheduling actors were created
-    simulation_head = ray.get_actor("simulation_head", namespace="doreisa")
+    simulation_head = ray.get_actor("simulation_head", namespace="deisa_ray")
     assert len(ray.get(simulation_head.list_scheduling_actors.remote())) == nb_nodes

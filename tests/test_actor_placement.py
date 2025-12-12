@@ -2,7 +2,7 @@ import pytest
 import ray
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 from tests.stubs import StubSchedulingActor
-from doreisa.simulation_node import Client
+from deisa.ray.bridge import Bridge
 from ray.util.state import list_actors
 import dask.array as da
 from ray.cluster_utils import Cluster
@@ -59,7 +59,7 @@ def test_fake_cluster(ray_multinode_cluster):
     assert set(ids.values()) == live_ids
 
 
-NAMESPACE = "doreisa"
+NAMESPACE = "deisa_ray"
 
 
 def actor_node_id_by_name(name: str, namespace: str = NAMESPACE) -> str:
@@ -84,16 +84,20 @@ def test_actor_placement(ray_multinode_cluster):
     )
     def head_script() -> None:
         """The head node checks that the values are correct"""
-        from doreisa.window_api import ArrayDefinition, run_simulation
+        from deisa.ray.window_api import Deisa
+        from deisa.ray.types import WindowArrayDefinition
+
+        deisa = Deisa()
 
         def simulation_callback(array: da.Array, timestep: int):
             return True
 
-        run_simulation(
+        deisa.register_callback(
             simulation_callback,
-            [ArrayDefinition("array")],
+            [WindowArrayDefinition("array")],
             max_iterations=0,
         )
+        deisa.execute_callbacks()
 
     # submit head script (analogous to submitting analytics to head node)
     ray.get(head_script.remote())
@@ -110,7 +114,13 @@ def test_actor_placement(ray_multinode_cluster):
         scheduling_strategy=NodeAffinitySchedulingStrategy(node_id=worker_node_id, soft=False),
     )
     def make_client_and_return_ids():
-        c = Client(_node_id=None, scheduling_actor_cls=StubSchedulingActor)  # type:ignore
+        from deisa.ray.utils import get_system_metadata
+
+        sys_md = get_system_metadata()
+        c = Bridge(
+            id=0, arrays_metadata={}, system_metadata=sys_md, _node_id=None, scheduling_actor_cls=StubSchedulingActor
+        )  # type:ignore
+
         return (c.node_id, f"sched-{c.node_id}")
 
     client_node_id, sched_name = ray.get(make_client_and_return_ids.remote())
@@ -129,7 +139,7 @@ def test_actor_placement(ray_multinode_cluster):
 #     )
 #     def head_script() -> None:
 #         """The head node checks that the values are correct"""
-#         from doreisa.window_api import ArrayDefinition, run_simulation
+#         from deisa.ray.window_api import ArrayDefinition, run_simulation
 #
 #         time.sleep(sleep_t)
 #
@@ -149,7 +159,7 @@ def test_actor_placement(ray_multinode_cluster):
 #         scheduling_strategy=NodeAffinitySchedulingStrategy(node_id=worker_node_id, soft=False),
 #     )
 #     def make_client_and_return_ids():
-#         c = Client(_node_id=None)  # type:ignore
+#         c = Bridge(_node_id=None)  # type:ignore
 #         return (c.node_id, f"sched-{c.node_id}")
 #
 #     # this should be blocking because we want the sim code to wait
@@ -171,7 +181,7 @@ def test_actor_placement(ray_multinode_cluster):
 #         scheduling_strategy=NodeAffinitySchedulingStrategy(node_id=worker_node_id, soft=False),
 #     )
 #     def make_client_and_return_ids():
-#         c = Client(_node_id=None, _init_retries=1)  # type:ignore
+#         c = Bridge(_node_id=None, _init_retries=1)  # type:ignore
 #         return (c.node_id, f"sched-{c.node_id}")
 #
 #     with pytest.raises(Exception):

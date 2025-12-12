@@ -9,10 +9,10 @@ NB_ITERATIONS = 10
 @ray.remote(max_retries=0)
 def head() -> None:
     """The head node checks that the values are correct"""
-    from doreisa.head_node import init
-    from doreisa.window_api import ArrayDefinition, run_simulation
+    from deisa.ray.window_api import Deisa
+    from deisa.ray.types import WindowArrayDefinition
 
-    init()
+    deisa = Deisa()
 
     def simulation_callback(array: list[da.Array], timestep: int):
         if timestep == 0:
@@ -26,13 +26,14 @@ def head() -> None:
         # This checks that they are defined with different names.
         assert (array[1] - array[0]).sum().compute() == 10
 
-    run_simulation(
+    deisa.register_callback(
         simulation_callback,
         [
-            ArrayDefinition("array", window_size=2),
+            WindowArrayDefinition("array", window_size=2),
         ],
         max_iterations=NB_ITERATIONS,
     )
+    deisa.execute_callbacks()
 
 
 def test_sliding_window(ray_cluster) -> None:  # noqa: F811
