@@ -10,10 +10,9 @@ from typing import Any, Callable, Dict, Mapping, Type
 
 import numpy as np
 import ray
-import ray.actor
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
-
 from deisa.ray.scheduling_actor import SchedulingActor as _RealSchedulingActor
+from deisa.ray.types import RayActorHandle
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +81,7 @@ class Bridge:
     ----------
     node_id : str
         The ID of the node this Bridge is associated with.
-    scheduling_actor : ray.actor.ActorHandle
+    scheduling_actor : RayActorHandle
         The Ray actor handle for the scheduling actor.
     preprocessing_callbacks : dict[str, Callable]
         Dictionary mapping array names to their preprocessing callback functions.
@@ -209,23 +208,28 @@ class Bridge:
 
     def _exchange_chunks_meta_with_node_actor(self):
         """
-        Send metadata to node actor for every array that is described in arrays metadata.
-        
-        :param self: TODO insert
+        Push per-array metadata to the node actor and cache preprocessing callbacks.
+
+        Notes
+        -----
+        This method registers both global chunk layout and the bridge-specific
+        chunk position for every array described in ``arrays_metadata``. It
+        then fetches preprocessing callbacks from the node actor and stores
+        them locally for use during :meth:`send`.
         """
         # send metadata of each array chunk (both global and local chunk info) to node actor
 
         for array_name, meta in self.arrays_metadata.items():
             self.node_actor.register_chunk_meta.remote(
                 # global info of array (same across bridges)
-                array_name = array_name,
-                chunk_shape = meta["chunk_shape"],
-                nb_chunks_per_dim = meta["nb_chunks_per_dim"] ,
-                nb_chunks_of_node = meta["nb_chunks_of_node"],
-                dtype = meta["dtype"],
+                array_name=array_name,
+                chunk_shape=meta["chunk_shape"],
+                nb_chunks_per_dim=meta["nb_chunks_per_dim"],
+                nb_chunks_of_node=meta["nb_chunks_of_node"],
+                dtype=meta["dtype"],
                 # local info of array specific to bridge
-                bridge_id = self.id,
-                chunk_position = meta["chunk_position"],
+                bridge_id=self.id,
+                chunk_position=meta["chunk_position"],
             )
 
         # double ray.get because method returns a ref itself
@@ -330,10 +334,7 @@ class Bridge:
             If required keys are missing for any array.
         """
         if not isinstance(arrays_metadata, Mapping):
-            raise TypeError(
-                f"arrays_metadata must be a mapping from str to dict, "
-                f"got {type(arrays_metadata).__name__}"
-            )
+            raise TypeError(f"arrays_metadata must be a mapping from str to dict, got {type(arrays_metadata).__name__}")
 
         required_keys = {
             "chunk_shape",
@@ -348,23 +349,16 @@ class Bridge:
         for array_name, meta in arrays_metadata.items():
             # key type
             if not isinstance(array_name, str):
-                raise TypeError(
-                    f"arrays_metadata keys must be str, got {type(array_name).__name__}"
-                )
+                raise TypeError(f"arrays_metadata keys must be str, got {type(array_name).__name__}")
 
             # value type
             if not isinstance(meta, Mapping):
-                raise TypeError(
-                    f"arrays_metadata['{array_name}'] must be a mapping, "
-                    f"got {type(meta).__name__}"
-                )
+                raise TypeError(f"arrays_metadata['{array_name}'] must be a mapping, got {type(meta).__name__}")
 
             # required keys present?
             missing = required_keys - meta.keys()
             if missing:
-                raise ValueError(
-                    f"arrays_metadata['{array_name}'] is missing required keys: {missing}"
-                )
+                raise ValueError(f"arrays_metadata['{array_name}'] is missing required keys: {missing}")
 
             self._validate_single_array_metadata(array_name, meta)
             validated[array_name] = dict(meta)
@@ -402,13 +396,9 @@ class Bridge:
         """
         # chunk_shape: tuple/list of positive ints
         chunk_shape = meta["chunk_shape"]
-        if not (
-            isinstance(chunk_shape, (tuple, list))
-            and all(isinstance(n, int) and n > 0 for n in chunk_shape)
-        ):
+        if not (isinstance(chunk_shape, (tuple, list)) and all(isinstance(n, int) and n > 0 for n in chunk_shape)):
             raise TypeError(
-                f"arrays_metadata['{name}']['chunk_shape'] must be a "
-                f"sequence of positive ints, got {chunk_shape!r}"
+                f"arrays_metadata['{name}']['chunk_shape'] must be a sequence of positive ints, got {chunk_shape!r}"
             )
 
         # nb_chunks_per_dim: same pattern
@@ -434,18 +424,17 @@ class Bridge:
         chunk_position = meta["chunk_position"]
         if not (
             isinstance(chunk_position, (tuple, list))
-            and all(isinstance(pos, int) and 0<=pos<nb_chunks for pos, nb_chunks in zip(chunk_position, nb_chunks_per_dim))
+            and all(
+                isinstance(pos, int) and 0 <= pos < nb_chunks
+                for pos, nb_chunks in zip(chunk_position, nb_chunks_per_dim)
+            )
         ):
             raise TypeError(
-                f"arrays_metadata['{name}']['chunk_position'] must be a "
-                f"sequence of ints, got {chunk_position!r}"
+                f"arrays_metadata['{name}']['chunk_position'] must be a sequence of ints, got {chunk_position!r}"
             )
 
         if len(chunk_position) != len(meta["chunk_shape"]):
-            raise ValueError(
-                f"arrays_metadata['{name}']['chunk_position'] must have the "
-                f"same length as 'chunk_shape'"
-            )
+            raise ValueError(f"arrays_metadata['{name}']['chunk_position'] must have the same length as 'chunk_shape'")
 
     def _validate_system_meta(self, system_meta: Mapping[str, Any]) -> dict[str, Any]:
         """
@@ -467,11 +456,9 @@ class Bridge:
             If ``system_meta`` is not a mapping.
         """
         if not isinstance(system_meta, Mapping):
-            raise TypeError(
-                f"system_metadata must be a mapping, got {type(system_meta).__name__}"
-            )
+            raise TypeError(f"system_metadata must be a mapping, got {type(system_meta).__name__}")
         return dict(system_meta)
-    
+
     def _create_node_actor(
         self,
         node_actor_cls: Type = _RealSchedulingActor,
@@ -506,20 +493,18 @@ class Bridge:
         for _ in range(max(1, self._init_retries)):
             try:
                 # first rank to arrive creates, others get same handle (get_if_exists)
-                self.node_actor: ray.actor.ActorHandle = node_actor_cls.options(
-                    **node_actor_options
-                ).remote(actor_id=self.node_id)  # type: ignore
+                self.node_actor: RayActorHandle = node_actor_cls.options(**node_actor_options).remote(
+                    actor_id=self.node_id
+                )  # type: ignore
                 break  # success
-            except Exception as e: 
+            except Exception as e:
                 last_err = e
                 # Try to re-create a fresh actor instance (same name will resolve to existing or new one)
                 continue
         # `else:` clause belongs to for loop. Only executed if it finishes normally without
-        #  encountering a `break`. 
+        #  encountering a `break`.
         else:
-            raise RuntimeError(
-                f"Failed to create/ready scheduling actor for node {self.node_id}"
-            ) from last_err
+            raise RuntimeError(f"Failed to create/ready scheduling actor for node {self.node_id}") from last_err
 
     # TODO feedback needs testing
     def get(
@@ -531,7 +516,7 @@ class Bridge:
         **kwargs: Any,
     ) -> Any | None:
         """
-        Retrieve information back from Analytics. 
+        Retrieve information back from Analytics.
 
         Used for two cases:
 
@@ -570,28 +555,18 @@ class Bridge:
 
     def _delete(self, *args: Any, name: str, **kwargs: Any) -> None:
         """
-        Delete a key from the information shared by Analytics. 
-
-        Should be called immediately after something has been shared. This is
-        done so that the user is in charge of handling events and the
-        simulation does not keep detecting the same
-        event.
+        Delete a feedback key from the node actor if present.
 
         Parameters
         ----------
         name : str
-            The name of the key that is being retrieved from the Analytics.
+            Key to remove.
 
         Notes
         -----
-        TODO: Should we make this private or allow user to handle it? For now, we decided that 
-        we will call it ourselves after every get, so error should never be raised.
-
-        Raises
-        ------
-        KeyError
-            If ``name`` does not exist among the keys that have been shared
-            by analytics.
+        This is currently used internally after :meth:`get` to avoid
+        repeatedly signaling the same event. Missing keys are silently
+        ignored.
         """
         del args, kwargs  # explicitly unused
         # Currently the semantics of deletion are still under discussion. For

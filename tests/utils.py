@@ -41,6 +41,7 @@ def simple_worker(
     """Worker node sending chunks of data"""
     from deisa.ray.bridge import Bridge
     from deisa.ray.utils import get_system_metadata
+
     sys_md = get_system_metadata()
     arrays_md = {
         array_name: {
@@ -48,14 +49,14 @@ def simple_worker(
             "nb_chunks_per_dim": chunks_per_dim,
             "nb_chunks_of_node": nb_chunks_of_node,
             "dtype": dtype,
-            "chunk_position": position
+            "chunk_position": position,
         }
     }
 
-    client = Bridge(id = rank, arrays_metadata=arrays_md, system_metadata=sys_md, _node_id=node_id)
+    client = Bridge(id=rank, arrays_metadata=arrays_md, system_metadata=sys_md, _node_id=node_id)
 
     array = (rank + 1) * np.ones(chunk_size, dtype=dtype)
 
     for i in range(nb_iterations):
-        chunk = i*array
-        client.send(array_name = array_name, chunk = chunk, timestep = i, chunked = True)
+        chunk = i * array
+        client.send(array_name=array_name, chunk=chunk, timestep=i, chunked=True)

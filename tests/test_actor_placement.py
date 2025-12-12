@@ -114,10 +114,12 @@ def test_actor_placement(ray_multinode_cluster):
         scheduling_strategy=NodeAffinitySchedulingStrategy(node_id=worker_node_id, soft=False),
     )
     def make_client_and_return_ids():
-
         from deisa.ray.utils import get_system_metadata
+
         sys_md = get_system_metadata()
-        c = Bridge(id = 0, arrays_metadata= {}, system_metadata= sys_md, _node_id=None, scheduling_actor_cls=StubSchedulingActor)  # type:ignore
+        c = Bridge(
+            id=0, arrays_metadata={}, system_metadata=sys_md, _node_id=None, scheduling_actor_cls=StubSchedulingActor
+        )  # type:ignore
 
         return (c.node_id, f"sched-{c.node_id}")
 

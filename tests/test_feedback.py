@@ -85,7 +85,7 @@
 #     # submit Deisa
 #     head_script.remote()
 #
-#     # retrieve res of refs 
+#     # retrieve res of refs
 #     c1, n1, f1 = ray.get(refs[0])
 #     c2, n2, f2 = ray.get(refs[1])
 #
@@ -93,4 +93,4 @@
 #     assert f2 is True
 #
 #
-#     
+#

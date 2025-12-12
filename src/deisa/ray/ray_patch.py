@@ -1,6 +1,7 @@
 import ray
 import ray.util.dask.scheduler
 
+
 @ray.remote(num_cpus=0, enable_task_events=False)
 def patched_dask_task_wrapper(func, repack, key, ray_pretask_cbs, ray_posttask_cbs, *args, first_call=True):
     """
@@ -97,4 +98,7 @@ def remote_ray_dask_get(dsk, keys):
     # Monkey-patch Dask-on-Ray
     ray.util.dask.scheduler.dask_task_wrapper = patched_dask_task_wrapper
 
+    # note: ray_dask_get(..., persist = True) return a tuple of ray refs,
+    # if set to false, patched_dask_task_wrapper fails for some reason.
+    # TODO: understand why
     return ray.util.dask.ray_dask_get(dsk, keys, ray_persist=True)

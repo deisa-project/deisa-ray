@@ -7,7 +7,7 @@ import ray
 import ray.actor
 
 from deisa.ray import Timestep
-from deisa.ray.types import DaskArrayData
+from deisa.ray.types import DaskArrayData, RayActorHandle
 
 
 @ray.remote
@@ -31,7 +31,7 @@ class HeadNodeActor:
 
     Attributes
     ----------
-    scheduling_actors : dict[str, ray.actor.ActorHandle]
+    scheduling_actors : dict[str, RayActorHandle]
         Mapping from scheduling actor IDs to their actor handles.
     new_pending_array_semaphore : asyncio.Semaphore
         Semaphore used to limit the number of pending arrays.
@@ -50,12 +50,12 @@ class HeadNodeActor:
     and analytics that consume the constructed arrays.
     """
 
-    # TODO: Discuss if max_pending_arrays should be here or in register callback. In that case, what 
-    # should happen when the freqs are diff and max_pending_arrays are diff too? When does the sim 
+    # TODO: Discuss if max_pending_arrays should be here or in register callback. In that case, what
+    # should happen when the freqs are diff and max_pending_arrays are diff too? When does the sim
     # stop?''
     def __init__(self) -> None:
         # For each ID of a actor_handle, the corresponding scheduling actor
-        self.scheduling_actors: dict[str, ray.actor.ActorHandle] = {}
+        self.scheduling_actors: dict[str, RayActorHandle] = {}
 
         # TODO: document what this event signals and update documentation
         self.new_array_created = asyncio.Event()
@@ -65,25 +65,40 @@ class HeadNodeActor:
         self.registered_arrays: dict[str, DaskArrayData] = {}
 
     # TODO rename or move creation of global container elsewhere
-    def register_arrays(self, arrays_definitions: list[tuple[str, Callable]], max_pending_arrays: int = 1_000_000_000)->None:
+    def register_arrays(
+        self, arrays_definitions: list[tuple[str, Callable]], max_pending_arrays: int = 1_000_000_000
+    ) -> None:
+        """
+        Register array definitions and initialize bookkeeping structures.
+
+        Parameters
+        ----------
+        arrays_definitions : list[tuple[str, Callable]]
+            Sequence of (name, preprocessing_callback) pairs for each array
+            produced by the simulation.
+        max_pending_arrays : int, optional
+            Upper bound on arrays that may be in-flight (built or waiting
+            to be collected). Acts as back-pressure for the simulation.
+            Default is ``1_000_000_000``.
+        """
         # regulate how far ahead sim can go wrt to analytics
         self.new_pending_array_semaphore = asyncio.Semaphore(max_pending_arrays)
 
-        for (name, f_preprocessing) in arrays_definitions:
-            self.registered_arrays[name] = DaskArrayData(name, f_preprocessing) 
+        for name, f_preprocessing in arrays_definitions:
+            self.registered_arrays[name] = DaskArrayData(name, f_preprocessing)
 
-    def list_scheduling_actors(self) -> dict[str, ray.actor.ActorHandle]:
+    def list_scheduling_actors(self) -> dict[str, RayActorHandle]:
         """
         Return the list of scheduling actors.
 
         Returns
         -------
-        Dict[ray.actor.ActorHandle]
+        Dict[RayActorHandle]
             Dictionary of actor_id to actor handles for all registered scheduling actors.
         """
         return self.scheduling_actors
 
-    async def register_scheduling_actor(self, actor_id: str, actor_handle: ray.actor.ActorHandle):
+    async def register_scheduling_actor(self, actor_id: str, actor_handle: RayActorHandle):
         """
         Register a scheduling actor that has been created.
 
@@ -91,7 +106,7 @@ class HeadNodeActor:
         ----------
         actor_id : str
             Unique identifier for the scheduling actor.
-        actor_handle : ray.actor.ActorHandle
+        actor_handle : RayActorHandle
             Ray actor handle for the scheduling actor.
 
         Notes
@@ -128,7 +143,7 @@ class HeadNodeActor:
         array_name: str,
         dtype: np.dtype,
         nb_chunks_per_dim: tuple[int, ...],
-        chunks_meta: list[tuple[int,tuple[int, ...], tuple[int, ...]]],  # [(chunk position, chunk size), ...]
+        chunks_meta: list[tuple[int, tuple[int, ...], tuple[int, ...]]],  # [(chunk position, chunk size), ...]
     ):
         """
         Register which chunks are owned by a scheduling actor.
@@ -192,7 +207,7 @@ class HeadNodeActor:
 
         # long story short, this creates an empty array.chunk_refs[timestep] = []
         while timestep not in array.chunk_refs:
-            # TODO what happens if new_array_created for an array of a prev iter is set? 
+            # TODO what happens if new_array_created for an array of a prev iter is set?
             # could it influence this iter?
             # need to reason more about this condition
             t1 = asyncio.create_task(self.new_pending_array_semaphore.acquire())
@@ -213,7 +228,7 @@ class HeadNodeActor:
                     self.new_array_created.set()
                     self.new_array_created.clear()
         # all_chunks_ref is [RayRef] st. ray.get(rayref) -> [ref_of_ref_chunk_i, ref_ref_chunk_i+1, ...] (belonging to actor that called it)
-        # so I unpack it and give this ray ref. 
+        # so I unpack it and give this ray ref.
         is_ready = array.add_chunk_ref(all_chunks_ref[0], timestep)
 
         if is_ready:
@@ -244,7 +259,7 @@ class HeadNodeActor:
         """
         return True
 
-    # TODO there is a single queue for all arrays. 
+    # TODO there is a single queue for all arrays.
     async def get_next_array(self) -> tuple[str, Timestep, da.Array]:
         """
         Get the next ready array from the queue.

@@ -1,15 +1,23 @@
 from dataclasses import dataclass
-from typing import Callable, NewType
+from typing import Callable, Any, TypeAlias
 from dask.highlevelgraph import HighLevelGraph
 import math
 import numpy as np
 import asyncio
 import ray
+import ray.actor
 from deisa.ray import Timestep
 import dask.array as da
 from deisa.ray._async_dict import AsyncDict
 
-DoubleRef  = NewType("DoubleRef", ray.ObjectRef)
+type DoubleRef = ray.ObjectRef
+type ActorID = str
+# anything used in dask to reprsent a task key (usually its a tuple)
+type GraphKey = Any
+# GraphValue can be any of: ChunkRef, ScheduledByOtherActor, or anything used in Dask to represent a task value.
+type GraphValue = Any
+RayActorHandle: TypeAlias = ray.actor.ActorHandle
+
 
 class ArrayPerTimestep:
     """
@@ -67,6 +75,7 @@ class PartialArray:
     and chunk ownership. Each array is registered once with the head node
     when the first timestep's chunks are ready.
     """
+
     # TODO add types
 
     def __init__(self):
@@ -78,6 +87,7 @@ class PartialArray:
         self.chunks_contained_meta: set[tuple[int, tuple[int, ...], tuple[int, ...]]] = set()
 
         self.per_timestep_arrays: AsyncDict[Timestep, ArrayPerTimestep] = AsyncDict()
+
 
 @dataclass
 class ScheduledByOtherActor:
@@ -101,7 +111,8 @@ class ScheduledByOtherActor:
     by different scheduling actors.
     """
 
-    actor_id: int
+    actor_id: ActorID
+
 
 class GraphInfo:
     """
@@ -129,6 +140,7 @@ class GraphInfo:
     def __init__(self):
         self.scheduled_event = asyncio.Event()
         self.refs: dict[str, ray.ObjectRef] = {}
+
 
 @dataclass
 class ChunkRef:
@@ -170,6 +182,7 @@ class ChunkRef:
     # Set for one chunk only.
     _all_chunks: ray.ObjectRef | None = None
 
+
 @dataclass
 class WindowArrayDefinition:
     """
@@ -203,6 +216,7 @@ class WindowArrayDefinition:
     window_size: int | None = None
     preprocess: Callable = lambda x: x
 
+
 @dataclass
 class _CallbackConfig:
     simulation_callback: Callable
@@ -210,6 +224,7 @@ class _CallbackConfig:
     max_iterations: int
     prepare_iteration: Callable | None
     preparation_advance: int
+
 
 class DaskArrayData:
     """
@@ -334,7 +349,7 @@ class DaskArrayData:
             assert self.dtype == dtype
             assert self.chunks_size is not None
 
-        # TODO this actually should be done each time 
+        # TODO this actually should be done each time
         self.position_to_node_actorID[position] = node_actor_id
         self.position_to_bridgeID[position] = bridge_id
         for i, pos in enumerate(position):
@@ -369,8 +384,8 @@ class DaskArrayData:
         self.chunk_refs[timestep].append(chunk_ref)
 
         # We don't know all the owners yet
-        # TODO this method is useless now because we no longer "send" this data at every timestep. 
-        # before it was needed since the nb_chunks could in theory change and we were giving info about 
+        # TODO this method is useless now because we no longer "send" this data at every timestep.
+        # before it was needed since the nb_chunks could in theory change and we were giving info about
         # array as well. This is no longer the case. Can someone confirm?
         if len(self.position_to_node_actorID) != self.nb_chunks:
             return False
@@ -424,7 +439,7 @@ class DaskArrayData:
             all_chunks = None
         else:
             all_chunks = ray.put(self.chunk_refs[timestep])
-            # TODO why is this done? is it so once array goes out of scope for user, everything is cleaned up? 
+            # TODO why is this done? is it so once array goes out of scope for user, everything is cleaned up?
             # is this the reason for the pickle dump in the beginning?
             del self.chunk_refs[timestep]
 
@@ -435,7 +450,8 @@ class DaskArrayData:
         graph = {
             # We need to repeat the name and position in the value since the key might be removed
             # by the Dask optimizer
-            (dask_name,) + position: ChunkRef( # note only first ChunkRef instance contains actual refs, the others contain only metadata.
+            (dask_name,)
+            + position: ChunkRef(  # note only first ChunkRef instance contains actual refs, the others contain only metadata.
                 actor_id,
                 self.name,
                 timestep,

@@ -1,14 +1,12 @@
 import random
 import time
 from collections import Counter
-from typing import Callable, Any
+from typing import Callable
 import ray
 from dask.core import get_dependencies
 from deisa.ray.scheduling_actor import ChunkRef, ScheduledByOtherActor
-from deisa.ray.types import DoubleRef
+from deisa.ray.types import DoubleRef, ActorID, GraphKey, GraphValue, RayActorHandle
 
-type ActorID = str
-type GraphKey = Any
 
 def random_partitioning(dsk, scheduling_actors: dict) -> dict[str, int]:
     """
@@ -120,15 +118,13 @@ def greedy_partitioning(dsk, scheduling_actors: dict) -> dict[str, int]:
         if isinstance(val, ChunkRef):
             partition[k] = val.actor_id
         else:
-            actors_dependencies = [explore(dep)
-                                   for dep in get_dependencies(dsk, k)]
+            actors_dependencies = [explore(dep) for dep in get_dependencies(dsk, k)]
 
             if not actors_dependencies:
                 # The task is a leaf, we use a random actor
                 partition[k] = random.choice(actor_names)
             else:
-                partition[k] = Counter(
-                    actors_dependencies).most_common(1)[0][0]
+                partition[k] = Counter(actors_dependencies).most_common(1)[0][0]
 
         return partition[k]
 
@@ -137,19 +133,45 @@ def greedy_partitioning(dsk, scheduling_actors: dict) -> dict[str, int]:
 
     return partition
 
+
 def log(message: str, debug_logs_path: str | None) -> None:
+    """
+    Append a timestamped debug message to ``debug_logs_path`` if provided.
+
+    Parameters
+    ----------
+    message : str
+        Text to append.
+    debug_logs_path : str or None
+        Destination file path. If ``None`` logging is skipped.
+    """
     if debug_logs_path is not None:
         with open(debug_logs_path, "a") as f:
             f.write(f"{time.time()} {message}\n")
 
-def process_keys(keys_needed: list)-> list:
+
+def process_keys(keys_needed: list) -> list:
+    """
+    Normalize the list of keys requested from the Dask graph.
+
+    Parameters
+    ----------
+    keys_needed : list
+        Keys requested by the caller; may contain nested lists produced by
+        non-aggregate operations.
+
+    Returns
+    -------
+    list
+        Flattened list of concrete task keys.
+    """
     assert isinstance(keys_needed, list)
 
     # unnest keys in case of non-aggregate operation
     # TODO: keys are generally a list of needed keys. In case of a simple aggregation, this is a list of one element.
     # however, when doing a non aggregating operation, the keys are wrapped in another list. For example, [[k0, k1], [k2,k3]]
     # investigate whether this is associated to the number of nodes/actors or the chunking?
-    def unnest(keys: list)->list:
+    def unnest(keys: list) -> list:
         if len(keys) == 1:
             if isinstance(keys[0], tuple):
                 return [keys[0]]
@@ -168,24 +190,51 @@ def process_keys(keys_needed: list)-> list:
 
     return unnest(keys_needed)
 
+
 def get_scheduling_actors_mapping():
+    """
+    Retrieve the mapping of scheduling actor IDs to their handles.
+
+    Returns
+    -------
+    dict[ActorID, RayActorHandle]
+        Mapping pulled from the head actor registered under the
+        ``deisa_ray`` namespace.
+    """
     head_node = ray.get_actor("simulation_head", namespace="deisa_ray")  # noqa: F841
 
     # Find the scheduling actors
-    scheduling_actor_id_to_handle: dict[ActorID, ray.actor.ActorHandle] = ray.get(head_node.list_scheduling_actors.remote())
+    scheduling_actor_id_to_handle: dict[ActorID, RayActorHandle] = ray.get(head_node.list_scheduling_actors.remote())
     assert isinstance(scheduling_actor_id_to_handle, dict)
 
     return scheduling_actor_id_to_handle
 
-def partition_and_schedule_graph(*, 
-                  full_dask_graph: dict, 
-                  graph_key_to_actor_id_map: dict[GraphKey, ActorID], 
-                  scheduling_actor_id_to_handle: dict[ActorID, ray.actor.ActorHandle],
-                  graph_id: int, 
-                  ):
 
-    partitioned_graphs: dict[ActorID, dict[GraphKey, Any]] = {
-        actor_id: {} for actor_id in scheduling_actor_id_to_handle}
+def partition_and_schedule_graph(
+    *,
+    full_dask_graph: dict,
+    graph_key_to_actor_id_map: dict[GraphKey, ActorID],
+    scheduling_actor_id_to_handle: dict[ActorID, RayActorHandle],
+    graph_id: int,
+):
+    """
+    Split a full Dask graph into per-actor subgraphs and submit them.
+
+    Parameters
+    ----------
+    full_dask_graph : dict
+        Complete Dask task graph.
+    graph_key_to_actor_id_map : dict[GraphKey, ActorID]
+        Mapping from task key to owning scheduling actor ID.
+    scheduling_actor_id_to_handle : dict[ActorID, RayActorHandle]
+        Actor handles keyed by actor ID.
+    graph_id : int
+        Unique identifier used to correlate per-actor subgraphs.
+    """
+
+    partitioned_graphs: dict[ActorID, dict[GraphKey, GraphValue]] = {
+        actor_id: {} for actor_id in scheduling_actor_id_to_handle
+    }
 
     for k, v in full_dask_graph.items():
         actor_id = graph_key_to_actor_id_map[k]
@@ -194,13 +243,13 @@ def partition_and_schedule_graph(*,
 
         for dep in get_dependencies(full_dask_graph, k):
             if graph_key_to_actor_id_map[dep] != actor_id:
-                partitioned_graphs[actor_id][dep] = ScheduledByOtherActor(
-                    graph_key_to_actor_id_map[dep])
+                partitioned_graphs[actor_id][dep] = ScheduledByOtherActor(graph_key_to_actor_id_map[dep])
 
     for actorID, actor_handle in scheduling_actor_id_to_handle.items():
         if partitioned_graphs[actorID]:
             # give subgraph to actor for scheduling
             actor_handle.schedule_graph.remote(graph_id, partitioned_graphs[actorID])
+
 
 def deisa_ray_get(full_dask_graph: dict, keys_needed: list, **kwargs):
     """
@@ -212,12 +261,12 @@ def deisa_ray_get(full_dask_graph: dict, keys_needed: list, **kwargs):
 
     Parameters
     ----------
-    dsk : dict
-        The Dask task graph dictionary. Keys are task identifiers, values
-        are tasks, ChunkRef objects, or other graph nodes.
-    keys : list
-        List of keys to compute from the task graph. Currently only supports
-        a single key (may be nested in a list).
+    full_dask_graph : dict
+        The full Dask task graph dictionary. Keys are task identifiers,
+        values are tasks, ChunkRef objects, or other graph nodes.
+    keys_needed : list
+        List of keys to compute from the task graph. May contain nested
+        lists produced by non-aggregate operations.
     **kwargs
         Additional keyword arguments. Supported options:
 
@@ -277,24 +326,24 @@ def deisa_ray_get(full_dask_graph: dict, keys_needed: list, **kwargs):
     ...     ray_persist=True
     ... )
     """
-    debug_logs_path: str | None = kwargs.get("deisa_ray_debug_logs", None)
-
     graph_id = random.randint(0, 2**128 - 1)
     partitioning_strategy: Callable = {"random": random_partitioning, "greedy": greedy_partitioning}[
         kwargs.get("deisa_ray_partitioning_strategy", "greedy")
     ]
 
-    scheduling_actor_id_to_handle: dict[ActorID, ray.actor.ActorHandle] = get_scheduling_actors_mapping()
+    scheduling_actor_id_to_handle: dict[ActorID, RayActorHandle] = get_scheduling_actors_mapping()
 
     full_dask_graph = {k: v for k, v in sorted(full_dask_graph.items())}
-    graph_key_to_actor_id_map: dict[GraphKey, ActorID] = partitioning_strategy(full_dask_graph, scheduling_actor_id_to_handle)
+    graph_key_to_actor_id_map: dict[GraphKey, ActorID] = partitioning_strategy(
+        full_dask_graph, scheduling_actor_id_to_handle
+    )
 
     partition_and_schedule_graph(
-        full_dask_graph = full_dask_graph, 
-        graph_key_to_actor_id_map=graph_key_to_actor_id_map, 
+        full_dask_graph=full_dask_graph,
+        graph_key_to_actor_id_map=graph_key_to_actor_id_map,
         scheduling_actor_id_to_handle=scheduling_actor_id_to_handle,
-        graph_id = graph_id
-        )
+        graph_id=graph_id,
+    )
 
     keys_needed = process_keys(keys_needed)
 

@@ -4,8 +4,18 @@ import time
 import ray
 import random
 
-def get_system_metadata()-> Dict: 
+
+def get_system_metadata() -> Dict:
+    """
+    Return system-level metadata placeholder.
+
+    Notes
+    -----
+    Currently returns an empty dictionary; the hook exists to keep backward
+    compatibility with callers expecting environment metadata.
+    """
     return {}
+
 
 def get_ready_actor_with_retry(name, namespace, deadline_s=180):
     """
@@ -27,7 +37,7 @@ def get_ready_actor_with_retry(name, namespace, deadline_s=180):
 
     Returns
     -------
-    ray.actor.ActorHandle
+    RayActorHandle
         The handle to the ready actor.
 
     Raises
@@ -57,6 +67,7 @@ def get_ready_actor_with_retry(name, namespace, deadline_s=180):
                 raise TimeoutError(f"{namespace}/{name} not found in {deadline_s}s")
             time.sleep(delay + random.random() * 0.1)
             delay = min(delay * 1.5, 5.0)
+
 
 def get_head_node_id() -> str:
     """
@@ -123,4 +134,3 @@ def get_head_actor_options() -> dict:
         # Disabled for performance reasons
         enable_task_events=False,
     )
-
