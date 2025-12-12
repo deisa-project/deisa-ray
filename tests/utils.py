@@ -3,9 +3,11 @@ import time
 import numpy as np
 import pytest
 import ray
-
+from deisa.ray.scheduling_actor import NodeActor
 
 # @pytest.fixture(scope = "session")
+
+
 @pytest.fixture()
 def ray_cluster():
     """Start a Ray cluster for this test"""
@@ -19,22 +21,7 @@ def wait_for_head_node() -> None:
     while True:
         try:
             a = ray.get_actor("simulation_head", namespace="deisa_ray")
-            print(f"WAITING simulation_head = {a}", flush=True)
             ray.get(a.ready.remote())
-            print("Done", flush=True)
-            return
-        except ValueError:
-            time.sleep(0.1)
-
-
-def wait_for_central_scheduler() -> None:
-    """Wait until the central scheduler is ready"""
-    while True:
-        try:
-            a = ray.get_actor("sched-central", namespace="deisa_ray")
-            print(f"WAITING sched-central = {a}", flush=True)
-            ray.get(a.ready.remote())
-            print("Done", flush=True)
             return
         except ValueError:
             time.sleep(0.1)
@@ -67,8 +54,8 @@ def simple_worker(
         }
     }
 
-    client = Bridge(id=rank, arrays_metadata=arrays_md,
-                    system_metadata=sys_md, _node_id=node_id)
+    client = Bridge(id=rank, arrays_metadata=arrays_md, system_metadata=sys_md,
+                    _node_id=node_id, scheduling_actor_cls=NodeActor)
 
     array = (rank + 1) * np.ones(chunk_size, dtype=dtype)
 

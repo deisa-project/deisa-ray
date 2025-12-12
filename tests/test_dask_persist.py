@@ -1,9 +1,8 @@
 import dask.array as da
 import ray
-from tests.utils import ray_cluster, simple_worker, wait_for_head_node, wait_for_central_scheduler  # noqa: F401
+from tests.utils import ray_cluster, simple_worker, wait_for_head_node  # noqa: F401
 
 NB_ITERATIONS = 10
-
 
 @ray.remote(max_retries=0)
 def head_script() -> None:
@@ -39,7 +38,6 @@ def head_script() -> None:
 def test_dask_persist(ray_cluster) -> None:  # noqa: F811
     head_ref = head_script.remote()
     wait_for_head_node()
-    wait_for_central_scheduler()
 
     worker_refs = []
     for rank in range(4):
@@ -48,7 +46,7 @@ def test_dask_persist(ray_cluster) -> None:  # noqa: F811
                 rank=rank,
                 position=(rank // 2, rank % 2),
                 chunks_per_dim=(2, 2),
-                nb_chunks_of_node=4,
+                nb_chunks_of_node=1,
                 chunk_size=(1, 1),
                 nb_iterations=NB_ITERATIONS,
                 node_id=f"node_{rank}",

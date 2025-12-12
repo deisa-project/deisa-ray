@@ -47,7 +47,7 @@ def test_init(ray_cluster):
     sys_md = get_system_metadata()
     c = Bridge(id = 0, arrays_metadata= {}, system_metadata = sys_md, _node_id=fake_node_id, scheduling_actor_cls=StubSchedulingActor)
     assert c.node_id == fake_node_id
-    assert isinstance(c.scheduling_actor, ray.actor.ActorHandle)
+    assert isinstance(c.node_actor, ray.actor.ActorHandle)
     assert isinstance(c.preprocessing_callbacks, dict)
     assert callable(c.preprocessing_callbacks["default"]) and callable(c.preprocessing_callbacks["double"])
     assert isinstance(c, Bridge)

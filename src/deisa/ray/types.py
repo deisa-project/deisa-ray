@@ -17,6 +17,7 @@ class ArraysMeta:
     """
     # should be used at the beginning of Bridge Init to describe an array.
 
+
 class ArrayPerTimestep:
     """
     Internal class tracking chunks for a specific array and timestep.
@@ -44,11 +45,11 @@ class ArrayPerTimestep:
         # Triggered when all the chunks are ready
         self.chunks_ready_event: asyncio.Event = asyncio.Event()
 
-        # {position: chunk}
+        # {bridge_id: chunk}
         self.local_chunks: AsyncDict[int, ray.ObjectRef | bytes] = AsyncDict()
 
 
-class Array:
+class PartialArray:
     """
     Internal class tracking metadata and chunks for an array.
 
@@ -76,14 +77,23 @@ class Array:
     # TODO add types
 
     def __init__(self):
-        # Indicates if set_owned_chunks method has been called for this array.
+        # Indicates if register_partial_array method has been called for this array.
         self.ready_event = asyncio.Event()
 
         # Chunks owned by this actor for this array.
         # {(bridge_id, chunk position, chunk size), ...}
-        self.owned_chunks: set[tuple[int, tuple[int, ...], tuple[int, ...]]] = set()
+        self.chunks_contained_meta: set[tuple[int,
+                                              tuple[int, ...], tuple[int, ...]]] = set()
 
-        self.timesteps: AsyncDict[Timestep, ArrayPerTimestep] = AsyncDict()
+        self.per_timestep_arrays: AsyncDict[Timestep,
+                                            ArrayPerTimestep] = AsyncDict()
+
+    def get_chunk_position(self, bridge_id):
+        return next(
+            pos for (bid, pos, size) in self.chunks_contained_meta
+            if bid == bridge_id
+        )
+
 
 @dataclass
 class ScheduledByOtherActor:
@@ -108,6 +118,7 @@ class ScheduledByOtherActor:
     """
 
     actor_id: int
+
 
 class GraphInfo:
     """
@@ -135,6 +146,7 @@ class GraphInfo:
     def __init__(self):
         self.scheduled_event = asyncio.Event()
         self.refs: dict[str, ray.ObjectRef] = {}
+
 
 @dataclass
 class ChunkRef:
@@ -176,6 +188,7 @@ class ChunkRef:
     # Set for one chunk only.
     _all_chunks: ray.ObjectRef | None = None
 
+
 @dataclass
 class WindowArrayDefinition:
     """
@@ -209,30 +222,6 @@ class WindowArrayDefinition:
     window_size: int | None = None
     preprocess: Callable = lambda x: x
 
-@dataclass
-class HeadArrayDefinition:
-    """
-    Description of a Dask array given by the user.
-
-    Parameters
-    ----------
-    name : str
-        The name of the array.
-    preprocess : Callable, optional
-        A preprocessing function to apply to chunks of this array before
-        they are sent to the analytics. The function should take a numpy
-        array and return a processed numpy array. Default is the identity
-        function (no preprocessing).
-
-    Examples
-    --------
-    >>> def normalize(arr):
-    ...     return arr / arr.max()
-    >>> array_def = ArrayDefinition(name="temperature", preprocess=normalize)
-    """
-
-    name: str
-    preprocess: Callable = lambda x: x
 
 @dataclass
 class _CallbackConfig:
@@ -241,6 +230,7 @@ class _CallbackConfig:
     max_iterations: int
     prepare_iteration: Callable | None
     preparation_advance: int
+
 
 class DaskArrayData:
     """
@@ -285,8 +275,9 @@ class DaskArrayData:
         when the array is built.
     """
 
-    def __init__(self, definition: HeadArrayDefinition) -> None:
-        self.definition = definition
+    def __init__(self, name, f_preprocessing) -> None:
+        self.name = name
+        self.f_preprocessing = f_preprocessing
 
         # This will be set when we know, for each chunk, the scheduling actor in charge of it.
         self.fully_defined: asyncio.Event = asyncio.Event()
@@ -302,7 +293,7 @@ class DaskArrayData:
         self.dtype: np.dtype | None = None
 
         # ID of the scheduling actor in charge of the chunk at each position
-        self.scheduling_actors_id: dict[tuple[int, ...], int] = {}
+        self.position_to_node_actorID: dict[tuple[int, ...], int] = {}
         self.position_to_bridgeID: dict[tuple, int] = {}
 
         # Number of scheduling actors owning chunks of this array.
@@ -315,14 +306,16 @@ class DaskArrayData:
         # When the array is buit, these references are put in the object store, and the
         # global reference is added to the Dask graph. Then, the list is cleared.
         self.chunk_refs: dict[Timestep, list[ray.ObjectRef]] = {}
+        self.position_to_chunk_ref: dict[Timestep,
+                                         dict[tuple[int, ...], ray.ObjectRef]]
 
-    def set_chunk_owner(
+    def update_meta(
         self,
         nb_chunks_per_dim: tuple[int, ...],
         dtype: np.dtype,
         position: tuple[int, ...],
         size: tuple[int, ...],
-        scheduling_actor_id: int,
+        node_actor_id: int,
         bridge_id: int,
     ) -> None:
         """
@@ -352,28 +345,27 @@ class DaskArrayData:
             have inconsistent dimensions, dtype, or sizes compared to the
             first chunk.
         """
+        # TODO should be done just once
         if self.nb_chunks_per_dim is None:
             self.nb_chunks_per_dim = nb_chunks_per_dim
             self.nb_chunks = math.prod(nb_chunks_per_dim)
 
             self.dtype = dtype
-            self.chunks_size = [[None for _ in range(n)] for n in nb_chunks_per_dim]
+            self.chunks_size = [
+                [None for _ in range(n)] for n in nb_chunks_per_dim]
         else:
             assert self.nb_chunks_per_dim == nb_chunks_per_dim
             assert self.dtype == dtype
             assert self.chunks_size is not None
 
-        for pos, nb_chunks in zip(position, nb_chunks_per_dim):
-            assert 0 <= pos < nb_chunks
-
-        self.scheduling_actors_id[position] = scheduling_actor_id
+        # TODO this actually should be done each time
+        self.position_to_node_actorID[position] = node_actor_id
         self.position_to_bridgeID[position] = bridge_id
-
-        for d in range(len(position)):
-            if self.chunks_size[d][position[d]] is None:
-                self.chunks_size[d][position[d]] = size[d]
+        for i, pos in enumerate(position):
+            if self.chunks_size[i][pos] is None:
+                self.chunks_size[i][pos] = size[pos]
             else:
-                assert self.chunks_size[d][position[d]] == size[d]
+                assert self.chunks_size[i][pos] == size[pos]
 
     def add_chunk_ref(self, chunk_ref: ray.ObjectRef, timestep: Timestep) -> bool:
         """
@@ -401,15 +393,21 @@ class DaskArrayData:
         self.chunk_refs[timestep].append(chunk_ref)
 
         # We don't know all the owners yet
-        if len(self.scheduling_actors_id) != self.nb_chunks:
+        # TODO this method is useless now because we no longer "send" this data at every timestep.
+        # before it was needed since the nb_chunks could in theory change and we were giving info about
+        # array as well. This is no longer the case. Can someone confirm?
+        if len(self.position_to_node_actorID) != self.nb_chunks:
             return False
 
         if self.nb_scheduling_actors is None:
-            self.nb_scheduling_actors = len(set(self.scheduling_actors_id.values()))
+            self.nb_scheduling_actors = len(
+                set(self.position_to_node_actorID.values()))
 
+        # each actor produces a single ref - once I have as many refs as scheduling actors,
+        # I mark the array as ready to be formed.
         return len(self.chunk_refs[timestep]) == self.nb_scheduling_actors
 
-    def get_full_array(self, timestep: Timestep, *, is_preparation: bool = False) -> da.Array:
+    def get_full_array(self, timestep: Timestep, *, is_preparation: bool = False, map: dict[tuple[int, ...], ray.ObjectRef] | None) -> da.Array:
         """
         Return the full Dask array for a given timestep.
 
@@ -443,7 +441,7 @@ class DaskArrayData:
         The array name includes the timestep to allow the same array name
         to be used for different timesteps.
         """
-        assert len(self.scheduling_actors_id) == self.nb_chunks
+        assert len(self.position_to_node_actorID) == self.nb_chunks
         assert self.nb_chunks is not None and self.nb_chunks_per_dim is not None
 
         if is_preparation:
@@ -454,23 +452,16 @@ class DaskArrayData:
 
         # We need to add the timestep since the same name can be used several times for different
         # timesteps
-        dask_name = f"{self.definition.name}_{timestep}"
+        dask_name = f"{self.name}_{timestep}"
 
         graph = {
             # We need to repeat the name and position in the value since the key might be removed
             # by the Dask optimizer
-            (dask_name,) + position: ChunkRef(
-                actor_id,
-                self.definition.name,
-                timestep,
-                position,
-                self.position_to_bridgeID[position],
-                _all_chunks=all_chunks if it == 0 else None,
-            )
-            for it, (position, actor_id) in enumerate(self.scheduling_actors_id.items())
+            (dask_name,) + position: ray.get(chunk) for position, chunk in map.items()
         }
 
-        dsk = HighLevelGraph.from_collections(dask_name, graph, dependencies=())
+        dsk = HighLevelGraph.from_collections(
+            dask_name, graph, dependencies=())
 
         full_array = da.Array(
             dsk,

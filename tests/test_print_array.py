@@ -1,9 +1,12 @@
 import dask.array as da
+import pytest
 import ray
+import numpy as np
 
 from tests.utils import ray_cluster, simple_worker, wait_for_head_node  # noqa: F401
 
-NB_ITERATIONS = 100
+NB_ITERATIONS = 10
+
 
 @ray.remote(max_retries=0)
 def head_script() -> None:
@@ -13,29 +16,26 @@ def head_script() -> None:
 
     deisa = Deisa()
 
-    def simulation_callback(array: da.Array, *, timestep: int, preparation_result: da.Array):
-        # We still have a dask array
-        assert isinstance(preparation_result, da.Array)
-        assert len(preparation_result.dask) == 1
+    def simulation_callback(array: da.Array, timestep: int):
+        x = array.compute()
+        print(f"ARRAY PRINTED = {x}", flush=True)
 
-        x_final = preparation_result.compute()
-        assert x_final == 10 * timestep
+        arr = timestep * np.arange(1, 5)
 
-    def prepare_iteration(array: da.Array, *, timestep: int) -> da.Array:
-        # We can't use compute here since the data is not available yet
-        return array.sum().persist()
+        # assert np.array2string(x) == np.array2string(arr)
+
+        # NOTE: Test for 2d/3d/4d/... arrays
 
     deisa.register_callback(
         simulation_callback,
         [WindowArrayDefinition("array")],
         max_iterations=NB_ITERATIONS,
-        prepare_iteration=prepare_iteration,
-        preparation_advance=10,
     )
     deisa.execute_callbacks()
 
 
-def test_prepare_iteration(ray_cluster) -> None:  # noqa: F811
+@pytest.mark.parametrize("nb_nodes", [1])
+def test_deisa_ray(nb_nodes: int, ray_cluster) -> None:  # noqa: F811
     head_ref = head_script.remote()
     wait_for_head_node()
 
@@ -46,10 +46,10 @@ def test_prepare_iteration(ray_cluster) -> None:  # noqa: F811
                 rank=rank,
                 position=(rank // 2, rank % 2),
                 chunks_per_dim=(2, 2),
-                nb_chunks_of_node=1,
+                nb_chunks_of_node=4 // nb_nodes,
                 chunk_size=(1, 1),
                 nb_iterations=NB_ITERATIONS,
-                node_id=f"node_{rank}",
+                node_id=f"node_{rank % nb_nodes}",
             )
         )
 

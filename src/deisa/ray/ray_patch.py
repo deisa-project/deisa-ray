@@ -1,6 +1,7 @@
 import ray
 import ray.util.dask.scheduler
 
+
 @ray.remote(num_cpus=0, enable_task_events=False)
 def patched_dask_task_wrapper(func, repack, key, ray_pretask_cbs, ray_posttask_cbs, *args, first_call=True):
     """
@@ -50,10 +51,12 @@ def patched_dask_task_wrapper(func, repack, key, ray_pretask_cbs, ray_posttask_c
         )
 
     if ray_pretask_cbs is not None:
-        pre_states = [cb(key, args) if cb is not None else None for cb in ray_pretask_cbs]
+        pre_states = [
+            cb(key, args) if cb is not None else None for cb in ray_pretask_cbs]
     repacked_args, repacked_deps = repack(args)
     # Recursively execute Dask-inlined tasks.
-    actual_args = [ray.util.dask.scheduler._execute_task(a, repacked_deps) for a in repacked_args]
+    actual_args = [ray.util.dask.scheduler._execute_task(
+        a, repacked_deps) for a in repacked_args]
     # Execute the actual underlying Dask task.
     result = func(*actual_args)
 
@@ -95,6 +98,6 @@ def remote_ray_dask_get(dsk, keys):
     import ray.util.dask
 
     # Monkey-patch Dask-on-Ray
-    ray.util.dask.scheduler.dask_task_wrapper = patched_dask_task_wrapper
+    # ray.util.dask.scheduler.dask_task_wrapper = patched_dask_task_wrapper
 
     return ray.util.dask.ray_dask_get(dsk, keys, ray_persist=True)

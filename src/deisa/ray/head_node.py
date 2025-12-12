@@ -1,5 +1,5 @@
 import asyncio
-from typing import Callable, Type
+from typing import Callable
 
 import dask.array as da
 import numpy as np
@@ -7,9 +7,7 @@ import ray
 import ray.actor
 
 from deisa.ray import Timestep
-from deisa.ray.types import HeadArrayDefinition, DaskArrayData
-from deisa.ray.scheduling_actor import SchedulingActor as _RealSchedulingActor
-from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
+from deisa.ray.types import DaskArrayData
 
 
 @ray.remote
@@ -55,67 +53,39 @@ class HeadNodeActor:
     # TODO: Discuss if max_pending_arrays should be here or in register callback. In that case, what
     # should happen when the freqs are diff and max_pending_arrays are diff too? When does the sim
     # stop?''
-    def __init__(self, max_pending_arrays: int = 1_000_000_000,
-                 scheduling_actor_cls: Type = _RealSchedulingActor) -> None:
-        # For each ID of a simulation node, the corresponding scheduling actor
-        self.node_id = ray.get_runtime_context().get_node_id()
+    def __init__(self) -> None:
+        # For each ID of a actor_handle, the corresponding scheduling actor
         self.scheduling_actors: dict[str, ray.actor.ActorHandle] = {}
-        # Must be used before creating a new array, to prevent the simulation from being
-        # too many iterations in advance of the analytics.
-        self.new_pending_array_semaphore = asyncio.Semaphore(
-            max_pending_arrays)
 
+        # TODO: document what this event signals and update documentation
         self.new_array_created = asyncio.Event()
 
         # All the newly created arrays
         self.arrays_ready: asyncio.Queue[tuple[str,
                                                Timestep, da.Array]] = asyncio.Queue()
-        # NOTE: now lifetime is detached, otherwise at the end of the init, it will get killed
-        # NOTE: get_if_exists prevents race conditions
-        scheduling_actor_options = {
-            "name": "sched-central",
-            "namespace": "deisa_ray",
-            "lifetime": "detached",
-            "get_if_exists": True,
-            # WARNING: be careful - if not using async actor (has at least one async method)
-            # this will make OS try to spawn 1 billion threads and it will blow up
-            # StubSchedulingActor is async because of this.
-            "max_concurrency": 1000_000_000,
-            "num_cpus": 0,
-            "enable_task_events": False,
-        }
-        scheduling_actor_options["scheduling_strategy"] = NodeAffinitySchedulingStrategy(
-            node_id=self.node_id, soft=False
-        )
+        self.registered_arrays: dict[str, DaskArrayData] = {}
 
-        central_scheduler: ray.actor.ActorHandle = scheduling_actor_cls.options(
-            **scheduling_actor_options
-        ).remote(actor_id=self.node_id, head=ray.get_runtime_context().current_actor)
-        ray.get(central_scheduler.ready.remote())
+    # TODO rename or move creation of global container elsewhere
+    def register_arrays(self, arrays_definitions: list[tuple[str, Callable]], max_pending_arrays: int = 1_000_000_000) -> None:
+        # regulate how far ahead sim can go wrt to analytics
+        self.new_pending_array_semaphore = asyncio.Semaphore(
+            max_pending_arrays)
 
-        self.register_scheduling_actor(self.node_id, central_scheduler)
-        print(f"ICI : {central_scheduler}", flush=True)
+        for (name, f_preprocessing) in arrays_definitions:
+            self.registered_arrays[name] = DaskArrayData(name, f_preprocessing)
 
-    def get_head_node_id(self):
-        return self.node_id
-
-    def register_arrays(self, arrays_definitions: list[HeadArrayDefinition]) -> None:
-        self.arrays: dict[str, DaskArrayData] = {
-            definition.name: DaskArrayData(definition) for definition in arrays_definitions
-        }
-
-    def list_scheduling_actors(self) -> list[ray.actor.ActorHandle]:
+    def list_scheduling_actors(self) -> dict[str, ray.actor.ActorHandle]:
         """
         Return the list of scheduling actors.
 
         Returns
         -------
-        list[ray.actor.ActorHandle]
-            List of actor handles for all registered scheduling actors.
+        Dict[ray.actor.ActorHandle]
+            Dictionary of actor_id to actor handles for all registered scheduling actors.
         """
         return self.scheduling_actors
 
-    def register_scheduling_actor(self, actor_id: str, actor_handle: ray.actor.ActorHandle):
+    async def register_scheduling_actor(self, actor_id: str, actor_handle: ray.actor.ActorHandle):
         """
         Register a scheduling actor that has been created.
 
@@ -152,16 +122,16 @@ class HeadNodeActor:
         provided during initialization. These callbacks are static and cannot
         be changed after initialization.
         """
-        return {name: array.definition.preprocess for name, array in self.arrays.items()}
+        return {name: array.f_preprocessing for name, array in self.registered_arrays.items()}
 
-    def set_owned_chunks(
+    def register_partial_array(
         self,
-        scheduling_actor_id: int,
+        actor_id_who_owns: int,
         array_name: str,
         dtype: np.dtype,
         nb_chunks_per_dim: tuple[int, ...],
         # [(chunk position, chunk size), ...]
-        chunks: list[tuple[int, tuple[int, ...], tuple[int, ...]]],
+        chunks_meta: list[tuple[int, tuple[int, ...], tuple[int, ...]]],
     ):
         """
         Register which chunks are owned by a scheduling actor.
@@ -187,11 +157,13 @@ class HeadNodeActor:
         which chunks they are responsible for. This information is used to
         track array construction progress.
         """
-        array = self.arrays[array_name]
+        # TODO no checks done for when all nodeactors have called this
+        # TODO missing check that analytics and sim have required/set same name of arrays, otherwise array is created and nothing happens
+        array = self.registered_arrays[array_name]
 
-        for bridge_id, position, size in chunks:
-            array.set_chunk_owner(nb_chunks_per_dim, dtype,
-                                  position, size, scheduling_actor_id, bridge_id)
+        for bridge_id, position, size in chunks_meta:
+            array.update_meta(nb_chunks_per_dim, dtype, position,
+                              size, actor_id_who_owns, bridge_id)
 
     async def chunks_ready(self, array_name: str, timestep: Timestep, all_chunks_ref: list[ray.ObjectRef]) -> None:
         """
@@ -220,9 +192,13 @@ class HeadNodeActor:
         chunks for a timestep are ready, the full Dask array is constructed
         and added to the `arrays_ready` queue for collection by analytics.
         """
-        array = self.arrays[array_name]
+        array = self.registered_arrays[array_name]
 
+        # long story short, this creates an empty array.chunk_refs[timestep] = []
         while timestep not in array.chunk_refs:
+            # TODO what happens if new_array_created for an array of a prev iter is set?
+            # could it influence this iter?
+            # need to reason more about this condition
             t1 = asyncio.create_task(
                 self.new_pending_array_semaphore.acquire())
             t2 = asyncio.create_task(self.new_array_created.wait())
@@ -241,17 +217,24 @@ class HeadNodeActor:
 
                     self.new_array_created.set()
                     self.new_array_created.clear()
-
+        # all_chunks_ref is [RayRef] st. ray.get(rayref) -> [ref_of_ref_chunk_i, ref_ref_chunk_i+1, ...] (belonging to actor that called it)
+        # so I unpack it and give this ray ref.
         is_ready = array.add_chunk_ref(all_chunks_ref[0], timestep)
+
+        position_to_chunkref: dict[tuple[int, ...], ray.ObjectRef] = {}
+        for node_actor_id, actor_handler in self.scheduling_actors.items():
+            position_to_chunkref |= ray.get(actor_handler.get_chunkposition_chunkref_map.remote(
+                array_name, timestep))
 
         if is_ready:
             self.arrays_ready.put_nowait(
                 (
                     array_name,
                     timestep,
-                    array.get_full_array(timestep),
+                    array.get_full_array(timestep, map=position_to_chunkref),
                 )
             )
+            # TODO Just used for preparation stuff
             array.fully_defined.set()
 
     def ready(self):
@@ -271,6 +254,7 @@ class HeadNodeActor:
         """
         return True
 
+    # TODO there is a single queue for all arrays.
     async def get_next_array(self) -> tuple[str, Timestep, da.Array]:
         """
         Get the next ready array from the queue.
@@ -322,5 +306,5 @@ class HeadNodeActor:
         are known) before returning. The returned array is suitable for
         preparation tasks that need array metadata but not the actual data.
         """
-        await self.arrays[array_name].fully_defined.wait()
-        return self.arrays[array_name].get_full_array(timestep, is_preparation=True)
+        await self.registered_arrays[array_name].fully_defined.wait()
+        return self.registered_arrays[array_name].get_full_array(timestep, is_preparation=True)

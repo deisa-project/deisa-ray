@@ -3,11 +3,10 @@ import ray
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 from tests.stubs import StubSchedulingActor
 from deisa.ray.bridge import Bridge
-from deisa.ray.utils import get_ready_actor_with_retry
 from ray.util.state import list_actors
 import dask.array as da
 from ray.cluster_utils import Cluster
-from tests.utils import wait_for_head_node, wait_for_central_scheduler
+from tests.utils import wait_for_head_node
 
 
 @pytest.fixture
@@ -26,8 +25,7 @@ def ray_multinode_cluster():
         },
     )
 
-    cluster.add_node(num_cpus=1, env_vars={
-                     "RAY_OVERRIDE_NODE_ID_FOR_TESTING": cluster_node_ids["node1"]})
+    cluster.add_node(num_cpus=1, env_vars={"RAY_OVERRIDE_NODE_ID_FOR_TESTING": cluster_node_ids["node1"]})
 
     # Connect driver to this cluster (IMPORTANT)
     ray.init(
@@ -66,7 +64,6 @@ NAMESPACE = "deisa_ray"
 
 def actor_node_id_by_name(name: str, namespace: str = NAMESPACE) -> str:
     for a in list_actors(filters=[("state", "=", "ALIVE")]):
-        print(f"ACTOR NAME = {a}", flush=True)
         if a.get("name") == name and a.get("ray_namespace") == namespace:
             # Newer Ray: address.node_id; older: may differ slightly
             nid = a.get("node_id")
@@ -83,8 +80,7 @@ def test_actor_placement(ray_multinode_cluster):
     # make sure that it runs on mock head node
     @ray.remote(
         max_retries=0,
-        scheduling_strategy=NodeAffinitySchedulingStrategy(
-            node_id=head_node_id, soft=False),
+        scheduling_strategy=NodeAffinitySchedulingStrategy(node_id=head_node_id, soft=False),
     )
     def head_script() -> None:
         """The head node checks that the values are correct"""
@@ -107,43 +103,27 @@ def test_actor_placement(ray_multinode_cluster):
     ray.get(head_script.remote())
     # just a ray.get_actor() wrapped in while loop
     wait_for_head_node()
-    print("TEST0", flush=True)
-    wait_for_central_scheduler()
-    print("TEST1", flush=True)
-    print("TEST2", flush=True)
 
-    print("ASSERT", flush=True)
     # check that head actor is running in mock head node
     assert actor_node_id_by_name("simulation_head") == head_node_id
-    assert actor_node_id_by_name("sched-central") == head_node_id
-
-    print("ASSERTED", flush=True)
 
     # start client in worker node (this will create one scheduling actor)
     # we need to check that both the scheduling actor and client have node_id that is the same as
     # the worker node id
     @ray.remote(
-        max_retries=0,
-        scheduling_strategy=NodeAffinitySchedulingStrategy(
-            node_id=worker_node_id, soft=False),
+        scheduling_strategy=NodeAffinitySchedulingStrategy(node_id=worker_node_id, soft=False),
     )
     def make_client_and_return_ids():
+
         from deisa.ray.utils import get_system_metadata
         sys_md = get_system_metadata()
-        print("Bridge Creation...", flush=True)
-        c = Bridge(id=0, arrays_metadata={}, system_metadata=sys_md,
-                   _node_id=None)  # type:ignore
-        print("Bridge Created", flush=True)
+        c = Bridge(id = 0, arrays_metadata= {}, system_metadata= sys_md, _node_id=None, scheduling_actor_cls=StubSchedulingActor)  # type:ignore
 
-        return c.node_id
+        return (c.node_id, f"sched-{c.node_id}")
 
-    print("NEW ASSERT", flush=True)
-    assert actor_node_id_by_name("sched-central") == head_node_id
-    wait_for_central_scheduler()
-    client_node_id = ray.get(make_client_and_return_ids.remote())
-    print("JUST BEFORE", flush=True)
+    client_node_id, sched_name = ray.get(make_client_and_return_ids.remote())
     assert client_node_id == worker_node_id
-    print("NEW ASSERTED", flush=True)
+    assert actor_node_id_by_name(sched_name) == worker_node_id
 
 
 # @pytest.mark.parametrize("sleep_t", [0, 60, 120])

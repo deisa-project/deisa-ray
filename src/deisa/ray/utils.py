@@ -47,16 +47,12 @@ def get_ready_actor_with_retry(name, namespace, deadline_s=180):
     start, delay = time.time(), 0.2
     while True:
         try:
-            print(f"look for actor : name = {
-                  name}, namespace = {namespace}", flush=True)
-            actor = ray.get_actor(name, namespace=namespace)
+            actor = ray.get_actor(name=name, namespace=namespace)
             # ready gate
             # TODO for even more reliability, in the future we should handle
             # actor exists, but unavailable
             # actor exists, crashed, need to recreate
-            print("WAIT FOR RDY", flush=True)
             ray.get(actor.ready.remote())
-            print(actor, flush=True)
             return actor
         except ValueError:
             if time.time() - start > deadline_s:
