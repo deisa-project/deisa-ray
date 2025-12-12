@@ -3,7 +3,7 @@
   <head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="deisa.ray.head_node module" href="deisa.ray.head_node.html"><link rel="prev" title="deisa.ray package" href="deisa.ray.html">
+<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="deisa.ray.errors module" href="deisa.ray.errors.html"><link rel="prev" title="deisa.ray package" href="deisa.ray.html">
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.09.25 -->
         <title>deisa.ray.bridge module - deisa-ray documentation</title>
@@ -198,7 +198,12 @@
 <ul class="current">
 <li class="toctree-l1 current has-children"><a class="reference internal" href="deisa.ray.html">deisa.ray package</a><input aria-label="Toggle navigation of deisa.ray package" checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
 <li class="toctree-l2 current current-page"><a class="current reference internal" href="#">deisa.ray.bridge module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.errors.html">deisa.ray.errors module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.head_node.html">deisa.ray.head_node module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.ray_patch.html">deisa.ray.ray_patch module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.scheduling_actor.html">deisa.ray.scheduling_actor module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.types.html">deisa.ray.types module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.utils.html">deisa.ray.utils module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.window_api.html">deisa.ray.window_api module</a></li>
 </ul>
 </li>
@@ -242,9 +247,13 @@
         <article role="main" id="furo-main-content">
           <section id="module-deisa.ray.bridge">
 <span id="deisa-ray-bridge-module"></span><h1>deisa.ray.bridge module<a class="headerlink" href="#module-deisa.ray.bridge" title="Link to this heading">¶</a></h1>
+<p>Bridge between MPI ranks and the Ray-based analytics system.</p>
+<p>This module exposes the <a class="reference internal" href="#deisa.ray.bridge.Bridge" title="deisa.ray.bridge.Bridge"><code class="xref py py-class docutils literal notranslate"><span class="pre">Bridge</span></code></a> class used by simulation ranks to
+register their data chunks and exchange information with analytics running on
+top of Ray.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="deisa.ray.bridge.Bridge">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">deisa.ray.bridge.</span></span><span class="sig-name descname"><span class="pre">Bridge</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">_node_id:</span> <span class="pre">str</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scheduling_actor_cls:</span> <span class="pre">~typing.Type</span> <span class="pre">=</span> <span class="pre">&lt;deisa.ray._scheduling_actor.ActorClass(SchedulingActor)</span> <span class="pre">object&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">_init_retries:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">3</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/deisa/ray/bridge.html#Bridge"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#deisa.ray.bridge.Bridge" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">deisa.ray.bridge.</span></span><span class="sig-name descname"><span class="pre">Bridge</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">id:</span> <span class="pre">int,</span> <span class="pre">arrays_metadata:</span> <span class="pre">~typing.Mapping[str,</span> <span class="pre">~typing.Mapping[str,</span> <span class="pre">~typing.Any]],</span> <span class="pre">system_metadata:</span> <span class="pre">~typing.Mapping[str,</span> <span class="pre">~typing.Any],</span> <span class="pre">*args:</span> <span class="pre">~typing.Any,</span> <span class="pre">_node_id:</span> <span class="pre">str</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None,</span> <span class="pre">scheduling_actor_cls:</span> <span class="pre">~typing.Type</span> <span class="pre">=</span> <span class="pre">&lt;deisa.ray.scheduling_actor.ActorClass(SchedulingActor)</span> <span class="pre">object&gt;,</span> <span class="pre">_init_retries:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">3,</span> <span class="pre">**kwargs:</span> <span class="pre">~typing.Any</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/deisa/ray/bridge.html#Bridge"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#deisa.ray.bridge.Bridge" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
 <p>Bridge between MPI ranks and Ray cluster for distributed array processing.</p>
 <p>Each Bridge instance is created by an MPI rank to connect to the Ray cluster
@@ -280,7 +289,7 @@ Default is 3.</p></li>
 <dd><p>The Ray actor handle for the scheduling actor.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>ray.actor.ActorHandle</p>
+<dd class="field-odd"><p>RayActorHandle</p>
 </dd>
 </dl>
 </dd></dl>
@@ -302,35 +311,82 @@ The scheduling actor is created with a detached lifetime to persist beyond
 the Bridge initialization. The actor uses node affinity scheduling to ensure
 it runs on the specified node.</p>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">bridge</span> <span class="o">=</span> <span class="n">Bridge</span><span class="p">()</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">bridge</span><span class="o">.</span><span class="n">add_chunk</span><span class="p">(</span>
-<span class="gp">... </span>    <span class="n">array_name</span><span class="o">=</span><span class="s2">&quot;temperature&quot;</span><span class="p">,</span>
-<span class="gp">... </span>    <span class="n">chunk_position</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
-<span class="gp">... </span>    <span class="n">nb_chunks_per_dim</span><span class="o">=</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
-<span class="gp">... </span>    <span class="n">nb_chunks_in_node</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
-<span class="gp">... </span>    <span class="n">timestep</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
-<span class="gp">... </span>    <span class="n">chunk</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">3.0</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">]])</span>
-<span class="gp">... </span><span class="p">)</span>
+<p>Create a bridge for a simulation rank that owns one array <code class="docutils literal notranslate"><span class="pre">temperature</span></code>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">arrays_metadata</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;temperature&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">&quot;chunk_shape&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span>
+        <span class="s2">&quot;nb_chunks_per_dim&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span>
+        <span class="s2">&quot;nb_chunks_of_node&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+        <span class="s2">&quot;dtype&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span>
+        <span class="s2">&quot;chunk_position&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+<span class="n">system_metadata</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;nb_ranks&quot;</span><span class="p">:</span> <span class="mi">4</span><span class="p">,</span>
+    <span class="s2">&quot;ray_address&quot;</span><span class="p">:</span> <span class="s2">&quot;auto&quot;</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="n">bridge</span> <span class="o">=</span> <span class="n">Bridge</span><span class="p">(</span>
+    <span class="nb">id</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+    <span class="n">arrays_metadata</span><span class="o">=</span><span class="n">arrays_metadata</span><span class="p">,</span>
+    <span class="n">system_metadata</span><span class="o">=</span><span class="n">system_metadata</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">bridge</span><span class="o">.</span><span class="n">send</span><span class="p">(</span>
+    <span class="n">array_name</span><span class="o">=</span><span class="s2">&quot;temperature&quot;</span><span class="p">,</span>
+    <span class="n">chunk</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">10</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">),</span>
+    <span class="n">timestep</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+<span class="p">)</span>
 </pre></div>
 </div>
 <dl class="py method">
-<dt class="sig sig-object py" id="deisa.ray.bridge.Bridge.add_chunk">
-<span class="sig-name descname"><span class="pre">add_chunk</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">array_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chunk_position</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nb_chunks_per_dim</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nb_chunks_in_node</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timestep</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chunk</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">store_externally</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/deisa/ray/bridge.html#Bridge.add_chunk"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#deisa.ray.bridge.Bridge.add_chunk" title="Link to this definition">¶</a></dt>
-<dd><p>Make a chunk of data available to the analytic.</p>
-<p>This method applies preprocessing callbacks to the chunk, stores it in
-Ray’s object store, and sends it to the scheduling actor. The method
-blocks until the data is processed by the scheduling actor.</p>
+<dt class="sig sig-object py" id="deisa.ray.bridge.Bridge.get">
+<span class="sig-name descname"><span class="pre">get</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">default</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chunked</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Any</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="reference internal" href="_modules/deisa/ray/bridge.html#Bridge.get"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#deisa.ray.bridge.Bridge.get" title="Link to this definition">¶</a></dt>
+<dd><p>Retrieve information back from Analytics.</p>
+<p>Used for two cases:</p>
+<ol class="arabic simple">
+<li><p>Retrieve a simple value that is set in the analytics so that the
+simulation can react to some event that has been detected. This
+case is asynchronous.</p></li>
+<li><p>(Planned) Retrieve a distributed array that has been modified by
+the analytics. This case is synchronous and currently not
+implemented for <code class="docutils literal notranslate"><span class="pre">chunked=True</span></code>.</p></li>
+</ol>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>name</strong> (<em>str</em>) – The name of the key that is being retrieved from the Analytics.</p></li>
+<li><p><strong>default</strong> (<em>Any</em><em>, </em><em>optional</em>) – The default value to return if the key has not been set or does
+not exist. Default is None.</p></li>
+<li><p><strong>chunked</strong> (<em>bool</em><em>, </em><em>optional</em>) – Whether the value that is returned is distributed or not. Should
+be set to True only if retrieving a distributed array that is
+handled by the bridge. Currently not implemented. Default is
+False.</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>When <code class="docutils literal notranslate"><span class="pre">chunked</span></code> is False, this method simply forwards the request to
+the node actor and returns the result (or <code class="docutils literal notranslate"><span class="pre">default</span></code> if not set).
+When <code class="docutils literal notranslate"><span class="pre">chunked</span></code> is True, a <code class="xref py py-class docutils literal notranslate"><span class="pre">NotImplementedError</span></code> is raised.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="deisa.ray.bridge.Bridge.send">
+<span class="sig-name descname"><span class="pre">send</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">array_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chunk</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timestep</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chunked</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">store_externally</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/deisa/ray/bridge.html#Bridge.send"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#deisa.ray.bridge.Bridge.send" title="Link to this definition">¶</a></dt>
+<dd><p>Make a chunk of data available to the analytics.</p>
+<p>This method applies the preprocessing callback associated with
+<code class="docutils literal notranslate"><span class="pre">array_name</span></code> to the chunk, stores it in Ray’s object store, and
+sends a reference to the node actor. The method blocks until the
+data is processed by the node actor.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>array_name</strong> (<em>str</em>) – The name of the array this chunk belongs to.</p></li>
-<li><p><strong>chunk_position</strong> (<em>tuple</em><em>[</em><em>int</em><em>, </em><em>...</em><em>]</em>) – The position of the chunk in the array decomposition, specified as
-a tuple of indices for each dimension.</p></li>
-<li><p><strong>nb_chunks_per_dim</strong> (<em>tuple</em><em>[</em><em>int</em><em>, </em><em>...</em><em>]</em>) – The number of chunks per dimension in the array decomposition.</p></li>
-<li><p><strong>nb_chunks_in_node</strong> (<em>int</em>) – The number of chunks sent by this node. The scheduling actor will
-inform the head actor when all chunks from this node are ready.</p></li>
+<li><p><strong>chunk</strong> (<em>numpy.ndarray</em>) – The chunk of data to be sent to the analytics.</p></li>
 <li><p><strong>timestep</strong> (<em>int</em>) – The timestep index for this chunk of data.</p></li>
-<li><p><strong>chunk</strong> (<em>np.ndarray</em>) – The chunk of data to be sent to the analytic.</p></li>
+<li><p><strong>chunked</strong> (<em>bool</em><em>, </em><em>optional</em>) – Whether the chunk was produced by the internal chunking logic.
+Currently reserved for future use. Default is True.</p></li>
 <li><p><strong>store_externally</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, the data is stored externally. Not implemented yet.
 Default is False.</p></li>
 </ul>
@@ -338,18 +394,48 @@ Default is False.</p></li>
 </dl>
 <p class="rubric">Notes</p>
 <p>The chunk is first processed through the preprocessing callback
-associated with <cite>array_name</cite>. The processed chunk is then stored in
-Ray’s object store with the scheduling actor as the owner, ensuring
-the reference persists even after the simulation script terminates.
-This method blocks until the scheduling actor has processed the chunk.</p>
+associated with <code class="docutils literal notranslate"><span class="pre">array_name</span></code>. The processed chunk is then stored in
+Ray’s object store with the node actor as the owner, ensuring the
+reference persists even after the simulation script terminates.
+This method blocks until the node actor has processed the chunk.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Raises<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>KeyError</strong> – If <cite>array_name</cite> is not found in the preprocessing callbacks
+<dd class="field-odd"><p><strong>KeyError</strong> – If <code class="docutils literal notranslate"><span class="pre">array_name</span></code> is not found in the preprocessing callbacks
     dictionary.</p>
 </dd>
 </dl>
 </dd></dl>
 
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="deisa.ray.bridge.get_node_actor_options">
+<span class="sig-prename descclassname"><span class="pre">deisa.ray.bridge.</span></span><span class="sig-name descname"><span class="pre">get_node_actor_options</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">namespace</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/deisa/ray/bridge.html#get_node_actor_options"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#deisa.ray.bridge.get_node_actor_options" title="Link to this definition">¶</a></dt>
+<dd><p>Return Ray options used to create (or get) a node scheduling actor.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>name</strong> (<em>str</em>) – Actor name to use for the node actor.</p></li>
+<li><p><strong>namespace</strong> (<em>str</em>) – Ray namespace where the actor will live.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Dictionary of options to be passed to <code class="docutils literal notranslate"><span class="pre">SchedulingActor.options</span></code>.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>dict</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>The options use <code class="docutils literal notranslate"><span class="pre">get_if_exists=True</span></code> to avoid race conditions when
+several bridges on the same node attempt to create the same actor.
+The actor is configured with:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">lifetime='detached'</span></code> so it survives the creating task</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">num_cpus=0</span></code> so it does not reserve CPU resources</p></li>
+<li><p>a very large <code class="docutils literal notranslate"><span class="pre">max_concurrency</span></code> because the actor is async-only
+and used mainly as a coordination point.</p></li>
+</ul>
 </dd></dl>
 
 </section>
@@ -359,12 +445,12 @@ This method blocks until the scheduling actor has processed the chunk.</p>
       <footer>
         
         <div class="related-pages">
-          <a class="next-page" href="deisa.ray.head_node.html">
+          <a class="next-page" href="deisa.ray.errors.html">
               <div class="page-info">
                 <div class="context">
                   <span>Next</span>
                 </div>
-                <div class="title">deisa.ray.head_node module</div>
+                <div class="title">deisa.ray.errors module</div>
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>
@@ -414,9 +500,11 @@ This method blocks until the scheduling actor has processed the chunk.</p>
 <li><a class="reference internal" href="#deisa.ray.bridge.Bridge.node_id"><code class="docutils literal notranslate"><span class="pre">Bridge.node_id</span></code></a></li>
 <li><a class="reference internal" href="#deisa.ray.bridge.Bridge.scheduling_actor"><code class="docutils literal notranslate"><span class="pre">Bridge.scheduling_actor</span></code></a></li>
 <li><a class="reference internal" href="#deisa.ray.bridge.Bridge.preprocessing_callbacks"><code class="docutils literal notranslate"><span class="pre">Bridge.preprocessing_callbacks</span></code></a></li>
-<li><a class="reference internal" href="#deisa.ray.bridge.Bridge.add_chunk"><code class="docutils literal notranslate"><span class="pre">Bridge.add_chunk()</span></code></a></li>
+<li><a class="reference internal" href="#deisa.ray.bridge.Bridge.get"><code class="docutils literal notranslate"><span class="pre">Bridge.get()</span></code></a></li>
+<li><a class="reference internal" href="#deisa.ray.bridge.Bridge.send"><code class="docutils literal notranslate"><span class="pre">Bridge.send()</span></code></a></li>
 </ul>
 </li>
+<li><a class="reference internal" href="#deisa.ray.bridge.get_node_actor_options"><code class="docutils literal notranslate"><span class="pre">get_node_actor_options()</span></code></a></li>
 </ul>
 </li>
 </ul>

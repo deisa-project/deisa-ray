@@ -3,7 +3,7 @@
   <head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="prev" title="deisa.ray.head_node module" href="deisa.ray.head_node.html">
+<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="prev" title="deisa.ray.utils module" href="deisa.ray.utils.html">
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.09.25 -->
         <title>deisa.ray.window_api module - deisa-ray documentation</title>
@@ -198,7 +198,12 @@
 <ul class="current">
 <li class="toctree-l1 current has-children"><a class="reference internal" href="deisa.ray.html">deisa.ray package</a><input aria-label="Toggle navigation of deisa.ray package" checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.bridge.html">deisa.ray.bridge module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.errors.html">deisa.ray.errors module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.head_node.html">deisa.ray.head_node module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.ray_patch.html">deisa.ray.ray_patch module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.scheduling_actor.html">deisa.ray.scheduling_actor module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.types.html">deisa.ray.types module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.utils.html">deisa.ray.utils module</a></li>
 <li class="toctree-l2 current current-page"><a class="current reference internal" href="#">deisa.ray.window_api module</a></li>
 </ul>
 </li>
@@ -243,108 +248,73 @@
           <section id="module-deisa.ray.window_api">
 <span id="deisa-ray-window-api-module"></span><h1>deisa.ray.window_api module<a class="headerlink" href="#module-deisa.ray.window_api" title="Link to this heading">¶</a></h1>
 <dl class="py class">
-<dt class="sig sig-object py" id="deisa.ray.window_api.ArrayDefinition">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">deisa.ray.window_api.</span></span><span class="sig-name descname"><span class="pre">ArrayDefinition</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name:</span> <span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">window_size:</span> <span class="pre">int</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">preprocess:</span> <span class="pre">~typing.Callable</span> <span class="pre">=</span> <span class="pre">&lt;function</span> <span class="pre">ArrayDefinition.&lt;lambda&gt;&gt;</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/deisa/ray/window_api.html#ArrayDefinition"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#deisa.ray.window_api.ArrayDefinition" title="Link to this definition">¶</a></dt>
+<dt class="sig sig-object py" id="deisa.ray.window_api.Deisa">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">deisa.ray.window_api.</span></span><span class="sig-name descname"><span class="pre">Deisa</span></span><a class="reference internal" href="_modules/deisa/ray/window_api.html#Deisa"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#deisa.ray.window_api.Deisa" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
-<p>Description of an array with optional windowing support.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="deisa.ray.window_api.Deisa.execute_callbacks">
+<span class="sig-name descname"><span class="pre">execute_callbacks</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/deisa/ray/window_api.html#Deisa.execute_callbacks"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#deisa.ray.window_api.Deisa.execute_callbacks" title="Link to this definition">¶</a></dt>
+<dd><p>Execute the registered simulation callback loop.</p>
+<p class="rubric">Notes</p>
+<p>Supports a single registered callback at present. Manages array
+retrieval from the head actor, optional preparation tasks, windowed
+array delivery, and garbage collection between iterations.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="deisa.ray.window_api.Deisa.register_callback">
+<span class="sig-name descname"><span class="pre">register_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">simulation_callback</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">arrays_description</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.WindowArrayDefinition" title="deisa.ray.types.WindowArrayDefinition"><span class="pre">WindowArrayDefinition</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_iterations</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1000000000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prepare_iteration</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">preparation_advance</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">3</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/deisa/ray/window_api.html#Deisa.register_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#deisa.ray.window_api.Deisa.register_callback" title="Link to this definition">¶</a></dt>
+<dd><p>Register the analytics callback and array descriptions.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>name</strong> (<em>str</em>) – The name of the array.</p></li>
-<li><p><strong>window_size</strong> (<em>int</em><em> or </em><em>None</em><em>, </em><em>optional</em>) – If specified, creates a sliding window of arrays for this array name.
-The window will contain the last <cite>window_size</cite> timesteps. If None,
-only the current timestep array is provided. Default is None.</p></li>
-<li><p><strong>preprocess</strong> (<em>Callable</em><em>, </em><em>optional</em>) – A preprocessing function to apply to chunks of this array before
-they are sent to the analytics. The function should take a numpy
-array and return a processed numpy array. Default is the identity
-function (no preprocessing).</p></li>
+<li><p><strong>simulation_callback</strong> (<em>Callable</em>) – Function to run for each iteration; receives arrays as kwargs
+and <code class="docutils literal notranslate"><span class="pre">timestep</span></code>.</p></li>
+<li><p><strong>arrays_description</strong> (<em>list</em><em>[</em><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.WindowArrayDefinition" title="deisa.ray.types.WindowArrayDefinition"><em>WindowArrayDefinition</em></a><em>]</em>) – Descriptions of arrays to stream to the callback (with optional
+sliding windows).</p></li>
+<li><p><strong>max_iterations</strong> (<em>int</em><em>, </em><em>optional</em>) – Maximum iterations to execute. Default is a large sentinel.</p></li>
+<li><p><strong>prepare_iteration</strong> (<em>Callable</em><em> or </em><em>None</em><em>, </em><em>optional</em>) – Optional preparatory callback run <code class="docutils literal notranslate"><span class="pre">preparation_advance</span></code> steps
+ahead. Receives the array and <code class="docutils literal notranslate"><span class="pre">timestep</span></code>.</p></li>
+<li><p><strong>preparation_advance</strong> (<em>int</em><em>, </em><em>optional</em>) – How many iterations ahead to prepare when <code class="docutils literal notranslate"><span class="pre">prepare_iteration</span></code>
+is provided. Default is 3.</p></li>
 </ul>
 </dd>
 </dl>
-<p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">def</span><span class="w"> </span><span class="nf">normalize</span><span class="p">(</span><span class="n">arr</span><span class="p">):</span>
-<span class="gp">... </span>    <span class="k">return</span> <span class="n">arr</span> <span class="o">/</span> <span class="n">arr</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Array with windowing: last 5 timesteps</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">array_def</span> <span class="o">=</span> <span class="n">ArrayDefinition</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;temperature&quot;</span><span class="p">,</span> <span class="n">window_size</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">preprocess</span><span class="o">=</span><span class="n">normalize</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Array without windowing: current timestep only</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">array_def</span> <span class="o">=</span> <span class="n">ArrayDefinition</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;pressure&quot;</span><span class="p">,</span> <span class="n">window_size</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
-</pre></div>
-</div>
-<dl class="py attribute">
-<dt class="sig sig-object py" id="deisa.ray.window_api.ArrayDefinition.name">
-<span class="sig-name descname"><span class="pre">name</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#deisa.ray.window_api.ArrayDefinition.name" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="deisa.ray.window_api.ArrayDefinition.preprocess">
-<span class="sig-name descname"><span class="pre">preprocess</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#deisa.ray.window_api.ArrayDefinition.preprocess" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py attribute">
-<dt class="sig sig-object py" id="deisa.ray.window_api.ArrayDefinition.window_size">
-<span class="sig-name descname"><span class="pre">window_size</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#deisa.ray.window_api.ArrayDefinition.window_size" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
-
 </dd></dl>
 
-<dl class="py function">
-<dt class="sig sig-object py" id="deisa.ray.window_api.run_simulation">
-<span class="sig-prename descclassname"><span class="pre">deisa.ray.window_api.</span></span><span class="sig-name descname"><span class="pre">run_simulation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">simulation_callback</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">arrays_description</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#deisa.ray.window_api.ArrayDefinition" title="deisa.ray.window_api.ArrayDefinition"><span class="pre">ArrayDefinition</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_iterations</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1000000000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prepare_iteration</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">preparation_advance</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">3</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/deisa/ray/window_api.html#run_simulation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#deisa.ray.window_api.run_simulation" title="Link to this definition">¶</a></dt>
-<dd><p>Run a simulation that processes arrays from the Ray cluster with optional windowing.</p>
-<p>This function coordinates the execution of a simulation callback that processes
-arrays received from the Ray cluster. It supports sliding windows for arrays,
-allowing the callback to access arrays from multiple timesteps. The function
-manages array collection, windowing, memory cleanup, and optional preparation
-callbacks.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="deisa.ray.window_api.Deisa.set">
+<span class="sig-name descname"><span class="pre">set</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">key</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Hashable</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chunked</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/deisa/ray/window_api.html#Deisa.set"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#deisa.ray.window_api.Deisa.set" title="Link to this definition">¶</a></dt>
+<dd><p>Broadcast a feedback value to all node actors.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>simulation_callback</strong> (<em>Callable</em>) – The main simulation callback function. It will be called with keyword
-arguments for each array (by name) and a <cite>timestep</cite> argument. If
-<cite>prepare_iteration</cite> is provided, it will also receive a
-<cite>preparation_result</cite> argument.</p></li>
-<li><p><strong>arrays_description</strong> (<em>list</em><em>[</em><a class="reference internal" href="#deisa.ray.window_api.ArrayDefinition" title="deisa.ray.window_api.ArrayDefinition"><em>ArrayDefinition</em></a><em>]</em>) – List of array definitions describing the arrays to be processed. Each
-definition can specify a window size for sliding window access.</p></li>
-<li><p><strong>max_iterations</strong> (<em>int</em><em>, </em><em>optional</em>) – Maximum number of iterations to run. Default is 1_000_000_000.</p></li>
-<li><p><strong>prepare_iteration</strong> (<em>Callable</em><em> or </em><em>None</em><em>, </em><em>optional</em>) – Optional callback function that is called in advance for each timestep
-to prepare data. The function receives a Dask array and timestep. The
-result is passed to the simulation_callback as <cite>preparation_result</cite>.
-Default is None.</p></li>
-<li><p><strong>preparation_advance</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of timesteps ahead to prepare. The prepare_iteration callback
-will be called this many timesteps in advance. Default is 3.</p></li>
+<li><p><strong>key</strong> (<em>Hashable</em>) – Identifier for the shared value.</p></li>
+<li><p><strong>value</strong> (<em>Any</em>) – Value to distribute.</p></li>
+<li><p><strong>chunked</strong> (<em>bool</em><em>, </em><em>optional</em>) – Placeholder for future distributed-array feedback. Only <code class="docutils literal notranslate"><span class="pre">False</span></code>
+is supported today. Default is <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p></li>
 </ul>
 </dd>
 </dl>
 <p class="rubric">Notes</p>
-<p>The function performs the following operations for each iteration:</p>
-<ol class="arabic simple">
-<li><p>Collects arrays from the head node until all required arrays for the
-current iteration are available.</p></li>
-<li><p>Constructs the arrays dictionary, applying windowing for arrays with
-<cite>window_size</cite> specified.</p></li>
-<li><p>Calls the simulation_callback with the arrays and timestep.</p></li>
-<li><p>Cleans up old arrays that are no longer needed for the window.</p></li>
-<li><p>Triggers garbage collection to free memory.</p></li>
-</ol>
-<p>For arrays with <cite>window_size</cite> set to <cite>n</cite>, the callback receives a list
-of arrays containing the last <cite>n</cite> timesteps. For arrays without windowing,
-the callback receives a single array for the current timestep.</p>
-<p>The function manages memory by deleting arrays that are outside the window
-and explicitly calling garbage collection to ensure Ray object references
-are released promptly.</p>
-<p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">def</span><span class="w"> </span><span class="nf">process_data</span><span class="p">(</span><span class="n">temperature</span><span class="p">,</span> <span class="n">pressure</span><span class="p">,</span> <span class="n">timestep</span><span class="p">):</span>
-<span class="gp">... </span>    <span class="c1"># Process arrays for current timestep</span>
-<span class="gp">... </span>    <span class="n">result</span> <span class="o">=</span> <span class="n">temperature</span> <span class="o">+</span> <span class="n">pressure</span>
-<span class="gp">... </span>    <span class="k">return</span> <span class="n">result</span>
-<span class="gp">&gt;&gt;&gt;</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">arrays</span> <span class="o">=</span> <span class="p">[</span>
-<span class="gp">... </span>    <span class="n">ArrayDefinition</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;temperature&quot;</span><span class="p">,</span> <span class="n">window_size</span><span class="o">=</span><span class="mi">5</span><span class="p">),</span>  <span class="c1"># Last 5 timesteps</span>
-<span class="gp">... </span>    <span class="n">ArrayDefinition</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;pressure&quot;</span><span class="p">),</span>  <span class="c1"># Current timestep only</span>
-<span class="gp">... </span><span class="p">]</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">run_simulation</span><span class="p">(</span><span class="n">process_data</span><span class="p">,</span> <span class="n">arrays</span><span class="p">,</span> <span class="n">max_iterations</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
-</pre></div>
-</div>
+<p>The method lazily fetches node actors once and uses fire-and-forget
+remote calls; callers should not assume synchronous delivery.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="deisa.ray.window_api.Deisa.unregister_callback">
+<span class="sig-name descname"><span class="pre">unregister_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">simulation_callback</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/deisa/ray/window_api.html#Deisa.unregister_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#deisa.ray.window_api.Deisa.unregister_callback" title="Link to this definition">¶</a></dt>
+<dd><p>Unregister a previously registered simulation callback.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>simulation_callback</strong> (<em>Callable</em>) – Callback to remove from the registry.</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>NotImplementedError</strong> – Always, as the feature has not been implemented yet.</p>
+</dd>
+</dl>
+</dd></dl>
+
 </dd></dl>
 
 </section>
@@ -355,14 +325,14 @@ are released promptly.</p>
         
         <div class="related-pages">
           
-          <a class="prev-page" href="deisa.ray.head_node.html">
+          <a class="prev-page" href="deisa.ray.utils.html">
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
               <div class="page-info">
                 <div class="context">
                   <span>Previous</span>
                 </div>
                 
-                <div class="title">deisa.ray.head_node module</div>
+                <div class="title">deisa.ray.utils module</div>
                 
               </div>
             </a>
@@ -397,13 +367,13 @@ are released promptly.</p>
           <div class="toc-tree">
             <ul>
 <li><a class="reference internal" href="#">deisa.ray.window_api module</a><ul>
-<li><a class="reference internal" href="#deisa.ray.window_api.ArrayDefinition"><code class="docutils literal notranslate"><span class="pre">ArrayDefinition</span></code></a><ul>
-<li><a class="reference internal" href="#deisa.ray.window_api.ArrayDefinition.name"><code class="docutils literal notranslate"><span class="pre">ArrayDefinition.name</span></code></a></li>
-<li><a class="reference internal" href="#deisa.ray.window_api.ArrayDefinition.preprocess"><code class="docutils literal notranslate"><span class="pre">ArrayDefinition.preprocess()</span></code></a></li>
-<li><a class="reference internal" href="#deisa.ray.window_api.ArrayDefinition.window_size"><code class="docutils literal notranslate"><span class="pre">ArrayDefinition.window_size</span></code></a></li>
+<li><a class="reference internal" href="#deisa.ray.window_api.Deisa"><code class="docutils literal notranslate"><span class="pre">Deisa</span></code></a><ul>
+<li><a class="reference internal" href="#deisa.ray.window_api.Deisa.execute_callbacks"><code class="docutils literal notranslate"><span class="pre">Deisa.execute_callbacks()</span></code></a></li>
+<li><a class="reference internal" href="#deisa.ray.window_api.Deisa.register_callback"><code class="docutils literal notranslate"><span class="pre">Deisa.register_callback()</span></code></a></li>
+<li><a class="reference internal" href="#deisa.ray.window_api.Deisa.set"><code class="docutils literal notranslate"><span class="pre">Deisa.set()</span></code></a></li>
+<li><a class="reference internal" href="#deisa.ray.window_api.Deisa.unregister_callback"><code class="docutils literal notranslate"><span class="pre">Deisa.unregister_callback()</span></code></a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#deisa.ray.window_api.run_simulation"><code class="docutils literal notranslate"><span class="pre">run_simulation()</span></code></a></li>
 </ul>
 </li>
 </ul>

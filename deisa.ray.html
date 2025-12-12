@@ -198,7 +198,12 @@
 <ul class="current">
 <li class="toctree-l1 current has-children current-page"><a class="current reference internal" href="#">deisa.ray package</a><input aria-label="Toggle navigation of deisa.ray package" checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.bridge.html">deisa.ray.bridge module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.errors.html">deisa.ray.errors module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.head_node.html">deisa.ray.head_node module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.ray_patch.html">deisa.ray.ray_patch module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.scheduling_actor.html">deisa.ray.scheduling_actor module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.types.html">deisa.ray.types module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.utils.html">deisa.ray.utils module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.window_api.html">deisa.ray.window_api module</a></li>
 </ul>
 </li>
@@ -251,30 +256,104 @@
 <li class="toctree-l3"><a class="reference internal" href="deisa.ray.bridge.html#deisa.ray.bridge.Bridge.node_id"><code class="docutils literal notranslate"><span class="pre">Bridge.node_id</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="deisa.ray.bridge.html#deisa.ray.bridge.Bridge.scheduling_actor"><code class="docutils literal notranslate"><span class="pre">Bridge.scheduling_actor</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="deisa.ray.bridge.html#deisa.ray.bridge.Bridge.preprocessing_callbacks"><code class="docutils literal notranslate"><span class="pre">Bridge.preprocessing_callbacks</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="deisa.ray.bridge.html#deisa.ray.bridge.Bridge.add_chunk"><code class="docutils literal notranslate"><span class="pre">Bridge.add_chunk()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.bridge.html#deisa.ray.bridge.Bridge.get"><code class="docutils literal notranslate"><span class="pre">Bridge.get()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.bridge.html#deisa.ray.bridge.Bridge.send"><code class="docutils literal notranslate"><span class="pre">Bridge.send()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.bridge.html#deisa.ray.bridge.get_node_actor_options"><code class="docutils literal notranslate"><span class="pre">get_node_actor_options()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="deisa.ray.errors.html">deisa.ray.errors module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.errors.html#deisa.ray.errors.ContractError"><code class="docutils literal notranslate"><span class="pre">ContractError</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="deisa.ray.head_node.html">deisa.ray.head_node module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="deisa.ray.ray_patch.html">deisa.ray.ray_patch module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="deisa.ray.scheduling_actor.html">deisa.ray.scheduling_actor module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.scheduling_actor.html#deisa.ray.scheduling_actor.NodeActorBase"><code class="docutils literal notranslate"><span class="pre">NodeActorBase</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.scheduling_actor.html#deisa.ray.scheduling_actor.NodeActorBase.actor_id"><code class="docutils literal notranslate"><span class="pre">NodeActorBase.actor_id</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.scheduling_actor.html#deisa.ray.scheduling_actor.NodeActorBase.actor_handle"><code class="docutils literal notranslate"><span class="pre">NodeActorBase.actor_handle</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.scheduling_actor.html#deisa.ray.scheduling_actor.NodeActorBase.head"><code class="docutils literal notranslate"><span class="pre">NodeActorBase.head</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.scheduling_actor.html#deisa.ray.scheduling_actor.NodeActorBase.arrays"><code class="docutils literal notranslate"><span class="pre">NodeActorBase.arrays</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.scheduling_actor.html#deisa.ray.scheduling_actor.NodeActorBase.feedback_non_chunked"><code class="docutils literal notranslate"><span class="pre">NodeActorBase.feedback_non_chunked</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.scheduling_actor.html#deisa.ray.scheduling_actor.NodeActorBase.add_chunk"><code class="docutils literal notranslate"><span class="pre">NodeActorBase.add_chunk()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.scheduling_actor.html#deisa.ray.scheduling_actor.NodeActorBase.delete"><code class="docutils literal notranslate"><span class="pre">NodeActorBase.delete()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.scheduling_actor.html#deisa.ray.scheduling_actor.NodeActorBase.get"><code class="docutils literal notranslate"><span class="pre">NodeActorBase.get()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.scheduling_actor.html#deisa.ray.scheduling_actor.NodeActorBase.preprocessing_callbacks"><code class="docutils literal notranslate"><span class="pre">NodeActorBase.preprocessing_callbacks()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.scheduling_actor.html#deisa.ray.scheduling_actor.NodeActorBase.ready"><code class="docutils literal notranslate"><span class="pre">NodeActorBase.ready()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.scheduling_actor.html#deisa.ray.scheduling_actor.NodeActorBase.register_chunk_meta"><code class="docutils literal notranslate"><span class="pre">NodeActorBase.register_chunk_meta()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.scheduling_actor.html#deisa.ray.scheduling_actor.NodeActorBase.set"><code class="docutils literal notranslate"><span class="pre">NodeActorBase.set()</span></code></a></li>
 </ul>
 </li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="deisa.ray.head_node.html">deisa.ray.head_node module</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="deisa.ray.head_node.html#deisa.ray.head_node.ArrayDefinition"><code class="docutils literal notranslate"><span class="pre">ArrayDefinition</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="deisa.ray.head_node.html#deisa.ray.head_node.ArrayDefinition.name"><code class="docutils literal notranslate"><span class="pre">ArrayDefinition.name</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="deisa.ray.head_node.html#deisa.ray.head_node.ArrayDefinition.preprocess"><code class="docutils literal notranslate"><span class="pre">ArrayDefinition.preprocess()</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="deisa.ray.types.html">deisa.ray.types module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.ArrayPerTimestep"><code class="docutils literal notranslate"><span class="pre">ArrayPerTimestep</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.ArrayPerTimestep.chunks_ready_event"><code class="docutils literal notranslate"><span class="pre">ArrayPerTimestep.chunks_ready_event</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.ArrayPerTimestep.local_chunks"><code class="docutils literal notranslate"><span class="pre">ArrayPerTimestep.local_chunks</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="deisa.ray.head_node.html#deisa.ray.head_node.get_head_actor_options"><code class="docutils literal notranslate"><span class="pre">get_head_actor_options()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="deisa.ray.head_node.html#deisa.ray.head_node.get_head_node_id"><code class="docutils literal notranslate"><span class="pre">get_head_node_id()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="deisa.ray.head_node.html#deisa.ray.head_node.init"><code class="docutils literal notranslate"><span class="pre">init()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.ChunkRef"><code class="docutils literal notranslate"><span class="pre">ChunkRef</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.ChunkRef.actor_id"><code class="docutils literal notranslate"><span class="pre">ChunkRef.actor_id</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.ChunkRef.array_name"><code class="docutils literal notranslate"><span class="pre">ChunkRef.array_name</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.ChunkRef.bridge_id"><code class="docutils literal notranslate"><span class="pre">ChunkRef.bridge_id</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.ChunkRef.position"><code class="docutils literal notranslate"><span class="pre">ChunkRef.position</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.ChunkRef.timestep"><code class="docutils literal notranslate"><span class="pre">ChunkRef.timestep</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.DaskArrayData"><code class="docutils literal notranslate"><span class="pre">DaskArrayData</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.DaskArrayData.definition"><code class="docutils literal notranslate"><span class="pre">DaskArrayData.definition</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.DaskArrayData.fully_defined"><code class="docutils literal notranslate"><span class="pre">DaskArrayData.fully_defined</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.DaskArrayData.nb_chunks_per_dim"><code class="docutils literal notranslate"><span class="pre">DaskArrayData.nb_chunks_per_dim</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.DaskArrayData.nb_chunks"><code class="docutils literal notranslate"><span class="pre">DaskArrayData.nb_chunks</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.DaskArrayData.chunks_size"><code class="docutils literal notranslate"><span class="pre">DaskArrayData.chunks_size</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.DaskArrayData.dtype"><code class="docutils literal notranslate"><span class="pre">DaskArrayData.dtype</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.DaskArrayData.scheduling_actors_id"><code class="docutils literal notranslate"><span class="pre">DaskArrayData.scheduling_actors_id</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.DaskArrayData.nb_scheduling_actors"><code class="docutils literal notranslate"><span class="pre">DaskArrayData.nb_scheduling_actors</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.DaskArrayData.chunk_refs"><code class="docutils literal notranslate"><span class="pre">DaskArrayData.chunk_refs</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.DaskArrayData.add_chunk_ref"><code class="docutils literal notranslate"><span class="pre">DaskArrayData.add_chunk_ref()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.DaskArrayData.get_full_array"><code class="docutils literal notranslate"><span class="pre">DaskArrayData.get_full_array()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.DaskArrayData.update_meta"><code class="docutils literal notranslate"><span class="pre">DaskArrayData.update_meta()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.GraphInfo"><code class="docutils literal notranslate"><span class="pre">GraphInfo</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.GraphInfo.scheduled_event"><code class="docutils literal notranslate"><span class="pre">GraphInfo.scheduled_event</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.GraphInfo.refs"><code class="docutils literal notranslate"><span class="pre">GraphInfo.refs</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.PartialArray"><code class="docutils literal notranslate"><span class="pre">PartialArray</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.PartialArray.is_registered"><code class="docutils literal notranslate"><span class="pre">PartialArray.is_registered</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.PartialArray.owned_chunks"><code class="docutils literal notranslate"><span class="pre">PartialArray.owned_chunks</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.PartialArray.timesteps"><code class="docutils literal notranslate"><span class="pre">PartialArray.timesteps</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.ScheduledByOtherActor"><code class="docutils literal notranslate"><span class="pre">ScheduledByOtherActor</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.ScheduledByOtherActor.actor_id"><code class="docutils literal notranslate"><span class="pre">ScheduledByOtherActor.actor_id</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.WindowArrayDefinition"><code class="docutils literal notranslate"><span class="pre">WindowArrayDefinition</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.WindowArrayDefinition.name"><code class="docutils literal notranslate"><span class="pre">WindowArrayDefinition.name</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.WindowArrayDefinition.preprocess"><code class="docutils literal notranslate"><span class="pre">WindowArrayDefinition.preprocess()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.WindowArrayDefinition.window_size"><code class="docutils literal notranslate"><span class="pre">WindowArrayDefinition.window_size</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="deisa.ray.utils.html">deisa.ray.utils module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.utils.html#deisa.ray.utils.get_head_actor_options"><code class="docutils literal notranslate"><span class="pre">get_head_actor_options()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.utils.html#deisa.ray.utils.get_head_node_id"><code class="docutils literal notranslate"><span class="pre">get_head_node_id()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.utils.html#deisa.ray.utils.get_ready_actor_with_retry"><code class="docutils literal notranslate"><span class="pre">get_ready_actor_with_retry()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.utils.html#deisa.ray.utils.get_system_metadata"><code class="docutils literal notranslate"><span class="pre">get_system_metadata()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="deisa.ray.window_api.html">deisa.ray.window_api module</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="deisa.ray.window_api.html#deisa.ray.window_api.ArrayDefinition"><code class="docutils literal notranslate"><span class="pre">ArrayDefinition</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="deisa.ray.window_api.html#deisa.ray.window_api.ArrayDefinition.name"><code class="docutils literal notranslate"><span class="pre">ArrayDefinition.name</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="deisa.ray.window_api.html#deisa.ray.window_api.ArrayDefinition.preprocess"><code class="docutils literal notranslate"><span class="pre">ArrayDefinition.preprocess()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="deisa.ray.window_api.html#deisa.ray.window_api.ArrayDefinition.window_size"><code class="docutils literal notranslate"><span class="pre">ArrayDefinition.window_size</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.window_api.html#deisa.ray.window_api.Deisa"><code class="docutils literal notranslate"><span class="pre">Deisa</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.window_api.html#deisa.ray.window_api.Deisa.execute_callbacks"><code class="docutils literal notranslate"><span class="pre">Deisa.execute_callbacks()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.window_api.html#deisa.ray.window_api.Deisa.register_callback"><code class="docutils literal notranslate"><span class="pre">Deisa.register_callback()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.window_api.html#deisa.ray.window_api.Deisa.set"><code class="docutils literal notranslate"><span class="pre">Deisa.set()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.window_api.html#deisa.ray.window_api.Deisa.unregister_callback"><code class="docutils literal notranslate"><span class="pre">Deisa.unregister_callback()</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="deisa.ray.window_api.html#deisa.ray.window_api.run_simulation"><code class="docutils literal notranslate"><span class="pre">run_simulation()</span></code></a></li>
 </ul>
 </li>
 </ul>

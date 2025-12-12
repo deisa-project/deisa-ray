@@ -1,0 +1,7 @@
+deisa.ray.errors module
+=======================
+
+.. automodule:: deisa.ray.errors
+   :members:
+   :show-inheritance:
+   :undoc-members:

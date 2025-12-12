@@ -198,7 +198,12 @@
 <ul>
 <li class="toctree-l1 has-children"><a class="reference internal" href="deisa.ray.html">deisa.ray package</a><input aria-label="Toggle navigation of deisa.ray package" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.bridge.html">deisa.ray.bridge module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.errors.html">deisa.ray.errors module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.head_node.html">deisa.ray.head_node module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.ray_patch.html">deisa.ray.ray_patch module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.scheduling_actor.html">deisa.ray.scheduling_actor module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.types.html">deisa.ray.types module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.utils.html">deisa.ray.utils module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.window_api.html">deisa.ray.window_api module</a></li>
 </ul>
 </li>
@@ -250,18 +255,38 @@
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.html#submodules">Submodules</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="deisa.ray.bridge.html">deisa.ray.bridge module</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="deisa.ray.bridge.html#deisa.ray.bridge.Bridge"><code class="docutils literal notranslate"><span class="pre">Bridge</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.bridge.html#deisa.ray.bridge.get_node_actor_options"><code class="docutils literal notranslate"><span class="pre">get_node_actor_options()</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="deisa.ray.head_node.html">deisa.ray.head_node module</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="deisa.ray.head_node.html#deisa.ray.head_node.ArrayDefinition"><code class="docutils literal notranslate"><span class="pre">ArrayDefinition</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="deisa.ray.head_node.html#deisa.ray.head_node.get_head_actor_options"><code class="docutils literal notranslate"><span class="pre">get_head_actor_options()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="deisa.ray.head_node.html#deisa.ray.head_node.get_head_node_id"><code class="docutils literal notranslate"><span class="pre">get_head_node_id()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="deisa.ray.head_node.html#deisa.ray.head_node.init"><code class="docutils literal notranslate"><span class="pre">init()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.errors.html">deisa.ray.errors module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.errors.html#deisa.ray.errors.ContractError"><code class="docutils literal notranslate"><span class="pre">ContractError</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.head_node.html">deisa.ray.head_node module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.ray_patch.html">deisa.ray.ray_patch module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.scheduling_actor.html">deisa.ray.scheduling_actor module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.scheduling_actor.html#deisa.ray.scheduling_actor.NodeActorBase"><code class="docutils literal notranslate"><span class="pre">NodeActorBase</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.types.html">deisa.ray.types module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.ArrayPerTimestep"><code class="docutils literal notranslate"><span class="pre">ArrayPerTimestep</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.ChunkRef"><code class="docutils literal notranslate"><span class="pre">ChunkRef</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.DaskArrayData"><code class="docutils literal notranslate"><span class="pre">DaskArrayData</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.GraphInfo"><code class="docutils literal notranslate"><span class="pre">GraphInfo</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.PartialArray"><code class="docutils literal notranslate"><span class="pre">PartialArray</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.ScheduledByOtherActor"><code class="docutils literal notranslate"><span class="pre">ScheduledByOtherActor</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.WindowArrayDefinition"><code class="docutils literal notranslate"><span class="pre">WindowArrayDefinition</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.utils.html">deisa.ray.utils module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.utils.html#deisa.ray.utils.get_head_actor_options"><code class="docutils literal notranslate"><span class="pre">get_head_actor_options()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.utils.html#deisa.ray.utils.get_head_node_id"><code class="docutils literal notranslate"><span class="pre">get_head_node_id()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.utils.html#deisa.ray.utils.get_ready_actor_with_retry"><code class="docutils literal notranslate"><span class="pre">get_ready_actor_with_retry()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.utils.html#deisa.ray.utils.get_system_metadata"><code class="docutils literal notranslate"><span class="pre">get_system_metadata()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="deisa.ray.window_api.html">deisa.ray.window_api module</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="deisa.ray.window_api.html#deisa.ray.window_api.ArrayDefinition"><code class="docutils literal notranslate"><span class="pre">ArrayDefinition</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="deisa.ray.window_api.html#deisa.ray.window_api.run_simulation"><code class="docutils literal notranslate"><span class="pre">run_simulation()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.window_api.html#deisa.ray.window_api.Deisa"><code class="docutils literal notranslate"><span class="pre">Deisa</span></code></a></li>
 </ul>
 </li>
 </ul>

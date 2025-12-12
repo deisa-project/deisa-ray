@@ -197,7 +197,12 @@
 <ul>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../../../deisa.ray.html">deisa.ray package</a><input aria-label="Toggle navigation of deisa.ray package" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.bridge.html">deisa.ray.bridge module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.errors.html">deisa.ray.errors module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.head_node.html">deisa.ray.head_node module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.ray_patch.html">deisa.ray.ray_patch module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.scheduling_actor.html">deisa.ray.scheduling_actor module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.types.html">deisa.ray.types module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.utils.html">deisa.ray.utils module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.window_api.html">deisa.ray.window_api module</a></li>
 </ul>
 </li>
@@ -235,53 +240,17 @@
         <article role="main" id="furo-main-content">
           <h1>Source code for deisa.ray.window_api</h1><div class="highlight"><pre>
 <span></span><span class="kn">import</span><span class="w"> </span><span class="nn">gc</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Callable</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Hashable</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">dask</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">dask.array</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">da</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">ray</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray._scheduler</span><span class="w"> </span><span class="kn">import</span> <span class="n">deisa_ray_get</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.head_node</span><span class="w"> </span><span class="kn">import</span> <span class="n">ArrayDefinition</span> <span class="k">as</span> <span class="n">HeadArrayDefinition</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.head_node</span><span class="w"> </span><span class="kn">import</span> <span class="n">SimulationHead</span><span class="p">,</span> <span class="n">get_head_actor_options</span>
-
-
-<div class="viewcode-block" id="ArrayDefinition">
-<a class="viewcode-back" href="../../../deisa.ray.window_api.html#deisa.ray.window_api.ArrayDefinition">[docs]</a>
-<span class="nd">@dataclass</span>
-<span class="k">class</span><span class="w"> </span><span class="nc">ArrayDefinition</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Description of an array with optional windowing support.</span>
-
-<span class="sd">    Parameters</span>
-<span class="sd">    ----------</span>
-<span class="sd">    name : str</span>
-<span class="sd">        The name of the array.</span>
-<span class="sd">    window_size : int or None, optional</span>
-<span class="sd">        If specified, creates a sliding window of arrays for this array name.</span>
-<span class="sd">        The window will contain the last `window_size` timesteps. If None,</span>
-<span class="sd">        only the current timestep array is provided. Default is None.</span>
-<span class="sd">    preprocess : Callable, optional</span>
-<span class="sd">        A preprocessing function to apply to chunks of this array before</span>
-<span class="sd">        they are sent to the analytics. The function should take a numpy</span>
-<span class="sd">        array and return a processed numpy array. Default is the identity</span>
-<span class="sd">        function (no preprocessing).</span>
-
-<span class="sd">    Examples</span>
-<span class="sd">    --------</span>
-<span class="sd">    &gt;&gt;&gt; def normalize(arr):</span>
-<span class="sd">    ...     return arr / arr.max()</span>
-<span class="sd">    &gt;&gt;&gt; # Array with windowing: last 5 timesteps</span>
-<span class="sd">    &gt;&gt;&gt; array_def = ArrayDefinition(name=&quot;temperature&quot;, window_size=5, preprocess=normalize)</span>
-<span class="sd">    &gt;&gt;&gt; # Array without windowing: current timestep only</span>
-<span class="sd">    &gt;&gt;&gt; array_def = ArrayDefinition(name=&quot;pressure&quot;, window_size=None)</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-
-    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
-    <span class="n">window_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
-    <span class="n">preprocess</span><span class="p">:</span> <span class="n">Callable</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span></div>
-
+<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.head_node</span><span class="w"> </span><span class="kn">import</span> <span class="n">HeadNodeActor</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_head_actor_options</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">WindowArrayDefinition</span><span class="p">,</span> <span class="n">_CallbackConfig</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
 
 
 <span class="nd">@ray</span><span class="o">.</span><span class="n">remote</span><span class="p">(</span><span class="n">num_cpus</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">max_retries</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
@@ -318,153 +287,241 @@
     <span class="k">return</span> <span class="n">prepare_iteration</span><span class="p">(</span><span class="n">array</span><span class="p">,</span> <span class="n">timestep</span><span class="o">=</span><span class="n">timestep</span><span class="p">)</span>
 
 
-<div class="viewcode-block" id="run_simulation">
-<a class="viewcode-back" href="../../../deisa.ray.window_api.html#deisa.ray.window_api.run_simulation">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">run_simulation</span><span class="p">(</span>
-    <span class="n">simulation_callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
-    <span class="n">arrays_description</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">ArrayDefinition</span><span class="p">],</span>
-    <span class="o">*</span><span class="p">,</span>
-    <span class="n">max_iterations</span><span class="o">=</span><span class="mi">1000_000_000</span><span class="p">,</span>
-    <span class="n">prepare_iteration</span><span class="p">:</span> <span class="n">Callable</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">preparation_advance</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Run a simulation that processes arrays from the Ray cluster with optional windowing.</span>
+<div class="viewcode-block" id="Deisa">
+<a class="viewcode-back" href="../../../deisa.ray.window_api.html#deisa.ray.window_api.Deisa">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Deisa</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize Ray and configure Dask to use the Deisa-Ray scheduler.</span>
 
-<span class="sd">    This function coordinates the execution of a simulation callback that processes</span>
-<span class="sd">    arrays received from the Ray cluster. It supports sliding windows for arrays,</span>
-<span class="sd">    allowing the callback to access arrays from multiple timesteps. The function</span>
-<span class="sd">    manages array collection, windowing, memory cleanup, and optional preparation</span>
-<span class="sd">    callbacks.</span>
+<span class="sd">        This function initializes Ray if it hasn&#39;t been initialized yet, and</span>
+<span class="sd">        configures Dask to use the Deisa-Ray custom scheduler with task-based</span>
+<span class="sd">        shuffling.</span>
 
-<span class="sd">    Parameters</span>
-<span class="sd">    ----------</span>
-<span class="sd">    simulation_callback : Callable</span>
-<span class="sd">        The main simulation callback function. It will be called with keyword</span>
-<span class="sd">        arguments for each array (by name) and a `timestep` argument. If</span>
-<span class="sd">        `prepare_iteration` is provided, it will also receive a</span>
-<span class="sd">        `preparation_result` argument.</span>
-<span class="sd">    arrays_description : list[ArrayDefinition]</span>
-<span class="sd">        List of array definitions describing the arrays to be processed. Each</span>
-<span class="sd">        definition can specify a window size for sliding window access.</span>
-<span class="sd">    max_iterations : int, optional</span>
-<span class="sd">        Maximum number of iterations to run. Default is 1_000_000_000.</span>
-<span class="sd">    prepare_iteration : Callable or None, optional</span>
-<span class="sd">        Optional callback function that is called in advance for each timestep</span>
-<span class="sd">        to prepare data. The function receives a Dask array and timestep. The</span>
-<span class="sd">        result is passed to the simulation_callback as `preparation_result`.</span>
-<span class="sd">        Default is None.</span>
-<span class="sd">    preparation_advance : int, optional</span>
-<span class="sd">        Number of timesteps ahead to prepare. The prepare_iteration callback</span>
-<span class="sd">        will be called this many timesteps in advance. Default is 3.</span>
+<span class="sd">        Notes</span>
+<span class="sd">        -----</span>
+<span class="sd">        Ray is initialized with automatic address detection, logging to driver</span>
+<span class="sd">        disabled, and error-level logging. Dask is configured to use the</span>
+<span class="sd">        `deisa_ray_get` scheduler with task-based shuffling.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">ray</span><span class="o">.</span><span class="n">is_initialized</span><span class="p">():</span>
+            <span class="n">ray</span><span class="o">.</span><span class="n">init</span><span class="p">(</span><span class="n">address</span><span class="o">=</span><span class="s2">&quot;auto&quot;</span><span class="p">,</span> <span class="n">log_to_driver</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">logging_level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">ERROR</span><span class="p">)</span>
 
-<span class="sd">    Notes</span>
-<span class="sd">    -----</span>
-<span class="sd">    The function performs the following operations for each iteration:</span>
+        <span class="n">dask</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">scheduler</span><span class="o">=</span><span class="n">deisa_ray_get</span><span class="p">,</span> <span class="n">shuffle</span><span class="o">=</span><span class="s2">&quot;tasks&quot;</span><span class="p">)</span>
+        <span class="c1"># create HeadNodeActor that coordinates everything.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">head</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="n">HeadNodeActor</span><span class="o">.</span><span class="n">options</span><span class="p">(</span><span class="o">**</span><span class="n">get_head_actor_options</span><span class="p">())</span><span class="o">.</span><span class="n">remote</span><span class="p">()</span>
+        <span class="c1"># store all node actors</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">node_actors</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="c1"># store registered callbacks from user analytics</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">registered_callbacks</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">_CallbackConfig</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
 
-<span class="sd">    1. Collects arrays from the head node until all required arrays for the</span>
-<span class="sd">       current iteration are available.</span>
-<span class="sd">    2. Constructs the arrays dictionary, applying windowing for arrays with</span>
-<span class="sd">       `window_size` specified.</span>
-<span class="sd">    3. Calls the simulation_callback with the arrays and timestep.</span>
-<span class="sd">    4. Cleans up old arrays that are no longer needed for the window.</span>
-<span class="sd">    5. Triggers garbage collection to free memory.</span>
+    <span class="c1"># TODO add persist</span>
+<div class="viewcode-block" id="Deisa.set">
+<a class="viewcode-back" href="../../../deisa.ray.window_api.html#deisa.ray.window_api.Deisa.set">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="n">Hashable</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">chunked</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Broadcast a feedback value to all node actors.</span>
 
-<span class="sd">    For arrays with `window_size` set to `n`, the callback receives a list</span>
-<span class="sd">    of arrays containing the last `n` timesteps. For arrays without windowing,</span>
-<span class="sd">    the callback receives a single array for the current timestep.</span>
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        key : Hashable</span>
+<span class="sd">            Identifier for the shared value.</span>
+<span class="sd">        value : Any</span>
+<span class="sd">            Value to distribute.</span>
+<span class="sd">        chunked : bool, optional</span>
+<span class="sd">            Placeholder for future distributed-array feedback. Only ``False``</span>
+<span class="sd">            is supported today. Default is ``False``.</span>
 
-<span class="sd">    The function manages memory by deleting arrays that are outside the window</span>
-<span class="sd">    and explicitly calling garbage collection to ensure Ray object references</span>
-<span class="sd">    are released promptly.</span>
+<span class="sd">        Notes</span>
+<span class="sd">        -----</span>
+<span class="sd">        The method lazily fetches node actors once and uses fire-and-forget</span>
+<span class="sd">        remote calls; callers should not assume synchronous delivery.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># TODO test</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">node_actors</span><span class="p">:</span>
+            <span class="c1"># retrieve node actors at least once</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">node_actors</span> <span class="o">=</span> <span class="n">ray</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">head</span><span class="o">.</span><span class="n">list_scheduling_actors</span><span class="o">.</span><span class="n">remote</span><span class="p">())</span>
 
-<span class="sd">    Examples</span>
-<span class="sd">    --------</span>
-<span class="sd">    &gt;&gt;&gt; def process_data(temperature, pressure, timestep):</span>
-<span class="sd">    ...     # Process arrays for current timestep</span>
-<span class="sd">    ...     result = temperature + pressure</span>
-<span class="sd">    ...     return result</span>
-<span class="sd">    &gt;&gt;&gt;</span>
-<span class="sd">    &gt;&gt;&gt; arrays = [</span>
-<span class="sd">    ...     ArrayDefinition(name=&quot;temperature&quot;, window_size=5),  # Last 5 timesteps</span>
-<span class="sd">    ...     ArrayDefinition(name=&quot;pressure&quot;),  # Current timestep only</span>
-<span class="sd">    ... ]</span>
-<span class="sd">    &gt;&gt;&gt; run_simulation(process_data, arrays, max_iterations=100)</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="c1"># Convert the definitions to the type expected by the head node</span>
-    <span class="n">head_arrays_description</span> <span class="o">=</span> <span class="p">[</span>
-        <span class="n">HeadArrayDefinition</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">definition</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">preprocess</span><span class="o">=</span><span class="n">definition</span><span class="o">.</span><span class="n">preprocess</span><span class="p">)</span> <span class="k">for</span> <span class="n">definition</span> <span class="ow">in</span> <span class="n">arrays_description</span>
-    <span class="p">]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">chunked</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">handle</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">node_actors</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="c1"># set the value inside each node actor</span>
+                <span class="c1"># TODO: does it need to be blocking?</span>
+                <span class="n">handle</span><span class="o">.</span><span class="n">set</span><span class="o">.</span><span class="n">remote</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">chunked</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># TODO: implement chunked version</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span></div>
 
-    <span class="c1"># Limit the advance the simulation can have over the analytics</span>
-    <span class="n">max_pending_arrays</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">arrays_description</span><span class="p">)</span>
 
-    <span class="n">head</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="n">SimulationHead</span><span class="o">.</span><span class="n">options</span><span class="p">(</span><span class="o">**</span><span class="n">get_head_actor_options</span><span class="p">())</span><span class="o">.</span><span class="n">remote</span><span class="p">(</span><span class="n">head_arrays_description</span><span class="p">,</span> <span class="n">max_pending_arrays</span><span class="p">)</span>
+<div class="viewcode-block" id="Deisa.unregister_callback">
+<a class="viewcode-back" href="../../../deisa.ray.window_api.html#deisa.ray.window_api.Deisa.unregister_callback">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">unregister_callback</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">simulation_callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Unregister a previously registered simulation callback.</span>
 
-    <span class="n">arrays_by_iteration</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">da</span><span class="o">.</span><span class="n">Array</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        simulation_callback : Callable</span>
+<span class="sd">            Callback to remove from the registry.</span>
 
-    <span class="k">if</span> <span class="n">prepare_iteration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">preparation_results</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">ray</span><span class="o">.</span><span class="n">ObjectRef</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        NotImplementedError</span>
+<span class="sd">            Always, as the feature has not been implemented yet.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;method not yet implemented.&quot;</span><span class="p">)</span></div>
 
-        <span class="k">for</span> <span class="n">timestep</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">min</span><span class="p">(</span><span class="n">preparation_advance</span><span class="p">,</span> <span class="n">max_iterations</span><span class="p">)):</span>
-            <span class="c1"># Get the next array from the head node</span>
-            <span class="n">array</span><span class="p">:</span> <span class="n">da</span><span class="o">.</span><span class="n">Array</span> <span class="o">=</span> <span class="n">ray</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">head</span><span class="o">.</span><span class="n">get_preparation_array</span><span class="o">.</span><span class="n">remote</span><span class="p">(</span><span class="n">arrays_description</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">timestep</span><span class="p">))</span>
-            <span class="n">preparation_results</span><span class="p">[</span><span class="n">timestep</span><span class="p">]</span> <span class="o">=</span> <span class="n">_call_prepare_iteration</span><span class="o">.</span><span class="n">remote</span><span class="p">(</span><span class="n">prepare_iteration</span><span class="p">,</span> <span class="n">array</span><span class="p">,</span> <span class="n">timestep</span><span class="p">)</span>
 
-    <span class="k">for</span> <span class="n">iteration</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">max_iterations</span><span class="p">):</span>
-        <span class="c1"># Start preparing in advance</span>
-        <span class="k">if</span> <span class="n">iteration</span> <span class="o">+</span> <span class="n">preparation_advance</span> <span class="o">&lt;</span> <span class="n">max_iterations</span> <span class="ow">and</span> <span class="n">prepare_iteration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">array</span> <span class="o">=</span> <span class="n">head</span><span class="o">.</span><span class="n">get_preparation_array</span><span class="o">.</span><span class="n">remote</span><span class="p">(</span><span class="n">arrays_description</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">iteration</span> <span class="o">+</span> <span class="n">preparation_advance</span><span class="p">)</span>
-            <span class="n">preparation_results</span><span class="p">[</span><span class="n">iteration</span> <span class="o">+</span> <span class="n">preparation_advance</span><span class="p">]</span> <span class="o">=</span> <span class="n">_call_prepare_iteration</span><span class="o">.</span><span class="n">remote</span><span class="p">(</span>
-                <span class="n">prepare_iteration</span><span class="p">,</span> <span class="n">array</span><span class="p">,</span> <span class="n">iteration</span> <span class="o">+</span> <span class="n">preparation_advance</span>
+<div class="viewcode-block" id="Deisa.register_callback">
+<a class="viewcode-back" href="../../../deisa.ray.window_api.html#deisa.ray.window_api.Deisa.register_callback">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">register_callback</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">simulation_callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
+        <span class="n">arrays_description</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">WindowArrayDefinition</span><span class="p">],</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">max_iterations</span><span class="o">=</span><span class="mi">1000_000_000</span><span class="p">,</span>
+        <span class="n">prepare_iteration</span><span class="p">:</span> <span class="n">Callable</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">preparation_advance</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Register the analytics callback and array descriptions.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        simulation_callback : Callable</span>
+<span class="sd">            Function to run for each iteration; receives arrays as kwargs</span>
+<span class="sd">            and ``timestep``.</span>
+<span class="sd">        arrays_description : list[WindowArrayDefinition]</span>
+<span class="sd">            Descriptions of arrays to stream to the callback (with optional</span>
+<span class="sd">            sliding windows).</span>
+<span class="sd">        max_iterations : int, optional</span>
+<span class="sd">            Maximum iterations to execute. Default is a large sentinel.</span>
+<span class="sd">        prepare_iteration : Callable or None, optional</span>
+<span class="sd">            Optional preparatory callback run ``preparation_advance`` steps</span>
+<span class="sd">            ahead. Receives the array and ``timestep``.</span>
+<span class="sd">        preparation_advance : int, optional</span>
+<span class="sd">            How many iterations ahead to prepare when ``prepare_iteration``</span>
+<span class="sd">            is provided. Default is 3.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">cfg</span> <span class="o">=</span> <span class="n">_CallbackConfig</span><span class="p">(</span>
+            <span class="n">simulation_callback</span><span class="o">=</span><span class="n">simulation_callback</span><span class="p">,</span>
+            <span class="n">arrays_description</span><span class="o">=</span><span class="n">arrays_description</span><span class="p">,</span>
+            <span class="n">max_iterations</span><span class="o">=</span><span class="n">max_iterations</span><span class="p">,</span>
+            <span class="n">prepare_iteration</span><span class="o">=</span><span class="n">prepare_iteration</span><span class="p">,</span>
+            <span class="n">preparation_advance</span><span class="o">=</span><span class="n">preparation_advance</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">registered_callbacks</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">cfg</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Deisa.execute_callbacks">
+<a class="viewcode-back" href="../../../deisa.ray.window_api.html#deisa.ray.window_api.Deisa.execute_callbacks">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">execute_callbacks</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Execute the registered simulation callback loop.</span>
+
+<span class="sd">        Notes</span>
+<span class="sd">        -----</span>
+<span class="sd">        Supports a single registered callback at present. Manages array</span>
+<span class="sd">        retrieval from the head actor, optional preparation tasks, windowed</span>
+<span class="sd">        array delivery, and garbage collection between iterations.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">registered_callbacks</span><span class="p">:</span>
+            <span class="k">return</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">registered_callbacks</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                <span class="s2">&quot;execute_callbacks currently supports exactly one registered &quot;</span>
+                <span class="s2">&quot;callback. Multiple-callback execution will be implemented later.&quot;</span>
             <span class="p">)</span>
 
-        <span class="c1"># Get new arrays</span>
-        <span class="k">while</span> <span class="nb">len</span><span class="p">(</span><span class="n">arrays_by_iteration</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">iteration</span><span class="p">,</span> <span class="p">{}))</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">arrays_description</span><span class="p">):</span>
-            <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
-            <span class="n">timestep</span><span class="p">:</span> <span class="nb">int</span>
-            <span class="n">array</span><span class="p">:</span> <span class="n">da</span><span class="o">.</span><span class="n">Array</span>
-            <span class="n">name</span><span class="p">,</span> <span class="n">timestep</span><span class="p">,</span> <span class="n">array</span> <span class="o">=</span> <span class="n">ray</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">head</span><span class="o">.</span><span class="n">get_next_array</span><span class="o">.</span><span class="n">remote</span><span class="p">())</span>
+        <span class="n">cfg</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">registered_callbacks</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">simulation_callback</span> <span class="o">=</span> <span class="n">cfg</span><span class="o">.</span><span class="n">simulation_callback</span>
+        <span class="n">arrays_description</span> <span class="o">=</span> <span class="n">cfg</span><span class="o">.</span><span class="n">arrays_description</span>
+        <span class="n">max_iterations</span> <span class="o">=</span> <span class="n">cfg</span><span class="o">.</span><span class="n">max_iterations</span>
+        <span class="n">prepare_iteration</span> <span class="o">=</span> <span class="n">cfg</span><span class="o">.</span><span class="n">prepare_iteration</span>
+        <span class="n">preparation_advance</span> <span class="o">=</span> <span class="n">cfg</span><span class="o">.</span><span class="n">preparation_advance</span>
 
-            <span class="k">if</span> <span class="n">timestep</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">arrays_by_iteration</span><span class="p">:</span>
-                <span class="n">arrays_by_iteration</span><span class="p">[</span><span class="n">timestep</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">max_pending_arrays</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">arrays_description</span><span class="p">)</span>
 
-            <span class="k">assert</span> <span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">arrays_by_iteration</span><span class="p">[</span><span class="n">timestep</span><span class="p">]</span>
-            <span class="n">arrays_by_iteration</span><span class="p">[</span><span class="n">timestep</span><span class="p">][</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">array</span>
+        <span class="c1"># Convert the definitions to the type expected by the head node</span>
+        <span class="n">head_arrays_description</span> <span class="o">=</span> <span class="p">[(</span><span class="n">definition</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">definition</span><span class="o">.</span><span class="n">preprocess</span><span class="p">)</span> <span class="k">for</span> <span class="n">definition</span> <span class="ow">in</span> <span class="n">arrays_description</span><span class="p">]</span>
 
-        <span class="c1"># Compute the arrays to pass to the callback</span>
-        <span class="n">all_arrays</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">da</span><span class="o">.</span><span class="n">Array</span> <span class="o">|</span> <span class="nb">list</span><span class="p">[</span><span class="n">da</span><span class="o">.</span><span class="n">Array</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="c1"># TODO maybe this goes in the register callbacks</span>
+        <span class="n">ray</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">head</span><span class="o">.</span><span class="n">register_arrays</span><span class="o">.</span><span class="n">remote</span><span class="p">(</span><span class="n">head_arrays_description</span><span class="p">,</span> <span class="n">max_pending_arrays</span><span class="p">))</span>
 
-        <span class="k">for</span> <span class="n">description</span> <span class="ow">in</span> <span class="n">arrays_description</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">description</span><span class="o">.</span><span class="n">window_size</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-                <span class="n">all_arrays</span><span class="p">[</span><span class="n">description</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">arrays_by_iteration</span><span class="p">[</span><span class="n">iteration</span><span class="p">][</span><span class="n">description</span><span class="o">.</span><span class="n">name</span><span class="p">]</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">all_arrays</span><span class="p">[</span><span class="n">description</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
-                    <span class="n">arrays_by_iteration</span><span class="p">[</span><span class="n">timestep</span><span class="p">][</span><span class="n">description</span><span class="o">.</span><span class="n">name</span><span class="p">]</span>
-                    <span class="k">for</span> <span class="n">timestep</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="n">iteration</span> <span class="o">-</span> <span class="n">description</span><span class="o">.</span><span class="n">window_size</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="n">iteration</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
-                <span class="p">]</span>
+        <span class="n">arrays_by_iteration</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">da</span><span class="o">.</span><span class="n">Array</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
 
         <span class="k">if</span> <span class="n">prepare_iteration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">preparation_result</span> <span class="o">=</span> <span class="n">ray</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">preparation_results</span><span class="p">[</span><span class="n">iteration</span><span class="p">])</span>
-            <span class="n">simulation_callback</span><span class="p">(</span><span class="o">**</span><span class="n">all_arrays</span><span class="p">,</span> <span class="n">timestep</span><span class="o">=</span><span class="n">timestep</span><span class="p">,</span> <span class="n">preparation_result</span><span class="o">=</span><span class="n">preparation_result</span><span class="p">)</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">simulation_callback</span><span class="p">(</span><span class="o">**</span><span class="n">all_arrays</span><span class="p">,</span> <span class="n">timestep</span><span class="o">=</span><span class="n">timestep</span><span class="p">)</span>
+            <span class="n">preparation_results</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">ray</span><span class="o">.</span><span class="n">ObjectRef</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
 
-        <span class="k">del</span> <span class="n">all_arrays</span>
+            <span class="k">for</span> <span class="n">timestep</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">min</span><span class="p">(</span><span class="n">preparation_advance</span><span class="p">,</span> <span class="n">max_iterations</span><span class="p">)):</span>
+                <span class="c1"># Get the next array from the head node</span>
+                <span class="n">array</span><span class="p">:</span> <span class="n">da</span><span class="o">.</span><span class="n">Array</span> <span class="o">=</span> <span class="n">ray</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">head</span><span class="o">.</span><span class="n">get_preparation_array</span><span class="o">.</span><span class="n">remote</span><span class="p">(</span><span class="n">arrays_description</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">timestep</span><span class="p">))</span>
+                <span class="n">preparation_results</span><span class="p">[</span><span class="n">timestep</span><span class="p">]</span> <span class="o">=</span> <span class="n">_call_prepare_iteration</span><span class="o">.</span><span class="n">remote</span><span class="p">(</span><span class="n">prepare_iteration</span><span class="p">,</span> <span class="n">array</span><span class="p">,</span> <span class="n">timestep</span><span class="p">)</span>
 
-        <span class="c1"># Remove the oldest arrays</span>
-        <span class="k">for</span> <span class="n">description</span> <span class="ow">in</span> <span class="n">arrays_description</span><span class="p">:</span>
-            <span class="n">older_timestep</span> <span class="o">=</span> <span class="n">iteration</span> <span class="o">-</span> <span class="p">(</span><span class="n">description</span><span class="o">.</span><span class="n">window_size</span> <span class="ow">or</span> <span class="mi">1</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
-            <span class="k">if</span> <span class="n">older_timestep</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">:</span>
-                <span class="k">del</span> <span class="n">arrays_by_iteration</span><span class="p">[</span><span class="n">older_timestep</span><span class="p">][</span><span class="n">description</span><span class="o">.</span><span class="n">name</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">iteration</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">max_iterations</span><span class="p">):</span>
+            <span class="c1"># Start preparing in advance</span>
+            <span class="k">if</span> <span class="n">iteration</span> <span class="o">+</span> <span class="n">preparation_advance</span> <span class="o">&lt;</span> <span class="n">max_iterations</span> <span class="ow">and</span> <span class="n">prepare_iteration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">array</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">head</span><span class="o">.</span><span class="n">get_preparation_array</span><span class="o">.</span><span class="n">remote</span><span class="p">(</span>
+                    <span class="n">arrays_description</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">iteration</span> <span class="o">+</span> <span class="n">preparation_advance</span>
+                <span class="p">)</span>
+                <span class="n">preparation_results</span><span class="p">[</span><span class="n">iteration</span> <span class="o">+</span> <span class="n">preparation_advance</span><span class="p">]</span> <span class="o">=</span> <span class="n">_call_prepare_iteration</span><span class="o">.</span><span class="n">remote</span><span class="p">(</span>
+                    <span class="n">prepare_iteration</span><span class="p">,</span> <span class="n">array</span><span class="p">,</span> <span class="n">iteration</span> <span class="o">+</span> <span class="n">preparation_advance</span>
+                <span class="p">)</span>
 
-                <span class="k">if</span> <span class="ow">not</span> <span class="n">arrays_by_iteration</span><span class="p">[</span><span class="n">older_timestep</span><span class="p">]:</span>
-                    <span class="k">del</span> <span class="n">arrays_by_iteration</span><span class="p">[</span><span class="n">older_timestep</span><span class="p">]</span>
+            <span class="c1"># Get new arrays</span>
+            <span class="k">while</span> <span class="nb">len</span><span class="p">(</span><span class="n">arrays_by_iteration</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">iteration</span><span class="p">,</span> <span class="p">{}))</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">arrays_description</span><span class="p">):</span>
+                <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
+                <span class="n">timestep</span><span class="p">:</span> <span class="nb">int</span>
+                <span class="n">array</span><span class="p">:</span> <span class="n">da</span><span class="o">.</span><span class="n">Array</span>
+                <span class="n">name</span><span class="p">,</span> <span class="n">timestep</span><span class="p">,</span> <span class="n">array</span> <span class="o">=</span> <span class="n">ray</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">head</span><span class="o">.</span><span class="n">get_next_array</span><span class="o">.</span><span class="n">remote</span><span class="p">())</span>
 
-        <span class="c1"># Free the memory used by the arrays now. Since an ObjectRef is a small object,</span>
-        <span class="c1"># Python may otherwise choose to keep it in memory for some time, preventing the</span>
-        <span class="c1"># actual data to be freed.</span>
-        <span class="n">gc</span><span class="o">.</span><span class="n">collect</span><span class="p">()</span></div>
+                <span class="k">if</span> <span class="n">timestep</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">arrays_by_iteration</span><span class="p">:</span>
+                    <span class="n">arrays_by_iteration</span><span class="p">[</span><span class="n">timestep</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+
+                <span class="k">assert</span> <span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">arrays_by_iteration</span><span class="p">[</span><span class="n">timestep</span><span class="p">]</span>
+                <span class="n">arrays_by_iteration</span><span class="p">[</span><span class="n">timestep</span><span class="p">][</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">array</span>
+
+            <span class="c1"># Compute the arrays to pass to the callback</span>
+            <span class="n">all_arrays</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">da</span><span class="o">.</span><span class="n">Array</span> <span class="o">|</span> <span class="nb">list</span><span class="p">[</span><span class="n">da</span><span class="o">.</span><span class="n">Array</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+
+            <span class="k">for</span> <span class="n">description</span> <span class="ow">in</span> <span class="n">arrays_description</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">description</span><span class="o">.</span><span class="n">window_size</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">all_arrays</span><span class="p">[</span><span class="n">description</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">arrays_by_iteration</span><span class="p">[</span><span class="n">iteration</span><span class="p">][</span><span class="n">description</span><span class="o">.</span><span class="n">name</span><span class="p">]</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">all_arrays</span><span class="p">[</span><span class="n">description</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
+                        <span class="n">arrays_by_iteration</span><span class="p">[</span><span class="n">timestep</span><span class="p">][</span><span class="n">description</span><span class="o">.</span><span class="n">name</span><span class="p">]</span>
+                        <span class="k">for</span> <span class="n">timestep</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="n">iteration</span> <span class="o">-</span> <span class="n">description</span><span class="o">.</span><span class="n">window_size</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="n">iteration</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+                    <span class="p">]</span>
+
+            <span class="k">if</span> <span class="n">prepare_iteration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">preparation_result</span> <span class="o">=</span> <span class="n">ray</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">preparation_results</span><span class="p">[</span><span class="n">iteration</span><span class="p">])</span>
+                <span class="n">simulation_callback</span><span class="p">(</span><span class="o">**</span><span class="n">all_arrays</span><span class="p">,</span> <span class="n">timestep</span><span class="o">=</span><span class="n">timestep</span><span class="p">,</span> <span class="n">preparation_result</span><span class="o">=</span><span class="n">preparation_result</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">simulation_callback</span><span class="p">(</span><span class="o">**</span><span class="n">all_arrays</span><span class="p">,</span> <span class="n">timestep</span><span class="o">=</span><span class="n">timestep</span><span class="p">)</span>
+
+            <span class="k">del</span> <span class="n">all_arrays</span>
+
+            <span class="c1"># Remove the oldest arrays</span>
+            <span class="k">for</span> <span class="n">description</span> <span class="ow">in</span> <span class="n">arrays_description</span><span class="p">:</span>
+                <span class="n">older_timestep</span> <span class="o">=</span> <span class="n">iteration</span> <span class="o">-</span> <span class="p">(</span><span class="n">description</span><span class="o">.</span><span class="n">window_size</span> <span class="ow">or</span> <span class="mi">1</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
+                <span class="k">if</span> <span class="n">older_timestep</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="k">del</span> <span class="n">arrays_by_iteration</span><span class="p">[</span><span class="n">older_timestep</span><span class="p">][</span><span class="n">description</span><span class="o">.</span><span class="n">name</span><span class="p">]</span>
+
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">arrays_by_iteration</span><span class="p">[</span><span class="n">older_timestep</span><span class="p">]:</span>
+                        <span class="k">del</span> <span class="n">arrays_by_iteration</span><span class="p">[</span><span class="n">older_timestep</span><span class="p">]</span>
+
+            <span class="c1"># Free the memory used by the arrays now. Since an ObjectRef is a small object,</span>
+            <span class="c1"># Python may otherwise choose to keep it in memory for some time, preventing the</span>
+            <span class="c1"># actual data to be freed.</span>
+            <span class="n">gc</span><span class="o">.</span><span class="n">collect</span><span class="p">()</span></div>
+</div>
 
 </pre></div>
         </article>
