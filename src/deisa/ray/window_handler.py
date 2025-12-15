@@ -1,14 +1,16 @@
 import gc
-from typing import Any, Callable, Hashable
+from typing import Any, Callable, Hashable, Optional
 
 import dask
 import dask.array as da
+from ray.util.dask import ray_dask_get
 import ray
 
 from deisa.ray._scheduler import deisa_ray_get
 from deisa.ray.head_node import HeadNodeActor
 from deisa.ray.utils import get_head_actor_options
-from deisa.ray.types import WindowArrayDefinition, _CallbackConfig
+from deisa.ray.types import ActorID, RayActorHandle, WindowArrayDefinition, _CallbackConfig
+from deisa.ray.config import config
 import logging
 
 
@@ -46,86 +48,102 @@ def _call_prepare_iteration(prepare_iteration: Callable, array: da.Array, timest
     return prepare_iteration(array, timestep=timestep)
 
 
+# class Deisa:
+#     def __init__(
+#         self,
+#         *,
+#         _ray_start = self._ray_start
+#     ):
+#         """
+#         Initialize Ray and configure Dask to use the Deisa-Ray scheduler.
+
+#         This function initializes Ray if it hasn't been initialized yet, and
+#         configures Dask to use the Deisa-Ray custom scheduler with task-based
+#         shuffling.
+
+#         Notes
+#         -----
+#         Ray is initialized with automatic address detection, logging to driver
+#         disabled, and error-level logging. Dask is configured to use the
+#         `deisa_ray_get` scheduler with task-based shuffling.
+#         """
+#          # Lock config at instantiation time to ensure reproducibility.
+#         config.lock()
+#         self._experimental_distributed_scheduling_enabled = (
+#             config.experimental_distributed_scheduling_enabled
+#         )
+#         if self._experimental_distributed_scheduling_enabled:
+#             dask.config.set(scheduler=deisa_ray_get, shuffle="tasks")
+#         else:
+#             dask.config.set(scheduler=ray_dask_get, shuffle = "tasks")
+
+#         # store all ray node actors
+#         self.node_actors = {}
+
+#         # store registered callbacks from user analytics
+#         self.registered_callbacks: list[_CallbackConfig] = []
+
+#         self._ray_start()
+
+
 class Deisa:
     def __init__(
         self,
-    ):
-        """
-        Initialize Ray and configure Dask to use the Deisa-Ray scheduler.
+        *,
+        ray_start: Optional[Callable[[], None]] = None,
+        handshake: Optional[Callable[["Deisa"], None]] = None,
+    ) -> None:
+        # cheap constructor: no Ray side effects
+        config.lock()
 
-        This function initializes Ray if it hasn't been initialized yet, and
-        configures Dask to use the Deisa-Ray custom scheduler with task-based
-        shuffling.
+        self._experimental_distributed_scheduling_enabled = config.experimental_distributed_scheduling_enabled
 
-        Notes
-        -----
-        Ray is initialized with automatic address detection, logging to driver
-        disabled, and error-level logging. Dask is configured to use the
-        `deisa_ray_get` scheduler with task-based shuffling.
-        """
-        if not ray.is_initialized():
-            ray.init(address="auto", log_to_driver=False, logging_level=logging.ERROR)
+        # Do NOT mutate global config here if you want cheap unit tests;
+        # do it when connecting, or inject it similarly.
+        self._ray_start = ray_start or self._ray_start_impl
+        self._handshake = handshake or self._handshake_impl
 
-        dask.config.set(scheduler=deisa_ray_get, shuffle="tasks")
-        # create HeadNodeActor that coordinates everything.
-        self.head: Any = HeadNodeActor.options(**get_head_actor_options()).remote()
-        # store all node actors
-        self.node_actors = {}
-        # store registered callbacks from user analytics
+        self._connected = False
+        self.node_actors: dict[ActorID, RayActorHandle] = {}
         self.registered_callbacks: list[_CallbackConfig] = []
 
-    # TODO add persist
-    def set(self, *args, key: Hashable, value: Any, chunked: bool = False, **kwargs) -> None:
+    def _handshake_impl(self, _: "Deisa") -> None:
+        pass
+
+    def _ensure_connected(self) -> None:
         """
-        Broadcast a feedback value to all node actors.
+        Ensures that the widow handler has connected to the Ray Cluster.
 
-        Parameters
-        ----------
-        key : Hashable
-            Identifier for the shared value.
-        value : Any
-            Value to distribute.
-        chunked : bool, optional
-            Placeholder for future distributed-array feedback. Only ``False``
-            is supported today. Default is ``False``.
+        This function connects to ray, creates a head_actor, and waits until a
+        handshake occurs, which happens when all node actors have connected to
+        the cluster. It also changes the dask on ray scheduler based on whether the
+        user wants to set centralized scheduling or not.
 
-        Notes
-        -----
-        The method lazily fetches node actors once and uses fire-and-forget
-        remote calls; callers should not assume synchronous delivery.
+        :param self: Description
         """
-        # TODO test
-        if not self.node_actors:
-            # retrieve node actors at least once
-            self.node_actors = ray.get(self.head.list_scheduling_actors.remote())
+        if self._connected:
+            return
 
-        if not chunked:
-            for _, handle in self.node_actors.items():
-                # set the value inside each node actor
-                # TODO: does it need to be blocking?
-                handle.set.remote(key, value, chunked)
+        # Side effects begin here (only once)
+        self._ray_start()
+
+        # configure dask here if it must reflect actual cluster runtime
+        if self._experimental_distributed_scheduling_enabled:
+            dask.config.set(scheduler=deisa_ray_get, shuffle="tasks")
         else:
-            # TODO: implement chunked version
-            raise NotImplementedError()
+            dask.config.set(scheduler=ray_dask_get, shuffle="tasks")
 
-    def unregister_callback(
-        self,
-        simulation_callback: Callable,
-    ) -> None:
-        """
-        Unregister a previously registered simulation callback.
+        self._create_head_actor()
+        self._handshake(self)
 
-        Parameters
-        ----------
-        simulation_callback : Callable
-            Callback to remove from the registry.
+        self._connected = True
 
-        Raises
-        ------
-        NotImplementedError
-            Always, as the feature has not been implemented yet.
-        """
-        raise NotImplementedError("method not yet implemented.")
+    def _create_head_actor(self) -> None:
+        self.head = HeadNodeActor.options(**get_head_actor_options()).remote()
+
+    def _ray_start_impl(self) -> None:
+        if not ray.is_initialized():
+            ray.init(address="auto", log_to_driver=False, logging_level=logging.ERROR)
 
     def register_callback(
         self,
@@ -156,6 +174,7 @@ class Deisa:
             How many iterations ahead to prepare when ``prepare_iteration``
             is provided. Default is 3.
         """
+        self._ensure_connected()  # connect + handshake before accepting callbacks
         cfg = _CallbackConfig(
             simulation_callback=simulation_callback,
             arrays_description=arrays_description,
@@ -165,6 +184,26 @@ class Deisa:
         )
         self.registered_callbacks.append(cfg)
 
+    def unregister_callback(
+        self,
+        simulation_callback: Callable,
+    ) -> None:
+        """
+        Unregister a previously registered simulation callback.
+
+        Parameters
+        ----------
+        simulation_callback : Callable
+            Callback to remove from the registry.
+
+        Raises
+        ------
+        NotImplementedError
+            Always, as the feature has not been implemented yet.
+        """
+        raise NotImplementedError("method not yet implemented.")
+
+    # TODO: introduce a method that will generate the final array spec for each registered array
     def execute_callbacks(
         self,
     ) -> None:
@@ -177,6 +216,8 @@ class Deisa:
         retrieval from the head actor, optional preparation tasks, windowed
         array delivery, and garbage collection between iterations.
         """
+        self._ensure_connected()
+
         if not self.registered_callbacks:
             return
 
@@ -267,3 +308,37 @@ class Deisa:
             # Python may otherwise choose to keep it in memory for some time, preventing the
             # actual data to be freed.
             gc.collect()
+
+    # TODO add persist
+    def set(self, *args, key: Hashable, value: Any, chunked: bool = False, **kwargs) -> None:
+        """
+        Broadcast a feedback value to all node actors.
+
+        Parameters
+        ----------
+        key : Hashable
+            Identifier for the shared value.
+        value : Any
+            Value to distribute.
+        chunked : bool, optional
+            Placeholder for future distributed-array feedback. Only ``False``
+            is supported today. Default is ``False``.
+
+        Notes
+        -----
+        The method lazily fetches node actors once and uses fire-and-forget
+        remote calls; callers should not assume synchronous delivery.
+        """
+        # TODO test
+        if not self.node_actors:
+            # retrieve node actors at least once
+            self.node_actors = ray.get(self.head.list_scheduling_actors.remote())
+
+        if not chunked:
+            for _, handle in self.node_actors.items():
+                # set the value inside each node actor
+                # TODO: does it need to be blocking?
+                handle.set.remote(key, value, chunked)
+        else:
+            # TODO: implement chunked version
+            raise NotImplementedError()
