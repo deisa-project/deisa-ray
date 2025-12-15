@@ -13,7 +13,7 @@ NB_ITERATIONS = 100  # Should be enough to saturate the memory in case the chunk
 @ray.remote(max_retries=0)
 def head_script() -> None:
     """The head node checks that the values are correct"""
-    from deisa.ray.window_api import Deisa
+    from deisa.ray.window_handler import Deisa
     from deisa.ray.types import WindowArrayDefinition
 
     deisa = Deisa()
