@@ -46,7 +46,7 @@ class ArrayPerTimestep:
         # Triggered when all the chunks are ready
         self.chunks_ready_event: asyncio.Event = asyncio.Event()
 
-        # {position: chunk}
+        # {bridgeID: chunk}
         self.local_chunks: AsyncDict[int, ray.ObjectRef | bytes] = AsyncDict()
 
 
@@ -85,6 +85,7 @@ class PartialArray:
         # Chunks owned by this actor for this array.
         # {(bridge_id, chunk position, chunk size), ...}
         self.chunks_contained_meta: set[tuple[int, tuple[int, ...], tuple[int, ...]]] = set()
+        self.bid_to_pos: dict[int, tuple]= {}
 
         self.per_timestep_arrays: AsyncDict[Timestep, ArrayPerTimestep] = AsyncDict()
 

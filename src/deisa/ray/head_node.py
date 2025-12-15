@@ -176,7 +176,7 @@ class HeadNodeActor:
         for bridge_id, position, size in chunks_meta:
             array.update_meta(nb_chunks_per_dim, dtype, position, size, actor_id_who_owns, bridge_id)
 
-    async def chunks_ready(self, array_name: str, timestep: Timestep, all_chunks_ref: list[ray.ObjectRef]) -> None:
+    async def chunks_ready(self, array_name: str, timestep: Timestep, pos_to_ref: dict[tuple, ray.ObjectRef]) -> None:
         """
         Called by scheduling actors to inform the head actor that chunks are ready.
 
@@ -227,9 +227,12 @@ class HeadNodeActor:
 
                     self.new_array_created.set()
                     self.new_array_created.clear()
+        chunks = [val for val in pos_to_ref.values()]
+        ref_to_list_of_chunks = ray.put(chunks)
+
         # all_chunks_ref is [RayRef] st. ray.get(rayref) -> [ref_of_ref_chunk_i, ref_ref_chunk_i+1, ...] (belonging to actor that called it)
         # so I unpack it and give this ray ref.
-        is_ready = array.add_chunk_ref(all_chunks_ref[0], timestep)
+        is_ready = array.add_chunk_ref(ref_to_list_of_chunks, timestep)
 
         if is_ready:
             self.arrays_ready.put_nowait(
