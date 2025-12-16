@@ -1,4 +1,5 @@
 import gc
+import time
 from typing import Any, Callable, Hashable, Optional
 
 import dask
@@ -70,7 +71,27 @@ class Deisa:
         self.registered_callbacks: list[_CallbackConfig] = []
 
     def _handshake_impl(self, _: "Deisa") -> None:
-        pass
+        """
+        Implementation for handshake between window handler (Deisa) and the Simulation side Bridges. 
+        
+        The handshake occurs when all the expected Ray Node Actors are connected.
+        
+        :param self: Description
+        :param _: Description
+        :type _: "Deisa"
+        """
+        # TODO finish and add this config option to Deisa
+        self.total_nodes = 100
+        from ray.util.state import list_actors
+        expected_ray_actors = self.total_nodes
+        connected_actors = 0
+        while connected_actors < expected_ray_actors:
+            connected_actors = 0
+            for a in list_actors(filters=[("state", "=", "ALIVE")]):
+                if a.get("ray_namespace") == "deisa_ray":
+                    connected_actors += 1
+        
+        
 
     def _ensure_connected(self) -> None:
         """
