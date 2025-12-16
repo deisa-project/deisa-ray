@@ -11,22 +11,26 @@ NB_ITERATIONS = 100  # Should be enough to saturate the memory in case the chunk
 
 
 @ray.remote(max_retries=0)
-def head_script() -> None:
+def head_script(enable_distributed_scheduling) -> None:
     """The head node checks that the values are correct"""
     from deisa.ray.window_handler import Deisa
     from deisa.ray.types import WindowArrayDefinition
 
-    deisa = Deisa()
+    import deisa.ray as deisa
+
+    deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
+
+    d = Deisa()
 
     def simulation_callback(array: da.Array, timestep: int):
         pass
 
-    deisa.register_callback(
+    d.register_callback(
         simulation_callback,
         [WindowArrayDefinition("array")],
         max_iterations=NB_ITERATIONS,
     )
-    deisa.execute_callbacks()
+    d.execute_callbacks()
 
 
 @pytest.fixture
@@ -38,13 +42,14 @@ def ray_spilling_cluster():
     ray.shutdown()
 
 
-def test_memory_release(ray_spilling_cluster: str) -> None:  # noqa: F811
+@pytest.mark.parametrize("enable_distributed_scheduling", [True, False])
+def test_memory_release(enable_distributed_scheduling, ray_spilling_cluster: str) -> None:  # noqa: F811
     """
     Perform a long simulation with a small object store spilling to disk. If the
     memory is not released correctly, the test will detect spilled objects on disk and
     fail.
     """
-    head_ref = head_script.remote()
+    head_ref = head_script.remote(enable_distributed_scheduling)
     wait_for_head_node()
 
     worker = simple_worker.remote(

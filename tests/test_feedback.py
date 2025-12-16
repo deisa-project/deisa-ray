@@ -56,16 +56,20 @@
 #         max_retries=0,
 #         scheduling_strategy=NodeAffinitySchedulingStrategy(node_id=head_node_id, soft=False),
 #     )
-#     def head_script() -> None:
+#     def head_script(enable_distributed_scheduling) -> None:
 #         """The head node checks that the values are correct"""
 #         from deisa.ray.window_api import Deisa
 #         from deisa.ray.types import WindowArrayDefinition
 #
-#         deisa = Deisa()
+#         import deisa.ray as deisa
+#
+#    deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
+#
+#    d = Deisa()
 #         def cb(array, timestep):
 #             deisa.set(key = "foo", value = True)
-#         deisa.register_callback(cb, [WindowArrayDefinition("array")], max_iterations=1)
-#         deisa.execute_callbacks()
+#         d.register_callback(cb, [WindowArrayDefinition("array")], max_iterations=1)
+#         d.execute_callbacks()
 #
 #     @ray.remote
 #     def make_bridge(i):

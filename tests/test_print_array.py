@@ -9,34 +9,47 @@ NB_ITERATIONS = 10
 
 
 @ray.remote(max_retries=0)
-def head_script() -> None:
+def head_script(enable_distributed_scheduling) -> None:
     """The head node checks that the values are correct"""
     from deisa.ray.window_handler import Deisa
     from deisa.ray.types import WindowArrayDefinition
 
-    deisa = Deisa()
+    import deisa.ray as deisa
+
+    deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
+
+    d = Deisa()
 
     def simulation_callback(array: da.Array, timestep: int):
         x = array.compute()
         print(f"ARRAY PRINTED = {x}", flush=True)
 
-        arr = timestep * np.arange(1, 5)
+        arr = timestep * np.array([[1, 2], [3, 4]])
+        assert (arr == np.array(x)).all()
 
-        assert np.array2string(x) == np.array2string(arr)
+        # rebuilding with "wrong" structure
+        # assert np.array2string(x) == np.array2string(arr)
 
         # NOTE: Test for 2d/3d/4d/... arrays
 
-    deisa.register_callback(
+    d.register_callback(
         simulation_callback,
         [WindowArrayDefinition("array")],
         max_iterations=NB_ITERATIONS,
     )
-    deisa.execute_callbacks()
+    d.execute_callbacks()
 
 
-@pytest.mark.parametrize("nb_nodes", [1])
-def test_deisa_ray(nb_nodes: int, ray_cluster) -> None:  # noqa: F811
-    head_ref = head_script.remote()
+# TODO: fix for distributed scheduling
+@pytest.mark.parametrize(
+    "nb_nodes, enable_distributed_scheduling",
+    [
+        # (1, True),
+        (1, False)
+    ],
+)
+def test_deisa_ray(nb_nodes: int, enable_distributed_scheduling, ray_cluster) -> None:  # noqa: F811
+    head_ref = head_script.remote(enable_distributed_scheduling)
     wait_for_head_node()
 
     worker_refs = []

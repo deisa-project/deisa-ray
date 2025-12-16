@@ -32,9 +32,10 @@ def patched_dask_task_wrapper(func, repack, key, ray_pretask_cbs, ray_posttask_c
 
     Returns
     -------
-    ray.ObjectRef
-        On the first call, returns an ObjectRef to the second call. On the
-        second call, returns the result of executing the task function.
+    ray.ObjectRef or Any
+        On the first call, returns a Ray ObjectRef pointing to the second
+        invocation (which runs with CPU resources). On the second call,
+        returns the concrete task result.
 
     Notes
     -----
@@ -83,8 +84,9 @@ def remote_ray_dask_get(dsk, keys):
 
     Returns
     -------
-    list[ray.ObjectRef]
-        List of Ray object references to the computed results.
+    tuple[ray.ObjectRef]
+        Tuple of *double* Ray ObjectRefs produced by ``ray_dask_get`` with
+        ``ray_persist=True``.
 
     Notes
     -----

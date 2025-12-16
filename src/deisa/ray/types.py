@@ -9,6 +9,7 @@ import ray.actor
 from deisa.ray import Timestep
 import dask.array as da
 from deisa.ray._async_dict import AsyncDict
+from collections import defaultdict
 
 type DoubleRef = ray.ObjectRef
 type ActorID = str
@@ -23,30 +24,26 @@ class ArrayPerTimestep:
     """
     Internal class tracking chunks for a specific array and timestep.
 
-    This class manages the collection of chunks for a particular array
-    at a specific timestep within a scheduling actor.
+    Tracks the per-timestep chunks owned by a single scheduling actor. Each
+    instance is keyed by ``timestep`` inside a :class:`PartialArray`.
 
     Attributes
     ----------
     chunks_ready_event : asyncio.Event
-        Event that is triggered when all chunks for this timestep are ready.
-    local_chunks : AsyncDict[tuple[int, ...], ray.ObjectRef | bytes]
-        Dictionary mapping chunk positions to their Ray object references
-        or pickled bytes. The chunks are stored as bytes after being sent
-        to the head node to free memory.
-
-    Notes
-    -----
-    This is an internal class used by SchedulingActor to track chunk
-    collection for arrays. Chunks are initially stored as ObjectRefs and
-    later converted to pickled bytes to free memory.
+        Triggered when all chunks for this timestep owned by the node actor
+        have arrived and been forwarded to the head actor.
+    local_chunks : AsyncDict[int, ray.ObjectRef | bytes]
+        Mapping of ``bridge_id`` to the double ObjectRef for that chunk. Once
+        forwarded to the head actor the value is replaced with pickled bytes
+        to free memory.
     """
 
     def __init__(self):
+        """Create the readiness event and the async storage for local chunks."""
         # Triggered when all the chunks are ready
         self.chunks_ready_event: asyncio.Event = asyncio.Event()
 
-        # {position: chunk}
+        # {bridgeID: chunk}
         self.local_chunks: AsyncDict[int, ray.ObjectRef | bytes] = AsyncDict()
 
 
@@ -54,37 +51,35 @@ class PartialArray:
     """
     Internal class tracking metadata and chunks for an array.
 
-    This class manages the registration state and chunk ownership information
-    for a specific array within a scheduling actor.
+    Maintains metadata for a single array on one scheduling actor, including
+    the set of locally owned chunks and per-timestep chunk collections.
 
     Attributes
     ----------
-    is_registered : bool
-        Indicates whether the `set_owned_chunks` method has been called
-        for this array, registering it with the head node.
-    owned_chunks : set[tuple[tuple[int, ...], tuple[int, ...]]]
-        Set of tuples, each containing (chunk_position, chunk_size) for
-        chunks owned by this actor for this array.
-    timesteps : AsyncDict[Timestep, _ArrayTimestep]
-        Dictionary mapping timesteps to their _ArrayTimestep objects,
-        which track the chunks for each timestep.
-
-    Notes
-    -----
-    This is an internal class used by SchedulingActor to track array state
-    and chunk ownership. Each array is registered once with the head node
-    when the first timestep's chunks are ready.
+    ready_event : asyncio.Event
+        Set once all local bridges have provided metadata for the array and
+        the head actor has been notified.
+    chunks_contained_meta : set[tuple[int, tuple[int, ...], tuple[int, ...]]]
+        Metadata tuples ``(bridge_id, chunk_position, chunk_size)`` for the
+        chunks owned by this actor.
+    bid_to_pos : dict[int, tuple]
+        Maps ``bridge_id`` to the corresponding chunk position for quick
+        lookup when forwarding payloads.
+    per_timestep_arrays : AsyncDict[Timestep, ArrayPerTimestep]
+        Per-timestep structures that hold chunk references as they arrive.
     """
 
     # TODO add types
 
     def __init__(self):
+        """Initialise per-array metadata containers and readiness flag."""
         # Indicates if register_partial_array method has been called for this array.
         self.ready_event = asyncio.Event()
 
         # Chunks owned by this actor for this array.
         # {(bridge_id, chunk position, chunk size), ...}
         self.chunks_contained_meta: set[tuple[int, tuple[int, ...], tuple[int, ...]]] = set()
+        self.bid_to_pos: dict[int, tuple] = {}
 
         self.per_timestep_arrays: AsyncDict[Timestep, ArrayPerTimestep] = AsyncDict()
 
@@ -118,26 +113,20 @@ class GraphInfo:
     """
     Information about graphs and their scheduling.
 
-    This class tracks the state and results of a Dask task graph that is
-    being scheduled by a scheduling actor.
+    Tracks scheduling status and produced references for a Dask task graph
+    scheduled by a :class:`SchedulingActor`.
 
     Attributes
     ----------
     scheduled_event : asyncio.Event
-        Event that is set when the graph has been scheduled and all tasks
-        have been submitted.
+        Event set once the graph has been submitted to Ray.
     refs : dict[str, ray.ObjectRef]
-        Dictionary mapping task keys to their Ray object references. These
-        references point to the results of the scheduled tasks.
-
-    Notes
-    -----
-    This class is used internally by SchedulingActor to track the progress
-    of graph scheduling and store the resulting object references for later
-    retrieval.
+        Mapping from task key to the *double* Ray ObjectRef returned by the
+        patched Dask-on-Ray scheduler.
     """
 
     def __init__(self):
+        """Create the scheduling event and storage for result references."""
         self.scheduled_event = asyncio.Event()
         self.refs: dict[str, ray.ObjectRef] = {}
 
@@ -230,21 +219,24 @@ class DaskArrayData:
     """
     Information about a Dask array being built.
 
-    This class tracks the metadata and state of a Dask array as it is
-    constructed from chunks sent by scheduling actors.
+    Tracks metadata and per-timestep state for a Dask array assembled from
+    chunks sent by scheduling actors.
 
     Parameters
     ----------
-    definition : ArrayDefinition
-        The definition of the array, including its name and preprocessing
-        function.
+    name : str
+        Array name registered with the head actor.
+    f_preprocessing : Callable
+        Preprocessing callback applied to each chunk.
 
     Attributes
     ----------
-    definition : ArrayDefinition
-        The array definition.
+    name : str
+        Array name without timestep suffix.
+    f_preprocessing : Callable
+        Preprocessing callback supplied at registration.
     fully_defined : asyncio.Event
-        Event that is set when all chunk owners are known.
+        Set when every chunk owner has been registered.
     nb_chunks_per_dim : tuple[int, ...] or None
         Number of chunks per dimension. Set when first chunk owner is
         registered.
@@ -257,19 +249,34 @@ class DaskArrayData:
     dtype : np.dtype or None
         The numpy dtype of the array chunks. Set when first chunk owner
         is registered.
-    scheduling_actors_id : dict[tuple[int, ...], int]
-        Mapping from chunk position to the ID of the scheduling actor
-        responsible for that chunk.
+    position_to_node_actorID : dict[tuple[int, ...], int]
+        Mapping from chunk position to the scheduling actor responsible
+        for that chunk.
+    position_to_bridgeID : dict[tuple, int]
+        Mapping from chunk position to the producing bridge ID.
     nb_scheduling_actors : int or None
         Number of unique scheduling actors owning chunks of this array.
         Set when all chunk owners are known.
     chunk_refs : dict[Timestep, list[ray.ObjectRef]]
-        For each timestep, a list of Ray object references to the chunks.
-        These references are used to keep chunks in memory and are cleared
-        when the array is built.
+        For each timestep, the list of per-actor references that keep
+        chunk payloads alive in the object store.
+    pos_to_ref_by_timestep : defaultdict
+        For each timestep, the (position, ref) pairs provided by scheduling
+        actors. Used when distributed scheduling is disabled.
     """
 
     def __init__(self, name, f_preprocessing) -> None:
+        """
+        Initialise per-array metadata containers.
+
+        Parameters
+        ----------
+        name : str
+            Array name as registered with the head actor.
+        f_preprocessing : Callable
+            Preprocessing callback applied to each chunk before analytics
+            consume the array.
+        """
         self.name = name
         self.f_preprocessing = f_preprocessing
 
@@ -301,6 +308,8 @@ class DaskArrayData:
         # global reference is added to the Dask graph. Then, the list is cleared.
         self.chunk_refs: dict[Timestep, list[ray.ObjectRef]] = {}
 
+        self.pos_to_ref_by_timestep = defaultdict(list)
+
     def update_meta(
         self,
         nb_chunks_per_dim: tuple[int, ...],
@@ -327,8 +336,10 @@ class DaskArrayData:
             The position of the chunk in the array decomposition.
         size : tuple[int, ...]
             The size of the chunk along each dimension.
-        scheduling_actor_id : int
-            The ID of the scheduling actor that owns this chunk.
+        node_actor_id : int
+            Scheduling actor that owns this chunk.
+        bridge_id : int
+            Bridge identifier that produced the chunk (used for lookups).
 
         Raises
         ------
@@ -358,7 +369,7 @@ class DaskArrayData:
             else:
                 assert self.chunks_size[i][pos] == size[pos]
 
-    def add_chunk_ref(self, chunk_ref: ray.ObjectRef, timestep: Timestep) -> bool:
+    def add_chunk_ref(self, chunk_ref: ray.ObjectRef, timestep: Timestep, pos_to_ref) -> bool:
         """
         Add a reference sent by a scheduling actor.
 
@@ -368,6 +379,9 @@ class DaskArrayData:
             Ray object reference to a chunk sent by a scheduling actor.
         timestep : Timestep
             The timestep this chunk belongs to.
+        pos_to_ref : dict[tuple, ray.ObjectRef]
+            Mapping of chunk position to the (double) Ray ObjectRef provided
+            by the scheduling actor for this timestep.
 
         Returns
         -------
@@ -382,6 +396,7 @@ class DaskArrayData:
         and all have sent their chunks for this timestep.
         """
         self.chunk_refs[timestep].append(chunk_ref)
+        self.pos_to_ref_by_timestep[timestep] += list(pos_to_ref.items())
 
         # We don't know all the owners yet
         # TODO this method is useless now because we no longer "send" this data at every timestep.
@@ -398,7 +413,9 @@ class DaskArrayData:
         # I mark the array as ready to be formed.
         return len(self.chunk_refs[timestep]) == self.nb_scheduling_actors
 
-    def get_full_array(self, timestep: Timestep, *, is_preparation: bool = False) -> da.Array:
+    def get_full_array(
+        self, timestep: Timestep, *, distributing_scheduling_enabled: bool, is_preparation: bool = False
+    ) -> da.Array:
         """
         Return the full Dask array for a given timestep.
 
@@ -406,6 +423,10 @@ class DaskArrayData:
         ----------
         timestep : Timestep
             The timestep for which the full array should be returned.
+        distributing_scheduling_enabled : bool
+            When ``True``, emit a graph containing :class:`ChunkRef` tasks
+            for distributed scheduling. When ``False``, materialise the
+            actual chunk payloads and build a local Dask array.
         is_preparation : bool, optional
             If True, the array will not contain ObjectRefs to the actual data.
             This is used for preparation arrays where only the structure is
@@ -426,11 +447,12 @@ class DaskArrayData:
 
         Notes
         -----
-        The array is built using a HighLevelGraph with ChunkRef tasks. When
-        `is_preparation` is False, the chunk references are stored in Ray's
-        object store and cleared from the local `chunk_refs` dictionary.
-        The array name includes the timestep to allow the same array name
-        to be used for different timesteps.
+        When distributed scheduling is enabled the graph uses :class:`ChunkRef`
+        placeholders that keep data owner information. Otherwise the concrete
+        chunk payloads are inlined. Chunk reference lists are deleted after
+        embedding in the graph to avoid leaking memory. ``is_preparation`` skips
+        storing payload refs entirely so analytics can inspect shapes/chunks
+        without materialising data.
         """
         assert len(self.position_to_node_actorID) == self.nb_chunks
         assert self.nb_chunks is not None and self.nb_chunks_per_dim is not None
@@ -439,28 +461,36 @@ class DaskArrayData:
             all_chunks = None
         else:
             all_chunks = ray.put(self.chunk_refs[timestep])
-            # TODO why is this done? is it so once array goes out of scope for user, everything is cleaned up?
-            # is this the reason for the pickle dump in the beginning?
             del self.chunk_refs[timestep]
 
         # We need to add the timestep since the same name can be used several times for different
         # timesteps
         dask_name = f"{self.name}_{timestep}"
 
-        graph = {
-            # We need to repeat the name and position in the value since the key might be removed
-            # by the Dask optimizer
-            (dask_name,)
-            + position: ChunkRef(  # note only first ChunkRef instance contains actual refs, the others contain only metadata.
-                actor_id,
-                self.name,
-                timestep,
-                position,
-                self.position_to_bridgeID[position],
-                _all_chunks=all_chunks if it == 0 else None,
-            )
-            for it, (position, actor_id) in enumerate(self.position_to_node_actorID.items())
-        }
+        if distributing_scheduling_enabled:
+            graph = {
+                # We need to repeat the name and position in the value since the key might be removed
+                # by the Dask optimizer
+                (dask_name,)
+                + position: ChunkRef(  # note only first ChunkRef instance contains actual refs, the others contain only metadata.
+                    actor_id,
+                    self.name,
+                    timestep,
+                    position,
+                    self.position_to_bridgeID[position],
+                    _all_chunks=all_chunks if it == 0 else None,
+                )
+                for it, (position, actor_id) in enumerate(self.position_to_node_actorID.items())
+            }
+        else:
+            # TODO: this could be an antipattern (calling ray.get in for loop). Could maybe put all the
+            # double refs in a list and call ray.wait() or ray.get() on the list?
+            # something that submits all the refs one go.
+            graph = {(dask_name,) + position: ray.get(dr) for position, dr in self.pos_to_ref_by_timestep[timestep]}
+
+        # Needed for prepare iteration otherwise key lookup fails since iteration does not yet exist
+        # TODO ensure flow is as expected
+        self.pos_to_ref_by_timestep.pop(timestep, None)
 
         dsk = HighLevelGraph.from_collections(dask_name, graph, dependencies=())
 

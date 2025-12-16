@@ -78,7 +78,7 @@ def slice(ray_multinode_cluster):
     assert m is not None
 
 
-# def test_pca(ray_multinode_cluster):
-#     d_arr = da.from_array(np.random.randint(0, 1000, size=(64, 64)), chunks = (32,64) )
-#     m = (d_arr*2).compute()
-#     assert m is not None
+def test_pca(ray_multinode_cluster):
+    d_arr = da.from_array(np.random.randint(0, 1000, size=(64, 64)), chunks=(32, 64))
+    m = (d_arr * 2).compute()
+    assert m is not None

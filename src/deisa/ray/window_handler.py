@@ -48,44 +48,6 @@ def _call_prepare_iteration(prepare_iteration: Callable, array: da.Array, timest
     return prepare_iteration(array, timestep=timestep)
 
 
-# class Deisa:
-#     def __init__(
-#         self,
-#         *,
-#         _ray_start = self._ray_start
-#     ):
-#         """
-#         Initialize Ray and configure Dask to use the Deisa-Ray scheduler.
-
-#         This function initializes Ray if it hasn't been initialized yet, and
-#         configures Dask to use the Deisa-Ray custom scheduler with task-based
-#         shuffling.
-
-#         Notes
-#         -----
-#         Ray is initialized with automatic address detection, logging to driver
-#         disabled, and error-level logging. Dask is configured to use the
-#         `deisa_ray_get` scheduler with task-based shuffling.
-#         """
-#          # Lock config at instantiation time to ensure reproducibility.
-#         config.lock()
-#         self._experimental_distributed_scheduling_enabled = (
-#             config.experimental_distributed_scheduling_enabled
-#         )
-#         if self._experimental_distributed_scheduling_enabled:
-#             dask.config.set(scheduler=deisa_ray_get, shuffle="tasks")
-#         else:
-#             dask.config.set(scheduler=ray_dask_get, shuffle = "tasks")
-
-#         # store all ray node actors
-#         self.node_actors = {}
-
-#         # store registered callbacks from user analytics
-#         self.registered_callbacks: list[_CallbackConfig] = []
-
-#         self._ray_start()
-
-
 class Deisa:
     def __init__(
         self,
@@ -108,7 +70,26 @@ class Deisa:
         self.registered_callbacks: list[_CallbackConfig] = []
 
     def _handshake_impl(self, _: "Deisa") -> None:
-        pass
+        """
+        Implementation for handshake between window handler (Deisa) and the Simulation side Bridges.
+
+        The handshake occurs when all the expected Ray Node Actors are connected.
+
+        :param self: Description
+        :param _: Description
+        :type _: "Deisa"
+        """
+        # TODO finish and add this config option to Deisa
+        self.total_nodes = 0
+        from ray.util.state import list_actors
+
+        expected_ray_actors = self.total_nodes
+        connected_actors = 0
+        while connected_actors < expected_ray_actors:
+            connected_actors = 0
+            for a in list_actors(filters=[("state", "=", "ALIVE")]):
+                if a.get("ray_namespace") == "deisa_ray":
+                    connected_actors += 1
 
     def _ensure_connected(self) -> None:
         """
@@ -133,7 +114,15 @@ class Deisa:
         else:
             dask.config.set(scheduler=ray_dask_get, shuffle="tasks")
 
+        # head is created
         self._create_head_actor()
+        # readyness gate for head actor - only return when its alive
+        ray.get(
+            self.head.exchange_config.remote(
+                {"experimental_distributed_scheduling_enabled": self._experimental_distributed_scheduling_enabled}
+            )
+        )
+
         self._handshake(self)
 
         self._connected = True
@@ -219,7 +208,7 @@ class Deisa:
         self._ensure_connected()
 
         if not self.registered_callbacks:
-            return
+            raise RuntimeError("Please register at least one callback before calling execute_callbacks()")
 
         if len(self.registered_callbacks) > 1:
             raise RuntimeError(

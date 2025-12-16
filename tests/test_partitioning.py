@@ -13,7 +13,11 @@ def head_script(partitioning_strategy: str) -> None:
     from deisa.ray.window_handler import Deisa
     from deisa.ray.types import WindowArrayDefinition
 
-    deisa = Deisa()
+    import deisa.ray as deisa
+
+    deisa.config.enable_experimental_distributed_scheduling(True)
+
+    d = Deisa()
 
     def simulation_callback(array: da.Array, timestep: int):
         x = array.sum().compute(deisa_ray_partitioning_strategy=partitioning_strategy)
@@ -22,12 +26,12 @@ def head_script(partitioning_strategy: str) -> None:
         # Test with a full Dask computation
         assert da.ones((2, 2), chunks=(1, 1)).sum().compute(deisa_ray_partitioning_strategy=partitioning_strategy) == 4
 
-    deisa.register_callback(
+    d.register_callback(
         simulation_callback,
         [WindowArrayDefinition("array")],
         max_iterations=NB_ITERATIONS,
     )
-    deisa.execute_callbacks()
+    d.execute_callbacks()
 
 
 @pytest.mark.parametrize("partitioning_strategy", ["random", "greedy"])

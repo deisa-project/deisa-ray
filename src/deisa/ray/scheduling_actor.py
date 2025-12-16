@@ -9,9 +9,9 @@ from deisa.ray.types import (
     GraphInfo,
     ArrayPerTimestep,
     PartialArray,
-    DoubleRef,
     RayActorHandle,
     ActorID,
+    DoubleRef,
 )
 from deisa.ray.utils import get_ready_actor_with_retry
 from deisa.ray.ray_patch import remote_ray_dask_get
@@ -46,10 +46,10 @@ class NodeActorBase:
     actor_handle : RayActorHandle
         Handle to this actor instance.
     head : RayActorHandle
-        Handle to the :class:`SimulationHead` actor.
-    arrays : AsyncDict[str, Array]
-        Dictionary mapping array names to their :class:`Array` instances,
-        which track chunks and timesteps.
+        Handle to the head node (:class:`~deisa.ray.head_node.HeadNodeActor`).
+    partial_arrays : AsyncDict[str, PartialArray]
+        Per-array containers that capture metadata and chunk references owned
+        by this node actor.
     feedback_non_chunked : dict
         Dictionary for storing non-chunked feedback values shared between
         analytics and simulation.
@@ -65,6 +65,11 @@ class NodeActorBase:
             Unique identifier for this node actor (typically the node ID).
         arrays_metadata : dict, optional
             Reserved for future use; currently unused. Default is ``{}``.
+
+        Notes
+        -----
+        Registers the actor with the head node immediately so it can start
+        receiving metadata and chunk notifications.
         """
         self.actor_id = actor_id
         self.actor_handle = ray.get_runtime_context().current_actor
@@ -162,8 +167,8 @@ class NodeActorBase:
         array_name : str
             Name of the array being assembled on this node.
         nb_chunks_of_node : int
-            Number of chunks contributed by this node. Stored for sanity checks
-            when registering metadata.
+            Number of chunks contributed by this node. Stored on the actor for
+            later sanity checks when receiving payloads.
 
         Returns
         -------
@@ -208,13 +213,15 @@ class NodeActorBase:
         Notes
         -----
         Once all bridges on the node have registered, the node actor forwards
-        the consolidated metadata to the head actor and signals readiness
-        for this array. Subsequent callers will await the per-array event.
+        the consolidated metadata to the head actor and toggles the per-array
+        event so concurrent callers can proceed. Until that point additional
+        callers block on ``ready_event``.
         """
         partial_array = self._create_or_retrieve_partial_array(array_name, nb_chunks_of_node)
 
         # add metadata for this array
         partial_array.chunks_contained_meta.add((bridge_id, chunk_position, chunk_shape))
+        partial_array.bid_to_pos[bridge_id] = chunk_position
 
         # Technically, no race conditions should happen since its calls to the same actor method
         # happen synchrnously (in ray). Since the method is async, it will run the method one a at
@@ -278,11 +285,11 @@ class NodeActorBase:
 
     def _pack_object_ref(self, refs: list[ray.ObjectRef]):
         """
-        Pack a list of ObjectRefs into a single ObjectRef.
+        Return the first ObjectRef from a list, intended to be called remotely.
 
-        This method is used to create an ObjectRef containing the given
-        ObjectRefs, allowing the expected format in the task graph. It
-        returns the first ObjectRef from the list.
+        The remote invocation of this method produces a *double* Ray
+        ObjectRef, which keeps distributed scheduling non-blocking while
+        preserving the original single-ref payload inside the list.
 
         Parameters
         ----------
@@ -297,9 +304,9 @@ class NodeActorBase:
 
         Notes
         -----
-        This is a method instead of a function with `num_cpus=0` to avoid
-        starting many new workers. The method is called remotely to create
-        the proper ObjectRef structure in the task graph.
+        Implemented as an actor method (rather than a separate remote
+        function) to avoid spinning up extra workers when generating the
+        double reference structure expected by the task graph.
         """
         return refs[0]
 
@@ -318,8 +325,8 @@ class NodeActorBase:
         Add a chunk of data to this node actor.
 
         This method is called by Bridge instances to send chunks of arrays
-        to this node actor. When all chunks from a node are received,
-        the actor notifies the head node that chunks are ready.
+        to this node actor. When all chunks from a node are received, the
+        actor forwards a position->double-ref mapping to the head node.
 
         Parameters
         ----------
@@ -349,17 +356,15 @@ class NodeActorBase:
         Notes
         -----
         This method manages chunk collection and coordination:
-        1. Stores the chunk reference in the local chunks dictionary
-        2. Records chunk ownership information
-        3. When all chunks from the node are received:
-           - Registers the array with the head node (first time only)
-           - Collects all owned chunks and sends them to the head node
-           - Converts chunk references to pickled bytes to free memory
-           - Notifies the head node that chunks are ready
-        4. Waits for the chunks_ready_event if chunks are not yet complete
-
-        The method blocks until all chunks for this timestep from this node
-        are ready, ensuring proper synchronization.
+        1. Wraps the single chunk ref in a double ref by calling
+           :meth:`_pack_object_ref` remotely.
+        2. Stores the double ref in the per-timestep structure.
+        3. When all local chunks have arrived, builds a
+           ``{chunk_position: double_ref}`` mapping and sends it to the head
+           actor via :meth:`HeadNodeActor.chunks_ready`.
+        4. Pickles stored refs to drop in-memory handles and free memory.
+        5. Signals or waits on the per-timestep event so callers block until
+           the node's share of chunks for the timestep is complete.
         """
         if array_name not in self.partial_arrays:
             # respect contract at the beginning
@@ -374,26 +379,26 @@ class NodeActorBase:
             partial_array.per_timestep_arrays[timestep] = ArrayPerTimestep()
         array_timestep = partial_array.per_timestep_arrays[timestep]
 
-        # in this function, chunk_ref is a [rayref]. Doing ray.get(chunk_ref[0]) would get the data.
-        # TODO why?
-        # the pack function returns chunk_ref[0] (the rayref to actual data). Note, I don't call it as self._pack_object_ref
-        # but rather, call it through the actor handle (so its a remote call). It memans that the local_chunk is a ref, s.t
-        # ray.get(ref) returns ANOTHER ref to the data. So, a ref of a ref.
-        array_timestep.local_chunks[bridge_id] = self.actor_handle._pack_object_ref.remote(chunk_ref)
+        # Note: We need to use double refs everywhere since we don't want the distributed scheduling to block.
+        # Therefore we call an rpc on the same actor (returns a ref) to a task which unwraps the ref.
+        double_ref_chunk: DoubleRef = self.actor_handle._pack_object_ref.remote(chunk_ref)
+        array_timestep.local_chunks[bridge_id] = double_ref_chunk
 
         if len(array_timestep.local_chunks) == self.nb_chunks_of_node:
-            chunks = []
-            for bridge_id, ref in array_timestep.local_chunks._data.items():
-                assert isinstance(ref, ray.ObjectRef)
-                chunks.append(ref)
-                array_timestep.local_chunks[bridge_id] = pickle.dumps(ref)
-            # all_chunks_ref is a ref to a list of refs of refs.
-            all_chunks_ref = ray.put(chunks)
+            pos_to_ref: dict[tuple, DoubleRef] = {}
+
+            for bridge_id, double_ref in array_timestep.local_chunks._data.items():
+                assert isinstance(double_ref, ray.ObjectRef)
+
+                pos_to_ref[partial_array.bid_to_pos[bridge_id]] = double_ref
+
+                array_timestep.local_chunks[bridge_id] = pickle.dumps(double_ref)
+
+            # all_chunks_ref = ray.put(pos_to_ref)
 
             # TODO rename
-            await self.head.chunks_ready.options(enable_task_events=False).remote(
-                array_name, timestep, [all_chunks_ref]
-            )
+            await self.head.chunks_ready.options(enable_task_events=False).remote(array_name, timestep, pos_to_ref)
+
             array_timestep.chunks_ready_event.set()
             array_timestep.chunks_ready_event.clear()
         else:
@@ -406,7 +411,7 @@ class SchedulingActor(NodeActorBase):
     Node actor with additional Dask graph scheduling behaviour.
 
     This actor inherits all chunk-collection and feedback mechanisms from
-    :class:`NodeActor` and adds graph scheduling capabilities used by the
+    :class:`NodeActorBase` and adds graph scheduling capabilities used by the
     custom Dask-on-Ray scheduler. When using a :class:`SchedulingActor`, the
     custom scheduler distributes Dask task graphs across multiple actors.
     When using a plain :class:`NodeActor`, standard Dask scheduling is used.
@@ -421,9 +426,9 @@ class SchedulingActor(NodeActorBase):
 
     Attributes
     ----------
-    scheduling_actors : list[RayActorHandle]
-        List of all scheduling actor handles, populated lazily when first
-        graph is scheduled.
+    scheduling_actors : dict[ActorID, RayActorHandle]
+        Mapping of actor IDs to scheduling actor handles, populated lazily
+        on first scheduling request.
     graph_infos : AsyncDict[int, GraphInfo]
         Dictionary mapping graph IDs to their :class:`GraphInfo` objects,
         which track graph scheduling state and results.
@@ -441,7 +446,7 @@ class SchedulingActor(NodeActorBase):
             Reserved for future extensions requiring array metadata at
             construction time. Default is ``{}``.
         """
-        # Delegate initialization to NodeActor, which sets up head node
+        # Delegate initialization to NodeActorBase, which sets up head node
         # registration, arrays, and feedback mechanisms.
         await super().__init__(actor_id=actor_id, arrays_metadata=arrays_metadata)
 
@@ -480,8 +485,8 @@ class SchedulingActor(NodeActorBase):
            - Replaces ChunkRef with actual chunk ObjectRefs from local storage
            - Converts pickled chunk references back to ObjectRefs
         4. Schedules the graph using remote_ray_dask_get
-        5. Stores the resulting ObjectRefs in GraphInfo
-        6. Sets the scheduled_event to signal completion
+        5. Stores the resulting *double* ObjectRefs in GraphInfo
+        6. Sets the scheduled_event to signal completion for dependents
 
         The method handles cross-actor dependencies by delegating tasks to
         the appropriate scheduling actors. Chunk references are retrieved
@@ -535,6 +540,7 @@ class SchedulingActor(NodeActorBase):
 
         Notes
         -----
+        The provided ``graph`` is mutated in place.
         - ``ScheduledByOtherActor`` entries are rewritten to remote calls
           to the owning scheduling actor.
         - ``ChunkRef`` entries are replaced with the pickled or direct
@@ -603,8 +609,9 @@ class SchedulingActor(NodeActorBase):
         This method is called by other scheduling actors when they need to
         retrieve values from graphs scheduled by this actor. It waits for
         the graph to be fully scheduled (via scheduled_event) before returning
-        the ObjectRef. The method is used to handle cross-actor dependencies
-        in distributed Dask computations.
+        the ObjectRef. Only one level of the double reference is unwrapped to
+        avoid blocking other actors, keeping cross-actor dependencies
+        non-blocking in distributed Dask computations.
         """
         graph_info = await self.graph_infos.wait_for_key(graph_id)
 
@@ -628,7 +635,7 @@ class NodeActor(NodeActorBase):
     """
     Actor responsible for gathering chunks and exchanging data with analytics.
 
-    This is a Ray actor. Shared logic is implemented in NodeBase.
+    This is a Ray actor. Shared logic is implemented in :class:`NodeActorBase`.
     """
 
     async def __init__(self, actor_id: int, arrays_metadata: Dict[str, Dict] = {}) -> None:
