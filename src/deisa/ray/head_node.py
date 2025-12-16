@@ -230,19 +230,21 @@ class HeadNodeActor:
         chunks = [val for val in pos_to_ref.values()]
         ref_to_list_of_chunks = ray.put(chunks)
 
-        # all_chunks_ref is [RayRef] st. ray.get(rayref) -> [ref_of_ref_chunk_i, ref_ref_chunk_i+1, ...] (belonging to actor that called it)
+        # ray.get(ref_to_list_of_chunks) -> [ref_of_ref_chunk_i, ref_ref_chunk_i+1, ...] (belonging to actor that owns it)
         # so I unpack it and give this ray ref.
-        is_ready = array.add_chunk_ref(ref_to_list_of_chunks, timestep)
+        is_ready = array.add_chunk_ref(ref_to_list_of_chunks, timestep, pos_to_ref)
 
+        distributed_scheduling_enabled = True
         if is_ready:
             self.arrays_ready.put_nowait(
                 (
                     array_name,
                     timestep,
-                    array.get_full_array(timestep),
+                    array.get_full_array(timestep, distributing_scheduling_enabled=distributed_scheduling_enabled),
                 )
             )
-            # TODO Just used for preparation stuff
+        # TODO Just used for preparation stuff
+        if distributed_scheduling_enabled:
             array.fully_defined.set()
 
     def ready(self):

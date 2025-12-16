@@ -9,6 +9,7 @@ import ray.actor
 from deisa.ray import Timestep
 import dask.array as da
 from deisa.ray._async_dict import AsyncDict
+from collections import defaultdict
 
 type DoubleRef = ray.ObjectRef
 type ActorID = str
@@ -302,6 +303,8 @@ class DaskArrayData:
         # global reference is added to the Dask graph. Then, the list is cleared.
         self.chunk_refs: dict[Timestep, list[ray.ObjectRef]] = {}
 
+        self.pos_to_ref_by_timestep = defaultdict(list)
+
     def update_meta(
         self,
         nb_chunks_per_dim: tuple[int, ...],
@@ -359,7 +362,7 @@ class DaskArrayData:
             else:
                 assert self.chunks_size[i][pos] == size[pos]
 
-    def add_chunk_ref(self, chunk_ref: ray.ObjectRef, timestep: Timestep) -> bool:
+    def add_chunk_ref(self, chunk_ref: ray.ObjectRef, timestep: Timestep, pos_to_ref) -> bool:
         """
         Add a reference sent by a scheduling actor.
 
@@ -383,6 +386,7 @@ class DaskArrayData:
         and all have sent their chunks for this timestep.
         """
         self.chunk_refs[timestep].append(chunk_ref)
+        self.pos_to_ref_by_timestep[timestep] += list(pos_to_ref.items())
 
         # We don't know all the owners yet
         # TODO this method is useless now because we no longer "send" this data at every timestep.
@@ -399,7 +403,8 @@ class DaskArrayData:
         # I mark the array as ready to be formed.
         return len(self.chunk_refs[timestep]) == self.nb_scheduling_actors
 
-    def get_full_array(self, timestep: Timestep, *, is_preparation: bool = False) -> da.Array:
+    # TODO change default of is_centralized to False
+    def get_full_array(self, timestep: Timestep, *, distributing_scheduling_enabled : bool = True,  is_preparation: bool = False) -> da.Array:
         """
         Return the full Dask array for a given timestep.
 
@@ -448,20 +453,33 @@ class DaskArrayData:
         # timesteps
         dask_name = f"{self.name}_{timestep}"
 
-        graph = {
-            # We need to repeat the name and position in the value since the key might be removed
-            # by the Dask optimizer
-            (dask_name,)
-            + position: ChunkRef(  # note only first ChunkRef instance contains actual refs, the others contain only metadata.
-                actor_id,
-                self.name,
-                timestep,
-                position,
-                self.position_to_bridgeID[position],
-                _all_chunks=all_chunks if it == 0 else None,
-            )
-            for it, (position, actor_id) in enumerate(self.position_to_node_actorID.items())
-        }
+        if distributing_scheduling_enabled:
+            graph = {
+                # We need to repeat the name and position in the value since the key might be removed
+                # by the Dask optimizer
+                (dask_name,)
+                + position: ChunkRef(  # note only first ChunkRef instance contains actual refs, the others contain only metadata.
+                    actor_id,
+                    self.name,
+                    timestep,
+                    position,
+                    self.position_to_bridgeID[position],
+                    _all_chunks=all_chunks if it == 0 else None,
+                )
+                for it, (position, actor_id) in enumerate(self.position_to_node_actorID.items())
+            }
+        else:
+            graph = {
+                # We need to repeat the name and position in the value since the key might be removed
+                # by the Dask optimizer
+                (dask_name,)
+                + position: dr
+                for position, dr in self.pos_to_ref_by_timestep[timestep]
+            }
+
+        # Needed for prepare iteration otherwise key lookup fails since iteration does not yet exist
+        # TODO ensure flow is as expected
+        self.pos_to_ref_by_timestep.pop(timestep, None)
 
         dsk = HighLevelGraph.from_collections(dask_name, graph, dependencies=())
 
