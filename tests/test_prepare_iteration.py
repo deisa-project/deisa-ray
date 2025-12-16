@@ -1,5 +1,6 @@
 import dask.array as da
 import ray
+import pytest
 
 from tests.utils import ray_cluster, simple_worker, wait_for_head_node  # noqa: F401
 
@@ -7,12 +8,16 @@ NB_ITERATIONS = 100
 
 
 @ray.remote(max_retries=0)
-def head_script() -> None:
+def head_script(enable_distributed_scheduling) -> None:
     """The head node checks that the values are correct"""
     from deisa.ray.window_handler import Deisa
     from deisa.ray.types import WindowArrayDefinition
 
-    deisa = Deisa()
+    import deisa.ray as deisa
+
+    deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
+
+    d = Deisa()
 
     def simulation_callback(array: da.Array, *, timestep: int, preparation_result: da.Array):
         # We still have a dask array
@@ -26,18 +31,22 @@ def head_script() -> None:
         # We can't use compute here since the data is not available yet
         return array.sum().persist()
 
-    deisa.register_callback(
+    d.register_callback(
         simulation_callback,
         [WindowArrayDefinition("array")],
         max_iterations=NB_ITERATIONS,
         prepare_iteration=prepare_iteration,
         preparation_advance=10,
     )
-    deisa.execute_callbacks()
+    d.execute_callbacks()
 
 
-def test_prepare_iteration(ray_cluster) -> None:  # noqa: F811
-    head_ref = head_script.remote()
+@pytest.mark.parametrize(
+        "enable_distributed_scheduling", 
+        [True]
+)
+def test_prepare_iteration(enable_distributed_scheduling, ray_cluster) -> None:  # noqa: F811
+    head_ref = head_script.remote(enable_distributed_scheduling)
     wait_for_head_node()
 
     worker_refs = []

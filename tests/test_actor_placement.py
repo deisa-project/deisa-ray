@@ -72,7 +72,11 @@ def actor_node_id_by_name(name: str, namespace: str = NAMESPACE) -> str:
     raise RuntimeError(f"Actor {name} not found in namespace {namespace}")
 
 
-def test_actor_placement(ray_multinode_cluster):
+@pytest.mark.parametrize(
+        "enable_distributed_scheduling", 
+        [True, False]
+)
+def test_actor_placement(enable_distributed_scheduling, ray_multinode_cluster):
     ids = ray_multinode_cluster["ids"]
     head_node_id, worker_node_id = ids["head"], ids["node1"]
 
@@ -82,25 +86,29 @@ def test_actor_placement(ray_multinode_cluster):
         max_retries=0,
         scheduling_strategy=NodeAffinitySchedulingStrategy(node_id=head_node_id, soft=False),
     )
-    def head_script() -> None:
+    def head_script(enable_distributed_scheduling) -> None:
         """The head node checks that the values are correct"""
         from deisa.ray.window_handler import Deisa
         from deisa.ray.types import WindowArrayDefinition
 
-        deisa = Deisa()
+        import deisa.ray as deisa
+
+        deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
+
+        d = Deisa()
 
         def simulation_callback(array: da.Array, timestep: int):
             return True
 
-        deisa.register_callback(
+        d.register_callback(
             simulation_callback,
             [WindowArrayDefinition("array")],
             max_iterations=0,
         )
-        deisa.execute_callbacks()
+        d.execute_callbacks()
 
     # submit head script (analogous to submitting analytics to head node)
-    ray.get(head_script.remote())
+    ray.get(head_script.remote(enable_distributed_scheduling))
     # just a ray.get_actor() wrapped in while loop
     wait_for_head_node()
 
@@ -137,7 +145,7 @@ def test_actor_placement(ray_multinode_cluster):
 #         max_retries=0,
 #         scheduling_strategy=NodeAffinitySchedulingStrategy(node_id=head_node_id, soft=False),
 #     )
-#     def head_script() -> None:
+#     def head_script(enable_distributed_scheduling) -> None:
 #         """The head node checks that the values are correct"""
 #         from deisa.ray.window_api import ArrayDefinition, run_simulation
 #
