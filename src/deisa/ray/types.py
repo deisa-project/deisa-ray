@@ -469,7 +469,7 @@ class DaskArrayData:
         else:
             graph = {
                 (dask_name,)
-                + position: dr
+                + position: ray.get(dr)
                 for position, dr in self.pos_to_ref_by_timestep[timestep]
             }
 

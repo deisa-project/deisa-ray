@@ -176,6 +176,10 @@ class HeadNodeActor:
         for bridge_id, position, size in chunks_meta:
             array.update_meta(nb_chunks_per_dim, dtype, position, size, actor_id_who_owns, bridge_id)
 
+    def exchange_config(self, config: dict) -> None:
+        self.config = config
+        self._experimental_distributed_scheduling_enabled = config["experimental_distributed_scheduling_enabled"]
+
     async def chunks_ready(self, array_name: str, timestep: Timestep, pos_to_ref: dict[tuple, ray.ObjectRef]) -> None:
         """
         Called by scheduling actors to inform the head actor that chunks are ready.
@@ -234,19 +238,18 @@ class HeadNodeActor:
         # so I unpack it and give this ray ref.
         is_ready = array.add_chunk_ref(ref_to_list_of_chunks, timestep, pos_to_ref)
 
-        distributed_scheduling_enabled = True
         if is_ready:
             self.arrays_ready.put_nowait(
                 (
                     array_name,
                     timestep,
-                    array.get_full_array(timestep, distributing_scheduling_enabled=distributed_scheduling_enabled),
+                    array.get_full_array(timestep, distributing_scheduling_enabled=self._experimental_distributed_scheduling_enabled),
                 )
             )
             # TODO Just used for preparation stuff
             # TODO for now, only used when doing distributed scheduling, but in theory could be 
             # used with centralized scheduling too
-            if distributed_scheduling_enabled:
+            if self._experimental_distributed_scheduling_enabled:
                 array.fully_defined.set()
 
     def ready(self):

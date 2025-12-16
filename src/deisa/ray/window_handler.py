@@ -81,7 +81,7 @@ class Deisa:
         :type _: "Deisa"
         """
         # TODO finish and add this config option to Deisa
-        self.total_nodes = 100
+        self.total_nodes = 0
         from ray.util.state import list_actors
         expected_ray_actors = self.total_nodes
         connected_actors = 0
@@ -90,8 +90,6 @@ class Deisa:
             for a in list_actors(filters=[("state", "=", "ALIVE")]):
                 if a.get("ray_namespace") == "deisa_ray":
                     connected_actors += 1
-        
-        
 
     def _ensure_connected(self) -> None:
         """
@@ -116,7 +114,11 @@ class Deisa:
         else:
             dask.config.set(scheduler=ray_dask_get, shuffle="tasks")
 
+        # head is created
         self._create_head_actor()
+        # readyness gate for head actor - only return when its alive
+        ray.get(self.head.exchange_config.remote({"experimental_distributed_scheduling_enabled": self._experimental_distributed_scheduling_enabled}))
+
         self._handshake(self)
 
         self._connected = True
@@ -202,7 +204,7 @@ class Deisa:
         self._ensure_connected()
 
         if not self.registered_callbacks:
-            return
+            raise RuntimeError("Please register at least one callback before calling execute_callbacks()")
 
         if len(self.registered_callbacks) > 1:
             raise RuntimeError(
