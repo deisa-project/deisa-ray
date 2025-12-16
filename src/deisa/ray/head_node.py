@@ -177,6 +177,16 @@ class HeadNodeActor:
             array.update_meta(nb_chunks_per_dim, dtype, position, size, actor_id_who_owns, bridge_id)
 
     def exchange_config(self, config: dict) -> None:
+        """
+        Called by windoe handler to send the configuration settings for Deisa.
+        At the moment, the only supported flag is the distributed scheduler, but
+        later this will be the point where we parse the config.
+        
+        # TODO update
+        :param self: Description
+        :param config: Description
+        :type config: dict
+        """
         self.config = config
         self._experimental_distributed_scheduling_enabled = config["experimental_distributed_scheduling_enabled"]
 
@@ -239,6 +249,7 @@ class HeadNodeActor:
         is_ready = array.add_chunk_ref(ref_to_list_of_chunks, timestep, pos_to_ref)
 
         if is_ready:
+            print(self._experimental_distributed_scheduling_enabled)
             self.arrays_ready.put_nowait(
                 (
                     array_name,
@@ -322,4 +333,4 @@ class HeadNodeActor:
         preparation tasks that need array metadata but not the actual data.
         """
         await self.registered_arrays[array_name].fully_defined.wait()
-        return self.registered_arrays[array_name].get_full_array(timestep, is_preparation=True)
+        return self.registered_arrays[array_name].get_full_array(timestep, is_preparation=True, distributing_scheduling_enabled=self._experimental_distributed_scheduling_enabled)

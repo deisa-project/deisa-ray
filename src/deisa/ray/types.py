@@ -403,8 +403,7 @@ class DaskArrayData:
         # I mark the array as ready to be formed.
         return len(self.chunk_refs[timestep]) == self.nb_scheduling_actors
 
-    # TODO change default of is_centralized to False
-    def get_full_array(self, timestep: Timestep, *, distributing_scheduling_enabled : bool = True,  is_preparation: bool = False) -> da.Array:
+    def get_full_array(self, timestep: Timestep, *, distributing_scheduling_enabled: bool,  is_preparation: bool = False) -> da.Array:
         """
         Return the full Dask array for a given timestep.
 

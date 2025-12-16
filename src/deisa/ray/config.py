@@ -13,9 +13,7 @@ class Config:
 
     def __init__(self) -> None:
         self._locked: bool = False
-        # TODO: make the default False when support for both is added
-        # self._enable_experimental_distributed_scheduling: bool = False
-        self._enable_experimental_distributed_scheduling: bool = True
+        self._enable_experimental_distributed_scheduling: bool = False
 
     @property
     def experimental_distributed_scheduling_enabled(self) -> bool:
