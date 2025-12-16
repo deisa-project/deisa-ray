@@ -54,6 +54,17 @@ class HeadNodeActor:
     # should happen when the freqs are diff and max_pending_arrays are diff too? When does the sim
     # stop?''
     def __init__(self) -> None:
+        """
+        Initialize synchronization primitives and bookkeeping containers.
+
+        Notes
+        -----
+        The semaphore that limits in-flight arrays is instantiated in
+        :meth:`register_arrays`. Here we only create the shared state that
+        persists for the lifetime of the actor (registered array metadata,
+        the queue of completed arrays, and the event used to signal array
+        creation).
+        """
         # For each ID of a actor_handle, the corresponding scheduling actor
         self.scheduling_actors: dict[str, RayActorHandle] = {}
 
@@ -69,17 +80,25 @@ class HeadNodeActor:
         self, arrays_definitions: list[tuple[str, Callable]], max_pending_arrays: int = 1_000_000_000
     ) -> None:
         """
-        Register array definitions and initialize bookkeeping structures.
+        Register array definitions and set back-pressure on pending timesteps.
 
         Parameters
         ----------
         arrays_definitions : list[tuple[str, Callable]]
-            Sequence of (name, preprocessing_callback) pairs for each array
-            produced by the simulation.
+            Sequence of ``(name, preprocessing_callback)`` pairs for each array
+            produced by the simulation. Each entry becomes a
+            :class:`~deisa.ray.types.DaskArrayData` instance.
         max_pending_arrays : int, optional
-            Upper bound on arrays that may be in-flight (built or waiting
-            to be collected). Acts as back-pressure for the simulation.
-            Default is ``1_000_000_000``.
+            Upper bound on the number of array timesteps that may be created
+            but not yet consumed. Used to throttle simulations that outrun
+            analytics. Default is ``1_000_000_000``.
+
+        Notes
+        -----
+        This method must be called before any scheduling actors register
+        themselves or send chunks. It creates a semaphore that gates the
+        creation of new timesteps and populates ``registered_arrays`` with
+        the provided definitions.
         """
         # regulate how far ahead sim can go wrt to analytics
         self.new_pending_array_semaphore = asyncio.Semaphore(max_pending_arrays)
@@ -146,28 +165,28 @@ class HeadNodeActor:
         chunks_meta: list[tuple[int, tuple[int, ...], tuple[int, ...]]],  # [(chunk position, chunk size), ...]
     ):
         """
-        Register which chunks are owned by a scheduling actor.
+        Register chunk ownership for a single array on behalf of one actor.
 
         Parameters
         ----------
-        scheduling_actor_id : int
-            The ID of the scheduling actor that owns these chunks.
+        actor_id_who_owns : int
+            Scheduling actor ID that owns the provided chunks.
         array_name : str
-            The name of the array these chunks belong to.
+            Name of the array being registered.
         dtype : np.dtype
-            The numpy dtype of the chunks.
+            NumPy dtype for all chunks owned by the actor.
         nb_chunks_per_dim : tuple[int, ...]
-            Number of chunks per dimension in the array decomposition.
-        chunks : list[int, tuple[tuple[int, ...], tuple[int, ...]]]
-            List of tuples, each containing (chunk_position, chunk_size).
-            The chunk_position is a tuple of indices, and chunk_size is a
-            tuple of sizes along each dimension.
+            Global chunk grid shape (number of chunks per dimension).
+        chunks_meta : list[tuple[int, tuple[int, ...], tuple[int, ...]]]
+            Iterable of ``(bridge_id, chunk_position, chunk_size)`` tuples
+            describing each owned chunk.
 
         Notes
         -----
-        This method is called by scheduling actors to inform the head actor
-        which chunks they are responsible for. This information is used to
-        track array construction progress.
+        Called once per scheduling actor per array to let the head actor know
+        who owns each chunk. The metadata is forwarded to
+        :class:`~deisa.ray.types.DaskArrayData` and later used to build the
+        Dask arrays when chunk payloads arrive.
         """
         # TODO no checks done for when all nodeactors have called this
         # TODO missing check that analytics and sim have required/set same name of arrays, otherwise array is created and nothing happens
@@ -178,26 +197,31 @@ class HeadNodeActor:
 
     def exchange_config(self, config: dict) -> None:
         """
-        Called by windoe handler to send the configuration settings for Deisa.
-        At the moment, the only supported flag is the distributed scheduler, but
-        later this will be the point where we parse the config.
-        
-        # TODO update
-        :param self: Description
-        :param config: Description
-        :type config: dict
+        Store runtime configuration flags for the head actor.
+
+        Parameters
+        ----------
+        config : dict
+            Configuration dictionary expected to contain the key
+            ``\"experimental_distributed_scheduling_enabled\"``. Additional
+            keys are stored unchanged for downstream consumers.
+
+        Notes
+        -----
+        This method is invoked by the window handler during setup to keep
+        the head actor aware of cluster-wide feature flags.
         """
         self.config = config
         self._experimental_distributed_scheduling_enabled = config["experimental_distributed_scheduling_enabled"]
 
     async def chunks_ready(self, array_name: str, timestep: Timestep, pos_to_ref: dict[tuple, ray.ObjectRef]) -> None:
         """
-        Called by scheduling actors to inform the head actor that chunks are ready.
+        Receive chunk references for a timestep and enqueue the full array when complete.
 
-        This method is called when a scheduling actor has prepared all its
-        chunks for a given timestep. The head actor collects these chunk
-        references and constructs the full Dask array when all chunks from
-        all scheduling actors are ready.
+        Scheduling actors call this once they have prepared their owned
+        chunks for ``timestep``. The head actor waits until the timestep is
+        registered, records the chunk references, and when all owners have
+        reported marks the array as ready for analytics consumption.
 
         Parameters
         ----------
@@ -205,17 +229,18 @@ class HeadNodeActor:
             The name of the array these chunks belong to.
         timestep : Timestep
             The timestep these chunks belong to.
-        all_chunks_ref : list[ray.ObjectRef]
-            List of Ray object references to the chunks. These references
-            point to data stored in Ray's object store.
+        pos_to_ref : dict[tuple, ray.ObjectRef]
+            Mapping from chunk position to Ray ObjectRef (double refs) for
+            the chunk payloads owned by the calling actor.
 
         Notes
         -----
-        This method may block if the timestep hasn't been initialized yet.
-        It waits for either the semaphore to allow a new pending array or
-        for the timestep to be created by another scheduling actor. When all
-        chunks for a timestep are ready, the full Dask array is constructed
-        and added to the `arrays_ready` queue for collection by analytics.
+        If the timestep entry is missing, the method waits either for the
+        pending-array semaphore (creating the entry itself) or for another
+        actor to create it. When :class:`~deisa.ray.types.DaskArrayData`
+        reports the timestep as complete, the assembled Dask array (or
+        distributed-scheduling graph) is put into ``arrays_ready``. The
+        semaphore is released when analytics later consume the array.
         """
         array = self.registered_arrays[array_name]
 
@@ -283,7 +308,7 @@ class HeadNodeActor:
     # TODO there is a single queue for all arrays.
     async def get_next_array(self) -> tuple[str, Timestep, da.Array]:
         """
-        Get the next ready array from the queue.
+        Get and return the next ready array from the queue.
 
         Returns
         -------
@@ -296,9 +321,9 @@ class HeadNodeActor:
         Notes
         -----
         This method blocks until an array is available in the `arrays_ready`
-        queue. When an array is retrieved, the semaphore is released to
-        allow the simulation to create new arrays. This method is typically
-        called by analytics to get the next available array for processing.
+        queue. When an array is retrieved, the pending-array semaphore is
+        released so new timesteps may be created. Called by analytics
+        components to pull work in order.
         """
         array = await self.arrays_ready.get()
         self.new_pending_array_semaphore.release()
@@ -328,9 +353,10 @@ class HeadNodeActor:
 
         Notes
         -----
-        This method waits until the array is fully defined (all chunk owners
-        are known) before returning. The returned array is suitable for
-        preparation tasks that need array metadata but not the actual data.
+        Waits for ``fully_defined`` on the corresponding
+        :class:`~deisa.ray.types.DaskArrayData` before returning. The
+        ``distributing_scheduling_enabled`` flag mirrors the runtime config
+        provided via :meth:`exchange_config`.
         """
         await self.registered_arrays[array_name].fully_defined.wait()
         return self.registered_arrays[array_name].get_full_array(timestep, is_preparation=True, distributing_scheduling_enabled=self._experimental_distributed_scheduling_enabled)
