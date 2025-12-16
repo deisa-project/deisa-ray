@@ -9,10 +9,9 @@ from deisa.ray.types import (
     GraphInfo,
     ArrayPerTimestep,
     PartialArray,
-    DoubleRef,
     RayActorHandle,
     ActorID,
-    DoubleRef
+    DoubleRef,
 )
 from deisa.ray.utils import get_ready_actor_with_retry
 from deisa.ray.ray_patch import remote_ray_dask_get
@@ -222,7 +221,7 @@ class NodeActorBase:
 
         # add metadata for this array
         partial_array.chunks_contained_meta.add((bridge_id, chunk_position, chunk_shape))
-        partial_array.bid_to_pos[bridge_id] = chunk_position 
+        partial_array.bid_to_pos[bridge_id] = chunk_position
 
         # Technically, no race conditions should happen since its calls to the same actor method
         # happen synchrnously (in ray). Since the method is async, it will run the method one a at
@@ -380,8 +379,8 @@ class NodeActorBase:
             partial_array.per_timestep_arrays[timestep] = ArrayPerTimestep()
         array_timestep = partial_array.per_timestep_arrays[timestep]
 
-        # Note: We need to use double refs everywhere since we don't want the distributed scheduling to block. 
-        # Therefore we call an rpc on the same actor (returns a ref) to a task which unwraps the ref. 
+        # Note: We need to use double refs everywhere since we don't want the distributed scheduling to block.
+        # Therefore we call an rpc on the same actor (returns a ref) to a task which unwraps the ref.
         double_ref_chunk: DoubleRef = self.actor_handle._pack_object_ref.remote(chunk_ref)
         array_timestep.local_chunks[bridge_id] = double_ref_chunk
 
@@ -398,9 +397,7 @@ class NodeActorBase:
             # all_chunks_ref = ray.put(pos_to_ref)
 
             # TODO rename
-            await self.head.chunks_ready.options(enable_task_events=False).remote(
-                array_name, timestep, pos_to_ref
-            )
+            await self.head.chunks_ready.options(enable_task_events=False).remote(array_name, timestep, pos_to_ref)
 
             array_timestep.chunks_ready_event.set()
             array_timestep.chunks_ready_event.clear()

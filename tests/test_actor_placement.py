@@ -72,10 +72,7 @@ def actor_node_id_by_name(name: str, namespace: str = NAMESPACE) -> str:
     raise RuntimeError(f"Actor {name} not found in namespace {namespace}")
 
 
-@pytest.mark.parametrize(
-        "enable_distributed_scheduling", 
-        [True, False]
-)
+@pytest.mark.parametrize("enable_distributed_scheduling", [True, False])
 def test_actor_placement(enable_distributed_scheduling, ray_multinode_cluster):
     ids = ray_multinode_cluster["ids"]
     head_node_id, worker_node_id = ids["head"], ids["node1"]

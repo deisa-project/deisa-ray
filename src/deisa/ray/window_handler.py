@@ -1,5 +1,4 @@
 import gc
-import time
 from typing import Any, Callable, Hashable, Optional
 
 import dask
@@ -72,10 +71,10 @@ class Deisa:
 
     def _handshake_impl(self, _: "Deisa") -> None:
         """
-        Implementation for handshake between window handler (Deisa) and the Simulation side Bridges. 
-        
+        Implementation for handshake between window handler (Deisa) and the Simulation side Bridges.
+
         The handshake occurs when all the expected Ray Node Actors are connected.
-        
+
         :param self: Description
         :param _: Description
         :type _: "Deisa"
@@ -83,6 +82,7 @@ class Deisa:
         # TODO finish and add this config option to Deisa
         self.total_nodes = 0
         from ray.util.state import list_actors
+
         expected_ray_actors = self.total_nodes
         connected_actors = 0
         while connected_actors < expected_ray_actors:
@@ -117,7 +117,11 @@ class Deisa:
         # head is created
         self._create_head_actor()
         # readyness gate for head actor - only return when its alive
-        ray.get(self.head.exchange_config.remote({"experimental_distributed_scheduling_enabled": self._experimental_distributed_scheduling_enabled}))
+        ray.get(
+            self.head.exchange_config.remote(
+                {"experimental_distributed_scheduling_enabled": self._experimental_distributed_scheduling_enabled}
+            )
+        )
 
         self._handshake(self)
 

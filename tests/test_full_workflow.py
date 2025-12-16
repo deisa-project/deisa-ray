@@ -1,4 +1,3 @@
-from math import dist
 import dask.array as da
 import pytest
 import ray
@@ -33,16 +32,16 @@ def head_script(enable_distributed_scheduling) -> None:
 
 
 @pytest.mark.parametrize(
-        "nb_nodes, enable_distributed_scheduling", 
-        [
-            (1, True),
-            (2, True),
-            (4, True),
-            (1, False),
-            (2, False),
-            (4, False),
-        ]
-                         )
+    "nb_nodes, enable_distributed_scheduling",
+    [
+        (1, True),
+        (2, True),
+        (4, True),
+        (1, False),
+        (2, False),
+        (4, False),
+    ],
+)
 def test_deisa_ray(nb_nodes: int, enable_distributed_scheduling: bool, ray_cluster) -> None:  # noqa: F811
     head_ref = head_script.remote(enable_distributed_scheduling)
     wait_for_head_node()

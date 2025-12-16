@@ -29,10 +29,7 @@ def head_script(enable_distributed_scheduling) -> None:
     d.execute_callbacks()
 
 
-@pytest.mark.parametrize(
-        "enable_distributed_scheduling", 
-        [True, False]
-)
+@pytest.mark.parametrize("enable_distributed_scheduling", [True, False])
 def test_dtype(enable_distributed_scheduling, ray_cluster) -> None:  # noqa: F811
     head_ref = head_script.remote(enable_distributed_scheduling)
     wait_for_head_node()

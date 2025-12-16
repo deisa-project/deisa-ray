@@ -279,11 +279,13 @@ class HeadNodeActor:
                 (
                     array_name,
                     timestep,
-                    array.get_full_array(timestep, distributing_scheduling_enabled=self._experimental_distributed_scheduling_enabled),
+                    array.get_full_array(
+                        timestep, distributing_scheduling_enabled=self._experimental_distributed_scheduling_enabled
+                    ),
                 )
             )
             # TODO Just used for preparation stuff
-            # TODO for now, only used when doing distributed scheduling, but in theory could be 
+            # TODO for now, only used when doing distributed scheduling, but in theory could be
             # used with centralized scheduling too
             if self._experimental_distributed_scheduling_enabled:
                 array.fully_defined.set()
@@ -359,4 +361,8 @@ class HeadNodeActor:
         provided via :meth:`exchange_config`.
         """
         await self.registered_arrays[array_name].fully_defined.wait()
-        return self.registered_arrays[array_name].get_full_array(timestep, is_preparation=True, distributing_scheduling_enabled=self._experimental_distributed_scheduling_enabled)
+        return self.registered_arrays[array_name].get_full_array(
+            timestep,
+            is_preparation=True,
+            distributing_scheduling_enabled=self._experimental_distributed_scheduling_enabled,
+        )

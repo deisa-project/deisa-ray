@@ -42,10 +42,7 @@ def ray_spilling_cluster():
     ray.shutdown()
 
 
-@pytest.mark.parametrize(
-        "enable_distributed_scheduling", 
-        [True, False]
-)
+@pytest.mark.parametrize("enable_distributed_scheduling", [True, False])
 def test_memory_release(enable_distributed_scheduling, ray_spilling_cluster: str) -> None:  # noqa: F811
     """
     Perform a long simulation with a small object store spilling to disk. If the

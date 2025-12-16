@@ -79,7 +79,7 @@ class PartialArray:
         # Chunks owned by this actor for this array.
         # {(bridge_id, chunk position, chunk size), ...}
         self.chunks_contained_meta: set[tuple[int, tuple[int, ...], tuple[int, ...]]] = set()
-        self.bid_to_pos: dict[int, tuple]= {}
+        self.bid_to_pos: dict[int, tuple] = {}
 
         self.per_timestep_arrays: AsyncDict[Timestep, ArrayPerTimestep] = AsyncDict()
 
@@ -413,7 +413,9 @@ class DaskArrayData:
         # I mark the array as ready to be formed.
         return len(self.chunk_refs[timestep]) == self.nb_scheduling_actors
 
-    def get_full_array(self, timestep: Timestep, *, distributing_scheduling_enabled: bool,  is_preparation: bool = False) -> da.Array:
+    def get_full_array(
+        self, timestep: Timestep, *, distributing_scheduling_enabled: bool, is_preparation: bool = False
+    ) -> da.Array:
         """
         Return the full Dask array for a given timestep.
 
@@ -481,14 +483,10 @@ class DaskArrayData:
                 for it, (position, actor_id) in enumerate(self.position_to_node_actorID.items())
             }
         else:
-            # TODO: this could be an antipattern (calling ray.get in for loop). Could maybe put all the 
+            # TODO: this could be an antipattern (calling ray.get in for loop). Could maybe put all the
             # double refs in a list and call ray.wait() or ray.get() on the list?
-            # something that submits all the refs one go. 
-            graph = {
-                (dask_name,)
-                + position: ray.get(dr)
-                for position, dr in self.pos_to_ref_by_timestep[timestep]
-            }
+            # something that submits all the refs one go.
+            graph = {(dask_name,) + position: ray.get(dr) for position, dr in self.pos_to_ref_by_timestep[timestep]}
 
         # Needed for prepare iteration otherwise key lookup fails since iteration does not yet exist
         # TODO ensure flow is as expected
