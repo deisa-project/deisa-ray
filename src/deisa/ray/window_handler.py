@@ -48,44 +48,6 @@ def _call_prepare_iteration(prepare_iteration: Callable, array: da.Array, timest
     return prepare_iteration(array, timestep=timestep)
 
 
-# class Deisa:
-#     def __init__(
-#         self,
-#         *,
-#         _ray_start = self._ray_start
-#     ):
-#         """
-#         Initialize Ray and configure Dask to use the Deisa-Ray scheduler.
-
-#         This function initializes Ray if it hasn't been initialized yet, and
-#         configures Dask to use the Deisa-Ray custom scheduler with task-based
-#         shuffling.
-
-#         Notes
-#         -----
-#         Ray is initialized with automatic address detection, logging to driver
-#         disabled, and error-level logging. Dask is configured to use the
-#         `deisa_ray_get` scheduler with task-based shuffling.
-#         """
-#          # Lock config at instantiation time to ensure reproducibility.
-#         config.lock()
-#         self._experimental_distributed_scheduling_enabled = (
-#             config.experimental_distributed_scheduling_enabled
-#         )
-#         if self._experimental_distributed_scheduling_enabled:
-#             dask.config.set(scheduler=deisa_ray_get, shuffle="tasks")
-#         else:
-#             dask.config.set(scheduler=ray_dask_get, shuffle = "tasks")
-
-#         # store all ray node actors
-#         self.node_actors = {}
-
-#         # store registered callbacks from user analytics
-#         self.registered_callbacks: list[_CallbackConfig] = []
-
-#         self._ray_start()
-
-
 class Deisa:
     def __init__(
         self,

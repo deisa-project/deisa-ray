@@ -445,8 +445,6 @@ class DaskArrayData:
             all_chunks = None
         else:
             all_chunks = ray.put(self.chunk_refs[timestep])
-            # TODO why is this done? is it so once array goes out of scope for user, everything is cleaned up?
-            # is this the reason for the pickle dump in the beginning?
             del self.chunk_refs[timestep]
 
         # We need to add the timestep since the same name can be used several times for different
@@ -470,8 +468,6 @@ class DaskArrayData:
             }
         else:
             graph = {
-                # We need to repeat the name and position in the value since the key might be removed
-                # by the Dask optimizer
                 (dask_name,)
                 + position: dr
                 for position, dr in self.pos_to_ref_by_timestep[timestep]

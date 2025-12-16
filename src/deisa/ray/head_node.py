@@ -243,9 +243,11 @@ class HeadNodeActor:
                     array.get_full_array(timestep, distributing_scheduling_enabled=distributed_scheduling_enabled),
                 )
             )
-        # TODO Just used for preparation stuff
-        if distributed_scheduling_enabled:
-            array.fully_defined.set()
+            # TODO Just used for preparation stuff
+            # TODO for now, only used when doing distributed scheduling, but in theory could be 
+            # used with centralized scheduling too
+            if distributed_scheduling_enabled:
+                array.fully_defined.set()
 
     def ready(self):
         """
