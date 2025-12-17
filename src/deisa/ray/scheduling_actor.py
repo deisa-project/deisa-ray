@@ -1,5 +1,6 @@
 import pickle
 import ray
+from ray.util.dask import ray_dask_get
 from deisa.ray._async_dict import AsyncDict
 from deisa.ray.types import (
     GraphKey,
@@ -11,10 +12,8 @@ from deisa.ray.types import (
     PartialArray,
     RayActorHandle,
     ActorID,
-    DoubleRef,
 )
 from deisa.ray.utils import get_ready_actor_with_retry
-from deisa.ray.ray_patch import remote_ray_dask_get
 from deisa.ray.errors import ContractError
 from typing import Dict, Hashable, Any
 
@@ -379,22 +378,18 @@ class NodeActorBase:
             partial_array.per_timestep_arrays[timestep] = ArrayPerTimestep()
         array_timestep = partial_array.per_timestep_arrays[timestep]
 
-        # Note: We need to use double refs everywhere since we don't want the distributed scheduling to block.
-        # Therefore we call an rpc on the same actor (returns a ref) to a task which unwraps the ref.
-        double_ref_chunk: DoubleRef = self.actor_handle._pack_object_ref.remote(chunk_ref)
-        array_timestep.local_chunks[bridge_id] = double_ref_chunk
+        chunk_ref: ray.ObjectRef = chunk_ref[0]
+        array_timestep.local_chunks[bridge_id] = chunk_ref
 
         if len(array_timestep.local_chunks) == self.nb_chunks_of_node:
-            pos_to_ref: dict[tuple, DoubleRef] = {}
+            pos_to_ref: dict[tuple, ray.ObjectRef] = {}
 
-            for bridge_id, double_ref in array_timestep.local_chunks._data.items():
-                assert isinstance(double_ref, ray.ObjectRef)
+            for bridge_id, ref in array_timestep.local_chunks._data.items():
+                assert isinstance(ref, ray.ObjectRef)
 
-                pos_to_ref[partial_array.bid_to_pos[bridge_id]] = double_ref
+                pos_to_ref[partial_array.bid_to_pos[bridge_id]] = ref
 
-                array_timestep.local_chunks[bridge_id] = pickle.dumps(double_ref)
-
-            # all_chunks_ref = ray.put(pos_to_ref)
+                array_timestep.local_chunks[bridge_id] = pickle.dumps(ref)
 
             # TODO rename
             await self.head.chunks_ready.options(enable_task_events=False).remote(array_name, timestep, pos_to_ref)
@@ -454,7 +449,12 @@ class SchedulingActor(NodeActorBase):
         self.scheduling_actors: dict[ActorID, RayActorHandle] = {}
         self.graph_infos: AsyncDict[int, GraphInfo] = AsyncDict()
 
-    async def schedule_graph(self, graph_id: int, graph: dict[GraphKey, GraphValue]) -> None:
+    async def schedule_graph(
+        self,
+        graph_id: int,
+        graph: dict[GraphKey, GraphValue],
+        initial_refs: dict[GraphKey, ray.ObjectRef] | None = None,
+    ) -> None:
         """
         Schedule a Dask task graph for execution.
 
@@ -474,19 +474,25 @@ class SchedulingActor(NodeActorBase):
             - ChunkRef objects (replaced with actual chunk ObjectRefs)
             - ScheduledByOtherActor objects (replaced with remote calls to
               other actors)
+        initial_refs : dict[GraphKey, ray.ObjectRef] or None, optional
+            Optional mapping of keys to pre-seeded *double* ObjectRefs. These
+            refs are injected into the :class:`GraphInfo` before scheduling
+            completes, which can be useful for tests or bootstrapping
+            cross-actor dependencies. Default is ``None``.
 
         Notes
         -----
         This method performs the following operations:
         1. Retrieves the list of all scheduling actors (if not already cached)
         2. Creates a GraphInfo object to track this graph's state
-        3. Processes the task graph:
+        3. Optionally pre-populates GraphInfo with seeded references
+        4. Processes the task graph:
            - Replaces ScheduledByOtherActor with remote calls to other actors
            - Replaces ChunkRef with actual chunk ObjectRefs from local storage
            - Converts pickled chunk references back to ObjectRefs
-        4. Schedules the graph using remote_ray_dask_get
-        5. Stores the resulting *double* ObjectRefs in GraphInfo
-        6. Sets the scheduled_event to signal completion for dependents
+        5. Schedules the graph using remote_ray_dask_get
+        6. Stores the resulting *double* ObjectRefs in GraphInfo
+        7. Sets the scheduled_event to signal completion for dependents
 
         The method handles cross-actor dependencies by delegating tasks to
         the appropriate scheduling actors. Chunk references are retrieved
@@ -500,6 +506,9 @@ class SchedulingActor(NodeActorBase):
         # Create and store graph info for tracking this graph's execution
         info = GraphInfo()
         self.graph_infos[graph_id] = info
+
+        if initial_refs:
+            info.refs.update(initial_refs)
 
         await self.substitute_graph_values_with_refs(graph_id, graph)
 
@@ -518,10 +527,11 @@ class SchedulingActor(NodeActorBase):
         # so, the function returns a ref -> result. But, since we set ray_persist, we get a ref to the output of the function.        # function. Therefore, we get a ref -> ref -> result.
         # Incindentally, this is why, removing ray_persist = True from remote_ray_dask_get makes everything fail (because we then
         # get a tuple of single refs instead of double). We need double refs to keep the entire graph consistent.
-        doubleRefs_of_results: tuple[DoubleRef] = await remote_ray_dask_get.remote(graph, keys_needed)
+        # doubleRefs_of_results: tuple[DoubleRef] = await remote_ray_dask_get.remote(graph, keys_needed)
+        refs_to_results: list[ray.ObjectRef] = ray_dask_get(graph, keys_needed, ray_persist=True)
 
         # store the refs in a dictionary so other actors can retrieve them
-        for key, ref in zip(keys_needed, doubleRefs_of_results):
+        for key, ref in zip(keys_needed, refs_to_results):
             info.refs[key] = ref
 
         info.scheduled_event.set()
@@ -582,9 +592,9 @@ class SchedulingActor(NodeActorBase):
     # a ref for a dask task that this actor posseses (is supposed to deal with). It does three things
     # 1. waits for the graph to be created (look at method above)
     # 2. waits for the scheduled_event to be set
-    # 3. retrieves the ref corresponding to the required key from a dictionary. Since this is a ref of ref,
-    # it awaits it to unpack one level and return a ref to a result of the task.
-    async def get_value(self, graph_id: int, key: str) -> ray.ObjectRef:
+    # 3. retrieves the ref corresponding to the required key from a dictionary. Since this is a ref
+    # it awaits it to unpack one level and return the value to the task.
+    async def get_value(self, graph_id: int, key: str) -> Any:
         """
         Get the result value for a specific key from a scheduled graph.
 
@@ -625,9 +635,8 @@ class SchedulingActor(NodeActorBase):
         # However, to make the entire graph "coherent", I need to make leaf nodes refs of refs as well. Then it all becomes
         # cohesive.
         # I am missing why we need the pickling and how memory is released.
-        double_ref = graph_info.refs[key]
-        ref_to_result = await double_ref
-        return ref_to_result
+        ref = graph_info.refs[key]
+        return await ref
 
 
 @ray.remote

@@ -5,7 +5,7 @@ from typing import Callable
 import ray
 from dask.core import get_dependencies
 from deisa.ray.scheduling_actor import ChunkRef, ScheduledByOtherActor
-from deisa.ray.types import DoubleRef, ActorID, GraphKey, GraphValue, RayActorHandle
+from deisa.ray.types import ActorID, GraphKey, GraphValue, RayActorHandle
 from ray.util.dask.scheduler_utils import nested_get
 from dask.core import flatten
 
@@ -336,24 +336,22 @@ def deisa_ray_get(full_dask_graph: dict, keys_needed: list, **kwargs):
 
     # repack keys in case of non-aggregate operation
 
-    result_refs: dict[GraphKey, DoubleRef] = {}
+    result_refs: dict[GraphKey, ray.ObjectRef] = {}
 
     for key in flattened_keys:
         actor_id: ActorID = graph_key_to_actor_id_map[key]
         actor_handle = scheduling_actor_id_to_handle[actor_id]
         result_refs[key] = actor_handle.get_value.remote(graph_id, key)
 
-    # TODO: not sure why ray_persist would need double refs as result. I would imagine I would need to
-    # call ray.get() at least once on all values in the dict.
+    # TODO: returns a list of refs to result
     if kwargs.get("ray_persist"):
         # Used to return results in same shape as keys_needed
         return nested_get(keys_needed, result_refs)
 
-    # unwrap twice using batched ray.get and repack into dict
+    # unwrap once using batched ray.get and repack into dict
     keys = list(result_refs.keys())
-    outer_refs = list(result_refs.values())  # materialize once, preserves order
-    inner_refs = ray.get(outer_refs)  # 1st batched get
-    vals = ray.get(inner_refs)  # 2nd batched get
+    refs = list(result_refs.values())  # materialize once, preserves order
+    vals = ray.get(refs)  # 1st batched get
     results = dict(zip(keys, vals))
 
     # Used to return results in same shape as keys_needed
