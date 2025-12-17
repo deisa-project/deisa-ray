@@ -198,13 +198,14 @@
 <ul class="current">
 <li class="toctree-l1 current has-children"><a class="reference internal" href="deisa.ray.html">deisa.ray package</a><input aria-label="Toggle navigation of deisa.ray package" checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.bridge.html">deisa.ray.bridge module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.config.html">deisa.ray.config module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.errors.html">deisa.ray.errors module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.head_node.html">deisa.ray.head_node module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.ray_patch.html">deisa.ray.ray_patch module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.scheduling_actor.html">deisa.ray.scheduling_actor module</a></li>
 <li class="toctree-l2 current current-page"><a class="current reference internal" href="#">deisa.ray.types module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.utils.html">deisa.ray.utils module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="deisa.ray.window_api.html">deisa.ray.window_api module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.window_handler.html">deisa.ray.window_handler module</a></li>
 </ul>
 </li>
 </ul>
@@ -252,12 +253,13 @@
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">deisa.ray.types.</span></span><span class="sig-name descname"><span class="pre">ArrayPerTimestep</span></span><a class="reference internal" href="_modules/deisa/ray/types.html#ArrayPerTimestep"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#deisa.ray.types.ArrayPerTimestep" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
 <p>Internal class tracking chunks for a specific array and timestep.</p>
-<p>This class manages the collection of chunks for a particular array
-at a specific timestep within a scheduling actor.</p>
+<p>Tracks the per-timestep chunks owned by a single scheduling actor. Each
+instance is keyed by <code class="docutils literal notranslate"><span class="pre">timestep</span></code> inside a <a class="reference internal" href="#deisa.ray.types.PartialArray" title="deisa.ray.types.PartialArray"><code class="xref py py-class docutils literal notranslate"><span class="pre">PartialArray</span></code></a>.</p>
 <dl class="py attribute">
 <dt class="sig sig-object py" id="deisa.ray.types.ArrayPerTimestep.chunks_ready_event">
 <span class="sig-name descname"><span class="pre">chunks_ready_event</span></span><a class="headerlink" href="#deisa.ray.types.ArrayPerTimestep.chunks_ready_event" title="Link to this definition">¶</a></dt>
-<dd><p>Event that is triggered when all chunks for this timestep are ready.</p>
+<dd><p>Triggered when all chunks for this timestep owned by the node actor
+have arrived and been forwarded to the head actor.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Type<span class="colon">:</span></dt>
 <dd class="field-odd"><p>asyncio.Event</p>
@@ -268,20 +270,16 @@ at a specific timestep within a scheduling actor.</p>
 <dl class="py attribute">
 <dt class="sig sig-object py" id="deisa.ray.types.ArrayPerTimestep.local_chunks">
 <span class="sig-name descname"><span class="pre">local_chunks</span></span><a class="headerlink" href="#deisa.ray.types.ArrayPerTimestep.local_chunks" title="Link to this definition">¶</a></dt>
-<dd><p>Dictionary mapping chunk positions to their Ray object references
-or pickled bytes. The chunks are stored as bytes after being sent
-to the head node to free memory.</p>
+<dd><p>Mapping of <code class="docutils literal notranslate"><span class="pre">bridge_id</span></code> to the double ObjectRef for that chunk. Once
+forwarded to the head actor the value is replaced with pickled bytes
+to free memory.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>AsyncDict[tuple[int, …], ray.ObjectRef | bytes]</p>
+<dd class="field-odd"><p>AsyncDict[int, ray.ObjectRef | bytes]</p>
 </dd>
 </dl>
 </dd></dl>
 
-<p class="rubric">Notes</p>
-<p>This is an internal class used by SchedulingActor to track chunk
-collection for arrays. Chunks are initially stored as ObjectRefs and
-later converted to pickled bytes to free memory.</p>
 </dd></dl>
 
 <dl class="py class">
@@ -341,21 +339,34 @@ may change in newer versions of Dask.</p>
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">deisa.ray.types.</span></span><span class="sig-name descname"><span class="pre">DaskArrayData</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">f_preprocessing</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/deisa/ray/types.html#DaskArrayData"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#deisa.ray.types.DaskArrayData" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
 <p>Information about a Dask array being built.</p>
-<p>This class tracks the metadata and state of a Dask array as it is
-constructed from chunks sent by scheduling actors.</p>
+<p>Tracks metadata and per-timestep state for a Dask array assembled from
+chunks sent by scheduling actors.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>definition</strong> (<em>ArrayDefinition</em>) – The definition of the array, including its name and preprocessing
-function.</p>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>name</strong> (<em>str</em>) – Array name registered with the head actor.</p></li>
+<li><p><strong>f_preprocessing</strong> (<em>Callable</em>) – Preprocessing callback applied to each chunk.</p></li>
+</ul>
 </dd>
 </dl>
 <dl class="py attribute">
-<dt class="sig sig-object py" id="deisa.ray.types.DaskArrayData.definition">
-<span class="sig-name descname"><span class="pre">definition</span></span><a class="headerlink" href="#deisa.ray.types.DaskArrayData.definition" title="Link to this definition">¶</a></dt>
-<dd><p>The array definition.</p>
+<dt class="sig sig-object py" id="deisa.ray.types.DaskArrayData.name">
+<span class="sig-name descname"><span class="pre">name</span></span><a class="headerlink" href="#deisa.ray.types.DaskArrayData.name" title="Link to this definition">¶</a></dt>
+<dd><p>Array name without timestep suffix.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>ArrayDefinition</p>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="deisa.ray.types.DaskArrayData.f_preprocessing">
+<span class="sig-name descname"><span class="pre">f_preprocessing</span></span><a class="headerlink" href="#deisa.ray.types.DaskArrayData.f_preprocessing" title="Link to this definition">¶</a></dt>
+<dd><p>Preprocessing callback supplied at registration.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Callable</p>
 </dd>
 </dl>
 </dd></dl>
@@ -363,7 +374,7 @@ function.</p>
 <dl class="py attribute">
 <dt class="sig sig-object py" id="deisa.ray.types.DaskArrayData.fully_defined">
 <span class="sig-name descname"><span class="pre">fully_defined</span></span><a class="headerlink" href="#deisa.ray.types.DaskArrayData.fully_defined" title="Link to this definition">¶</a></dt>
-<dd><p>Event that is set when all chunk owners are known.</p>
+<dd><p>Set when every chunk owner has been registered.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Type<span class="colon">:</span></dt>
 <dd class="field-odd"><p>asyncio.Event</p>
@@ -420,13 +431,24 @@ is registered.</p>
 </dd></dl>
 
 <dl class="py attribute">
-<dt class="sig sig-object py" id="deisa.ray.types.DaskArrayData.scheduling_actors_id">
-<span class="sig-name descname"><span class="pre">scheduling_actors_id</span></span><a class="headerlink" href="#deisa.ray.types.DaskArrayData.scheduling_actors_id" title="Link to this definition">¶</a></dt>
-<dd><p>Mapping from chunk position to the ID of the scheduling actor
-responsible for that chunk.</p>
+<dt class="sig sig-object py" id="deisa.ray.types.DaskArrayData.position_to_node_actorID">
+<span class="sig-name descname"><span class="pre">position_to_node_actorID</span></span><a class="headerlink" href="#deisa.ray.types.DaskArrayData.position_to_node_actorID" title="Link to this definition">¶</a></dt>
+<dd><p>Mapping from chunk position to the scheduling actor responsible
+for that chunk.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Type<span class="colon">:</span></dt>
 <dd class="field-odd"><p>dict[tuple[int, …], int]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="deisa.ray.types.DaskArrayData.position_to_bridgeID">
+<span class="sig-name descname"><span class="pre">position_to_bridgeID</span></span><a class="headerlink" href="#deisa.ray.types.DaskArrayData.position_to_bridgeID" title="Link to this definition">¶</a></dt>
+<dd><p>Mapping from chunk position to the producing bridge ID.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>dict[tuple, int]</p>
 </dd>
 </dl>
 </dd></dl>
@@ -446,9 +468,8 @@ Set when all chunk owners are known.</p>
 <dl class="py attribute">
 <dt class="sig sig-object py" id="deisa.ray.types.DaskArrayData.chunk_refs">
 <span class="sig-name descname"><span class="pre">chunk_refs</span></span><a class="headerlink" href="#deisa.ray.types.DaskArrayData.chunk_refs" title="Link to this definition">¶</a></dt>
-<dd><p>For each timestep, a list of Ray object references to the chunks.
-These references are used to keep chunks in memory and are cleared
-when the array is built.</p>
+<dd><p>For each timestep, the list of per-actor references that keep
+chunk payloads alive in the object store.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Type<span class="colon">:</span></dt>
 <dd class="field-odd"><p>dict[Timestep, list[ray.ObjectRef]]</p>
@@ -456,15 +477,29 @@ when the array is built.</p>
 </dl>
 </dd></dl>
 
+<dl class="py attribute">
+<dt class="sig sig-object py" id="deisa.ray.types.DaskArrayData.pos_to_ref_by_timestep">
+<span class="sig-name descname"><span class="pre">pos_to_ref_by_timestep</span></span><a class="headerlink" href="#deisa.ray.types.DaskArrayData.pos_to_ref_by_timestep" title="Link to this definition">¶</a></dt>
+<dd><p>For each timestep, the (position, ref) pairs provided by scheduling
+actors. Used when distributed scheduling is disabled.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>defaultdict</p>
+</dd>
+</dl>
+</dd></dl>
+
 <dl class="py method">
 <dt class="sig sig-object py" id="deisa.ray.types.DaskArrayData.add_chunk_ref">
-<span class="sig-name descname"><span class="pre">add_chunk_ref</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">chunk_ref</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ObjectRef</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timestep</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Hashable</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="_modules/deisa/ray/types.html#DaskArrayData.add_chunk_ref"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#deisa.ray.types.DaskArrayData.add_chunk_ref" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">add_chunk_ref</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">chunk_ref</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ObjectRef</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timestep</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Hashable</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pos_to_ref</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="_modules/deisa/ray/types.html#DaskArrayData.add_chunk_ref"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#deisa.ray.types.DaskArrayData.add_chunk_ref" title="Link to this definition">¶</a></dt>
 <dd><p>Add a reference sent by a scheduling actor.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>chunk_ref</strong> (<em>ray.ObjectRef</em>) – Ray object reference to a chunk sent by a scheduling actor.</p></li>
 <li><p><strong>timestep</strong> (<em>Timestep</em>) – The timestep this chunk belongs to.</p></li>
+<li><p><strong>pos_to_ref</strong> (<em>dict</em><em>[</em><em>tuple</em><em>, </em><em>ray.ObjectRef</em><em>]</em>) – Mapping of chunk position to the (double) Ray ObjectRef provided
+by the scheduling actor for this timestep.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
@@ -483,12 +518,15 @@ and all have sent their chunks for this timestep.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="deisa.ray.types.DaskArrayData.get_full_array">
-<span class="sig-name descname"><span class="pre">get_full_array</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">timestep</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Hashable</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_preparation</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Array</span></span></span><a class="reference internal" href="_modules/deisa/ray/types.html#DaskArrayData.get_full_array"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#deisa.ray.types.DaskArrayData.get_full_array" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">get_full_array</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">timestep</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Hashable</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">distributing_scheduling_enabled</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_preparation</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Array</span></span></span><a class="reference internal" href="_modules/deisa/ray/types.html#DaskArrayData.get_full_array"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#deisa.ray.types.DaskArrayData.get_full_array" title="Link to this definition">¶</a></dt>
 <dd><p>Return the full Dask array for a given timestep.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>timestep</strong> (<em>Timestep</em>) – The timestep for which the full array should be returned.</p></li>
+<li><p><strong>distributing_scheduling_enabled</strong> (<em>bool</em>) – When <code class="docutils literal notranslate"><span class="pre">True</span></code>, emit a graph containing <a class="reference internal" href="#deisa.ray.types.ChunkRef" title="deisa.ray.types.ChunkRef"><code class="xref py py-class docutils literal notranslate"><span class="pre">ChunkRef</span></code></a> tasks
+for distributed scheduling. When <code class="docutils literal notranslate"><span class="pre">False</span></code>, materialise the
+actual chunk payloads and build a local Dask array.</p></li>
 <li><p><strong>is_preparation</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, the array will not contain ObjectRefs to the actual data.
 This is used for preparation arrays where only the structure is
 needed. Default is False.</p></li>
@@ -508,11 +546,12 @@ in Ray’s object store.</p>
 </dd>
 </dl>
 <p class="rubric">Notes</p>
-<p>The array is built using a HighLevelGraph with ChunkRef tasks. When
-<cite>is_preparation</cite> is False, the chunk references are stored in Ray’s
-object store and cleared from the local <cite>chunk_refs</cite> dictionary.
-The array name includes the timestep to allow the same array name
-to be used for different timesteps.</p>
+<p>When distributed scheduling is enabled the graph uses <a class="reference internal" href="#deisa.ray.types.ChunkRef" title="deisa.ray.types.ChunkRef"><code class="xref py py-class docutils literal notranslate"><span class="pre">ChunkRef</span></code></a>
+placeholders that keep data owner information. Otherwise the concrete
+chunk payloads are inlined. Chunk reference lists are deleted after
+embedding in the graph to avoid leaking memory. <code class="docutils literal notranslate"><span class="pre">is_preparation</span></code> skips
+storing payload refs entirely so analytics can inspect shapes/chunks
+without materialising data.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -529,7 +568,8 @@ it initializes the array dimensions and dtype.</p>
 <li><p><strong>dtype</strong> (<em>np.dtype</em>) – The numpy dtype of the chunk.</p></li>
 <li><p><strong>position</strong> (<em>tuple</em><em>[</em><em>int</em><em>, </em><em>...</em><em>]</em>) – The position of the chunk in the array decomposition.</p></li>
 <li><p><strong>size</strong> (<em>tuple</em><em>[</em><em>int</em><em>, </em><em>...</em><em>]</em>) – The size of the chunk along each dimension.</p></li>
-<li><p><strong>scheduling_actor_id</strong> (<em>int</em>) – The ID of the scheduling actor that owns this chunk.</p></li>
+<li><p><strong>node_actor_id</strong> (<em>int</em>) – Scheduling actor that owns this chunk.</p></li>
+<li><p><strong>bridge_id</strong> (<em>int</em>) – Bridge identifier that produced the chunk (used for lookups).</p></li>
 </ul>
 </dd>
 <dt class="field-even">Raises<span class="colon">:</span></dt>
@@ -547,13 +587,12 @@ it initializes the array dimensions and dtype.</p>
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">deisa.ray.types.</span></span><span class="sig-name descname"><span class="pre">GraphInfo</span></span><a class="reference internal" href="_modules/deisa/ray/types.html#GraphInfo"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#deisa.ray.types.GraphInfo" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
 <p>Information about graphs and their scheduling.</p>
-<p>This class tracks the state and results of a Dask task graph that is
-being scheduled by a scheduling actor.</p>
+<p>Tracks scheduling status and produced references for a Dask task graph
+scheduled by a <code class="xref py py-class docutils literal notranslate"><span class="pre">SchedulingActor</span></code>.</p>
 <dl class="py attribute">
 <dt class="sig sig-object py" id="deisa.ray.types.GraphInfo.scheduled_event">
 <span class="sig-name descname"><span class="pre">scheduled_event</span></span><a class="headerlink" href="#deisa.ray.types.GraphInfo.scheduled_event" title="Link to this definition">¶</a></dt>
-<dd><p>Event that is set when the graph has been scheduled and all tasks
-have been submitted.</p>
+<dd><p>Event set once the graph has been submitted to Ray.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Type<span class="colon">:</span></dt>
 <dd class="field-odd"><p>asyncio.Event</p>
@@ -564,8 +603,8 @@ have been submitted.</p>
 <dl class="py attribute">
 <dt class="sig sig-object py" id="deisa.ray.types.GraphInfo.refs">
 <span class="sig-name descname"><span class="pre">refs</span></span><a class="headerlink" href="#deisa.ray.types.GraphInfo.refs" title="Link to this definition">¶</a></dt>
-<dd><p>Dictionary mapping task keys to their Ray object references. These
-references point to the results of the scheduled tasks.</p>
+<dd><p>Mapping from task key to the <em>double</em> Ray ObjectRef returned by the
+patched Dask-on-Ray scheduler.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Type<span class="colon">:</span></dt>
 <dd class="field-odd"><p>dict[str, ray.ObjectRef]</p>
@@ -573,10 +612,6 @@ references point to the results of the scheduled tasks.</p>
 </dl>
 </dd></dl>
 
-<p class="rubric">Notes</p>
-<p>This class is used internally by SchedulingActor to track the progress
-of graph scheduling and store the resulting object references for later
-retrieval.</p>
 </dd></dl>
 
 <dl class="py class">
@@ -584,48 +619,55 @@ retrieval.</p>
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">deisa.ray.types.</span></span><span class="sig-name descname"><span class="pre">PartialArray</span></span><a class="reference internal" href="_modules/deisa/ray/types.html#PartialArray"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#deisa.ray.types.PartialArray" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
 <p>Internal class tracking metadata and chunks for an array.</p>
-<p>This class manages the registration state and chunk ownership information
-for a specific array within a scheduling actor.</p>
+<p>Maintains metadata for a single array on one scheduling actor, including
+the set of locally owned chunks and per-timestep chunk collections.</p>
 <dl class="py attribute">
-<dt class="sig sig-object py" id="deisa.ray.types.PartialArray.is_registered">
-<span class="sig-name descname"><span class="pre">is_registered</span></span><a class="headerlink" href="#deisa.ray.types.PartialArray.is_registered" title="Link to this definition">¶</a></dt>
-<dd><p>Indicates whether the <cite>set_owned_chunks</cite> method has been called
-for this array, registering it with the head node.</p>
+<dt class="sig sig-object py" id="deisa.ray.types.PartialArray.ready_event">
+<span class="sig-name descname"><span class="pre">ready_event</span></span><a class="headerlink" href="#deisa.ray.types.PartialArray.ready_event" title="Link to this definition">¶</a></dt>
+<dd><p>Set once all local bridges have provided metadata for the array and
+the head actor has been notified.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>bool</p>
+<dd class="field-odd"><p>asyncio.Event</p>
 </dd>
 </dl>
 </dd></dl>
 
 <dl class="py attribute">
-<dt class="sig sig-object py" id="deisa.ray.types.PartialArray.owned_chunks">
-<span class="sig-name descname"><span class="pre">owned_chunks</span></span><a class="headerlink" href="#deisa.ray.types.PartialArray.owned_chunks" title="Link to this definition">¶</a></dt>
-<dd><p>Set of tuples, each containing (chunk_position, chunk_size) for
-chunks owned by this actor for this array.</p>
+<dt class="sig sig-object py" id="deisa.ray.types.PartialArray.chunks_contained_meta">
+<span class="sig-name descname"><span class="pre">chunks_contained_meta</span></span><a class="headerlink" href="#deisa.ray.types.PartialArray.chunks_contained_meta" title="Link to this definition">¶</a></dt>
+<dd><p>Metadata tuples <code class="docutils literal notranslate"><span class="pre">(bridge_id,</span> <span class="pre">chunk_position,</span> <span class="pre">chunk_size)</span></code> for the
+chunks owned by this actor.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>set[tuple[tuple[int, …], tuple[int, …]]]</p>
+<dd class="field-odd"><p>set[tuple[int, tuple[int, …], tuple[int, …]]]</p>
 </dd>
 </dl>
 </dd></dl>
 
 <dl class="py attribute">
-<dt class="sig sig-object py" id="deisa.ray.types.PartialArray.timesteps">
-<span class="sig-name descname"><span class="pre">timesteps</span></span><a class="headerlink" href="#deisa.ray.types.PartialArray.timesteps" title="Link to this definition">¶</a></dt>
-<dd><p>Dictionary mapping timesteps to their _ArrayTimestep objects,
-which track the chunks for each timestep.</p>
+<dt class="sig sig-object py" id="deisa.ray.types.PartialArray.bid_to_pos">
+<span class="sig-name descname"><span class="pre">bid_to_pos</span></span><a class="headerlink" href="#deisa.ray.types.PartialArray.bid_to_pos" title="Link to this definition">¶</a></dt>
+<dd><p>Maps <code class="docutils literal notranslate"><span class="pre">bridge_id</span></code> to the corresponding chunk position for quick
+lookup when forwarding payloads.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>AsyncDict[Timestep, _ArrayTimestep]</p>
+<dd class="field-odd"><p>dict[int, tuple]</p>
 </dd>
 </dl>
 </dd></dl>
 
-<p class="rubric">Notes</p>
-<p>This is an internal class used by SchedulingActor to track array state
-and chunk ownership. Each array is registered once with the head node
-when the first timestep’s chunks are ready.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="deisa.ray.types.PartialArray.per_timestep_arrays">
+<span class="sig-name descname"><span class="pre">per_timestep_arrays</span></span><a class="headerlink" href="#deisa.ray.types.PartialArray.per_timestep_arrays" title="Link to this definition">¶</a></dt>
+<dd><p>Per-timestep structures that hold chunk references as they arrive.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>AsyncDict[Timestep, <a class="reference internal" href="#deisa.ray.types.ArrayPerTimestep" title="deisa.ray.types.ArrayPerTimestep">ArrayPerTimestep</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
 </dd></dl>
 
 <dl class="py class">
@@ -770,15 +812,18 @@ function (no preprocessing).</p></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#deisa.ray.types.DaskArrayData"><code class="docutils literal notranslate"><span class="pre">DaskArrayData</span></code></a><ul>
-<li><a class="reference internal" href="#deisa.ray.types.DaskArrayData.definition"><code class="docutils literal notranslate"><span class="pre">DaskArrayData.definition</span></code></a></li>
+<li><a class="reference internal" href="#deisa.ray.types.DaskArrayData.name"><code class="docutils literal notranslate"><span class="pre">DaskArrayData.name</span></code></a></li>
+<li><a class="reference internal" href="#deisa.ray.types.DaskArrayData.f_preprocessing"><code class="docutils literal notranslate"><span class="pre">DaskArrayData.f_preprocessing</span></code></a></li>
 <li><a class="reference internal" href="#deisa.ray.types.DaskArrayData.fully_defined"><code class="docutils literal notranslate"><span class="pre">DaskArrayData.fully_defined</span></code></a></li>
 <li><a class="reference internal" href="#deisa.ray.types.DaskArrayData.nb_chunks_per_dim"><code class="docutils literal notranslate"><span class="pre">DaskArrayData.nb_chunks_per_dim</span></code></a></li>
 <li><a class="reference internal" href="#deisa.ray.types.DaskArrayData.nb_chunks"><code class="docutils literal notranslate"><span class="pre">DaskArrayData.nb_chunks</span></code></a></li>
 <li><a class="reference internal" href="#deisa.ray.types.DaskArrayData.chunks_size"><code class="docutils literal notranslate"><span class="pre">DaskArrayData.chunks_size</span></code></a></li>
 <li><a class="reference internal" href="#deisa.ray.types.DaskArrayData.dtype"><code class="docutils literal notranslate"><span class="pre">DaskArrayData.dtype</span></code></a></li>
-<li><a class="reference internal" href="#deisa.ray.types.DaskArrayData.scheduling_actors_id"><code class="docutils literal notranslate"><span class="pre">DaskArrayData.scheduling_actors_id</span></code></a></li>
+<li><a class="reference internal" href="#deisa.ray.types.DaskArrayData.position_to_node_actorID"><code class="docutils literal notranslate"><span class="pre">DaskArrayData.position_to_node_actorID</span></code></a></li>
+<li><a class="reference internal" href="#deisa.ray.types.DaskArrayData.position_to_bridgeID"><code class="docutils literal notranslate"><span class="pre">DaskArrayData.position_to_bridgeID</span></code></a></li>
 <li><a class="reference internal" href="#deisa.ray.types.DaskArrayData.nb_scheduling_actors"><code class="docutils literal notranslate"><span class="pre">DaskArrayData.nb_scheduling_actors</span></code></a></li>
 <li><a class="reference internal" href="#deisa.ray.types.DaskArrayData.chunk_refs"><code class="docutils literal notranslate"><span class="pre">DaskArrayData.chunk_refs</span></code></a></li>
+<li><a class="reference internal" href="#deisa.ray.types.DaskArrayData.pos_to_ref_by_timestep"><code class="docutils literal notranslate"><span class="pre">DaskArrayData.pos_to_ref_by_timestep</span></code></a></li>
 <li><a class="reference internal" href="#deisa.ray.types.DaskArrayData.add_chunk_ref"><code class="docutils literal notranslate"><span class="pre">DaskArrayData.add_chunk_ref()</span></code></a></li>
 <li><a class="reference internal" href="#deisa.ray.types.DaskArrayData.get_full_array"><code class="docutils literal notranslate"><span class="pre">DaskArrayData.get_full_array()</span></code></a></li>
 <li><a class="reference internal" href="#deisa.ray.types.DaskArrayData.update_meta"><code class="docutils literal notranslate"><span class="pre">DaskArrayData.update_meta()</span></code></a></li>
@@ -790,9 +835,10 @@ function (no preprocessing).</p></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#deisa.ray.types.PartialArray"><code class="docutils literal notranslate"><span class="pre">PartialArray</span></code></a><ul>
-<li><a class="reference internal" href="#deisa.ray.types.PartialArray.is_registered"><code class="docutils literal notranslate"><span class="pre">PartialArray.is_registered</span></code></a></li>
-<li><a class="reference internal" href="#deisa.ray.types.PartialArray.owned_chunks"><code class="docutils literal notranslate"><span class="pre">PartialArray.owned_chunks</span></code></a></li>
-<li><a class="reference internal" href="#deisa.ray.types.PartialArray.timesteps"><code class="docutils literal notranslate"><span class="pre">PartialArray.timesteps</span></code></a></li>
+<li><a class="reference internal" href="#deisa.ray.types.PartialArray.ready_event"><code class="docutils literal notranslate"><span class="pre">PartialArray.ready_event</span></code></a></li>
+<li><a class="reference internal" href="#deisa.ray.types.PartialArray.chunks_contained_meta"><code class="docutils literal notranslate"><span class="pre">PartialArray.chunks_contained_meta</span></code></a></li>
+<li><a class="reference internal" href="#deisa.ray.types.PartialArray.bid_to_pos"><code class="docutils literal notranslate"><span class="pre">PartialArray.bid_to_pos</span></code></a></li>
+<li><a class="reference internal" href="#deisa.ray.types.PartialArray.per_timestep_arrays"><code class="docutils literal notranslate"><span class="pre">PartialArray.per_timestep_arrays</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#deisa.ray.types.ScheduledByOtherActor"><code class="docutils literal notranslate"><span class="pre">ScheduledByOtherActor</span></code></a><ul>

@@ -5,7 +5,7 @@
     <meta name="color-scheme" content="light dark"><link rel="index" title="Index" href="../../../genindex.html"><link rel="search" title="Search" href="../../../search.html">
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.09.25 -->
-        <title>deisa.ray.window_api - deisa-ray documentation</title>
+        <title>deisa.ray.window_handler - deisa-ray documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=d111a655" />
     <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo.css?v=580074bf" />
     <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -197,13 +197,14 @@
 <ul>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../../../deisa.ray.html">deisa.ray package</a><input aria-label="Toggle navigation of deisa.ray package" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.bridge.html">deisa.ray.bridge module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.config.html">deisa.ray.config module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.errors.html">deisa.ray.errors module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.head_node.html">deisa.ray.head_node module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.ray_patch.html">deisa.ray.ray_patch module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.scheduling_actor.html">deisa.ray.scheduling_actor module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.types.html">deisa.ray.types module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.utils.html">deisa.ray.utils module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.window_api.html">deisa.ray.window_api module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.window_handler.html">deisa.ray.window_handler module</a></li>
 </ul>
 </li>
 </ul>
@@ -238,18 +239,20 @@
           </label>
         </div>
         <article role="main" id="furo-main-content">
-          <h1>Source code for deisa.ray.window_api</h1><div class="highlight"><pre>
+          <h1>Source code for deisa.ray.window_handler</h1><div class="highlight"><pre>
 <span></span><span class="kn">import</span><span class="w"> </span><span class="nn">gc</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Hashable</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Hashable</span><span class="p">,</span> <span class="n">Optional</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">dask</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">dask.array</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">da</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">ray.util.dask</span><span class="w"> </span><span class="kn">import</span> <span class="n">ray_dask_get</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">ray</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray._scheduler</span><span class="w"> </span><span class="kn">import</span> <span class="n">deisa_ray_get</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.head_node</span><span class="w"> </span><span class="kn">import</span> <span class="n">HeadNodeActor</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_head_actor_options</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">WindowArrayDefinition</span><span class="p">,</span> <span class="n">_CallbackConfig</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">ActorID</span><span class="p">,</span> <span class="n">RayActorHandle</span><span class="p">,</span> <span class="n">WindowArrayDefinition</span><span class="p">,</span> <span class="n">_CallbackConfig</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.config</span><span class="w"> </span><span class="kn">import</span> <span class="n">config</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
 
 
@@ -288,96 +291,95 @@
 
 
 <div class="viewcode-block" id="Deisa">
-<a class="viewcode-back" href="../../../deisa.ray.window_api.html#deisa.ray.window_api.Deisa">[docs]</a>
+<a class="viewcode-back" href="../../../deisa.ray.window_handler.html#deisa.ray.window_handler.Deisa">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">Deisa</span><span class="p">:</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
-    <span class="p">):</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">ray_start</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[],</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">handshake</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="s2">&quot;Deisa&quot;</span><span class="p">],</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># cheap constructor: no Ray side effects</span>
+        <span class="n">config</span><span class="o">.</span><span class="n">lock</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_experimental_distributed_scheduling_enabled</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">experimental_distributed_scheduling_enabled</span>
+
+        <span class="c1"># Do NOT mutate global config here if you want cheap unit tests;</span>
+        <span class="c1"># do it when connecting, or inject it similarly.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_ray_start</span> <span class="o">=</span> <span class="n">ray_start</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ray_start_impl</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_handshake</span> <span class="o">=</span> <span class="n">handshake</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_handshake_impl</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_connected</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">node_actors</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">ActorID</span><span class="p">,</span> <span class="n">RayActorHandle</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">registered_callbacks</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">_CallbackConfig</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_handshake_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">_</span><span class="p">:</span> <span class="s2">&quot;Deisa&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Initialize Ray and configure Dask to use the Deisa-Ray scheduler.</span>
+<span class="sd">        Implementation for handshake between window handler (Deisa) and the Simulation side Bridges.</span>
 
-<span class="sd">        This function initializes Ray if it hasn&#39;t been initialized yet, and</span>
-<span class="sd">        configures Dask to use the Deisa-Ray custom scheduler with task-based</span>
-<span class="sd">        shuffling.</span>
+<span class="sd">        The handshake occurs when all the expected Ray Node Actors are connected.</span>
 
-<span class="sd">        Notes</span>
-<span class="sd">        -----</span>
-<span class="sd">        Ray is initialized with automatic address detection, logging to driver</span>
-<span class="sd">        disabled, and error-level logging. Dask is configured to use the</span>
-<span class="sd">        `deisa_ray_get` scheduler with task-based shuffling.</span>
+<span class="sd">        :param self: Description</span>
+<span class="sd">        :param _: Description</span>
+<span class="sd">        :type _: &quot;Deisa&quot;</span>
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># TODO finish and add this config option to Deisa</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">total_nodes</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">ray.util.state</span><span class="w"> </span><span class="kn">import</span> <span class="n">list_actors</span>
+
+        <span class="n">expected_ray_actors</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">total_nodes</span>
+        <span class="n">connected_actors</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">while</span> <span class="n">connected_actors</span> <span class="o">&lt;</span> <span class="n">expected_ray_actors</span><span class="p">:</span>
+            <span class="n">connected_actors</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">list_actors</span><span class="p">(</span><span class="n">filters</span><span class="o">=</span><span class="p">[(</span><span class="s2">&quot;state&quot;</span><span class="p">,</span> <span class="s2">&quot;=&quot;</span><span class="p">,</span> <span class="s2">&quot;ALIVE&quot;</span><span class="p">)]):</span>
+                <span class="k">if</span> <span class="n">a</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ray_namespace&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;deisa_ray&quot;</span><span class="p">:</span>
+                    <span class="n">connected_actors</span> <span class="o">+=</span> <span class="mi">1</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_ensure_connected</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Ensures that the widow handler has connected to the Ray Cluster.</span>
+
+<span class="sd">        This function connects to ray, creates a head_actor, and waits until a</span>
+<span class="sd">        handshake occurs, which happens when all node actors have connected to</span>
+<span class="sd">        the cluster. It also changes the dask on ray scheduler based on whether the</span>
+<span class="sd">        user wants to set centralized scheduling or not.</span>
+
+<span class="sd">        :param self: Description</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_connected</span><span class="p">:</span>
+            <span class="k">return</span>
+
+        <span class="c1"># Side effects begin here (only once)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_ray_start</span><span class="p">()</span>
+
+        <span class="c1"># configure dask here if it must reflect actual cluster runtime</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_experimental_distributed_scheduling_enabled</span><span class="p">:</span>
+            <span class="n">dask</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">scheduler</span><span class="o">=</span><span class="n">deisa_ray_get</span><span class="p">,</span> <span class="n">shuffle</span><span class="o">=</span><span class="s2">&quot;tasks&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">dask</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">scheduler</span><span class="o">=</span><span class="n">ray_dask_get</span><span class="p">,</span> <span class="n">shuffle</span><span class="o">=</span><span class="s2">&quot;tasks&quot;</span><span class="p">)</span>
+
+        <span class="c1"># head is created</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_create_head_actor</span><span class="p">()</span>
+        <span class="c1"># readyness gate for head actor - only return when its alive</span>
+        <span class="n">ray</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">head</span><span class="o">.</span><span class="n">exchange_config</span><span class="o">.</span><span class="n">remote</span><span class="p">(</span>
+                <span class="p">{</span><span class="s2">&quot;experimental_distributed_scheduling_enabled&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_experimental_distributed_scheduling_enabled</span><span class="p">}</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_handshake</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_connected</span> <span class="o">=</span> <span class="kc">True</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_create_head_actor</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">head</span> <span class="o">=</span> <span class="n">HeadNodeActor</span><span class="o">.</span><span class="n">options</span><span class="p">(</span><span class="o">**</span><span class="n">get_head_actor_options</span><span class="p">())</span><span class="o">.</span><span class="n">remote</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_ray_start_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">ray</span><span class="o">.</span><span class="n">is_initialized</span><span class="p">():</span>
             <span class="n">ray</span><span class="o">.</span><span class="n">init</span><span class="p">(</span><span class="n">address</span><span class="o">=</span><span class="s2">&quot;auto&quot;</span><span class="p">,</span> <span class="n">log_to_driver</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">logging_level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">ERROR</span><span class="p">)</span>
 
-        <span class="n">dask</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">scheduler</span><span class="o">=</span><span class="n">deisa_ray_get</span><span class="p">,</span> <span class="n">shuffle</span><span class="o">=</span><span class="s2">&quot;tasks&quot;</span><span class="p">)</span>
-        <span class="c1"># create HeadNodeActor that coordinates everything.</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">head</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="n">HeadNodeActor</span><span class="o">.</span><span class="n">options</span><span class="p">(</span><span class="o">**</span><span class="n">get_head_actor_options</span><span class="p">())</span><span class="o">.</span><span class="n">remote</span><span class="p">()</span>
-        <span class="c1"># store all node actors</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">node_actors</span> <span class="o">=</span> <span class="p">{}</span>
-        <span class="c1"># store registered callbacks from user analytics</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">registered_callbacks</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">_CallbackConfig</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
-
-    <span class="c1"># TODO add persist</span>
-<div class="viewcode-block" id="Deisa.set">
-<a class="viewcode-back" href="../../../deisa.ray.window_api.html#deisa.ray.window_api.Deisa.set">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">set</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="n">Hashable</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">chunked</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Broadcast a feedback value to all node actors.</span>
-
-<span class="sd">        Parameters</span>
-<span class="sd">        ----------</span>
-<span class="sd">        key : Hashable</span>
-<span class="sd">            Identifier for the shared value.</span>
-<span class="sd">        value : Any</span>
-<span class="sd">            Value to distribute.</span>
-<span class="sd">        chunked : bool, optional</span>
-<span class="sd">            Placeholder for future distributed-array feedback. Only ``False``</span>
-<span class="sd">            is supported today. Default is ``False``.</span>
-
-<span class="sd">        Notes</span>
-<span class="sd">        -----</span>
-<span class="sd">        The method lazily fetches node actors once and uses fire-and-forget</span>
-<span class="sd">        remote calls; callers should not assume synchronous delivery.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="c1"># TODO test</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">node_actors</span><span class="p">:</span>
-            <span class="c1"># retrieve node actors at least once</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">node_actors</span> <span class="o">=</span> <span class="n">ray</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">head</span><span class="o">.</span><span class="n">list_scheduling_actors</span><span class="o">.</span><span class="n">remote</span><span class="p">())</span>
-
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">chunked</span><span class="p">:</span>
-            <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">handle</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">node_actors</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-                <span class="c1"># set the value inside each node actor</span>
-                <span class="c1"># TODO: does it need to be blocking?</span>
-                <span class="n">handle</span><span class="o">.</span><span class="n">set</span><span class="o">.</span><span class="n">remote</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">chunked</span><span class="p">)</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="c1"># TODO: implement chunked version</span>
-            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span></div>
-
-
-<div class="viewcode-block" id="Deisa.unregister_callback">
-<a class="viewcode-back" href="../../../deisa.ray.window_api.html#deisa.ray.window_api.Deisa.unregister_callback">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">unregister_callback</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span>
-        <span class="n">simulation_callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Unregister a previously registered simulation callback.</span>
-
-<span class="sd">        Parameters</span>
-<span class="sd">        ----------</span>
-<span class="sd">        simulation_callback : Callable</span>
-<span class="sd">            Callback to remove from the registry.</span>
-
-<span class="sd">        Raises</span>
-<span class="sd">        ------</span>
-<span class="sd">        NotImplementedError</span>
-<span class="sd">            Always, as the feature has not been implemented yet.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;method not yet implemented.&quot;</span><span class="p">)</span></div>
-
-
 <div class="viewcode-block" id="Deisa.register_callback">
-<a class="viewcode-back" href="../../../deisa.ray.window_api.html#deisa.ray.window_api.Deisa.register_callback">[docs]</a>
+<a class="viewcode-back" href="../../../deisa.ray.window_handler.html#deisa.ray.window_handler.Deisa.register_callback">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">register_callback</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">simulation_callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
@@ -407,6 +409,7 @@
 <span class="sd">            How many iterations ahead to prepare when ``prepare_iteration``</span>
 <span class="sd">            is provided. Default is 3.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_ensure_connected</span><span class="p">()</span>  <span class="c1"># connect + handshake before accepting callbacks</span>
         <span class="n">cfg</span> <span class="o">=</span> <span class="n">_CallbackConfig</span><span class="p">(</span>
             <span class="n">simulation_callback</span><span class="o">=</span><span class="n">simulation_callback</span><span class="p">,</span>
             <span class="n">arrays_description</span><span class="o">=</span><span class="n">arrays_description</span><span class="p">,</span>
@@ -417,8 +420,31 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">registered_callbacks</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">cfg</span><span class="p">)</span></div>
 
 
+<div class="viewcode-block" id="Deisa.unregister_callback">
+<a class="viewcode-back" href="../../../deisa.ray.window_handler.html#deisa.ray.window_handler.Deisa.unregister_callback">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">unregister_callback</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">simulation_callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Unregister a previously registered simulation callback.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        simulation_callback : Callable</span>
+<span class="sd">            Callback to remove from the registry.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        NotImplementedError</span>
+<span class="sd">            Always, as the feature has not been implemented yet.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;method not yet implemented.&quot;</span><span class="p">)</span></div>
+
+
+    <span class="c1"># TODO: introduce a method that will generate the final array spec for each registered array</span>
 <div class="viewcode-block" id="Deisa.execute_callbacks">
-<a class="viewcode-back" href="../../../deisa.ray.window_api.html#deisa.ray.window_api.Deisa.execute_callbacks">[docs]</a>
+<a class="viewcode-back" href="../../../deisa.ray.window_handler.html#deisa.ray.window_handler.Deisa.execute_callbacks">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">execute_callbacks</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
@@ -431,8 +457,10 @@
 <span class="sd">        retrieval from the head actor, optional preparation tasks, windowed</span>
 <span class="sd">        array delivery, and garbage collection between iterations.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_ensure_connected</span><span class="p">()</span>
+
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">registered_callbacks</span><span class="p">:</span>
-            <span class="k">return</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Please register at least one callback before calling execute_callbacks()&quot;</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">registered_callbacks</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
@@ -521,6 +549,43 @@
             <span class="c1"># Python may otherwise choose to keep it in memory for some time, preventing the</span>
             <span class="c1"># actual data to be freed.</span>
             <span class="n">gc</span><span class="o">.</span><span class="n">collect</span><span class="p">()</span></div>
+
+
+    <span class="c1"># TODO add persist</span>
+<div class="viewcode-block" id="Deisa.set">
+<a class="viewcode-back" href="../../../deisa.ray.window_handler.html#deisa.ray.window_handler.Deisa.set">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="n">Hashable</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">chunked</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Broadcast a feedback value to all node actors.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        key : Hashable</span>
+<span class="sd">            Identifier for the shared value.</span>
+<span class="sd">        value : Any</span>
+<span class="sd">            Value to distribute.</span>
+<span class="sd">        chunked : bool, optional</span>
+<span class="sd">            Placeholder for future distributed-array feedback. Only ``False``</span>
+<span class="sd">            is supported today. Default is ``False``.</span>
+
+<span class="sd">        Notes</span>
+<span class="sd">        -----</span>
+<span class="sd">        The method lazily fetches node actors once and uses fire-and-forget</span>
+<span class="sd">        remote calls; callers should not assume synchronous delivery.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># TODO test</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">node_actors</span><span class="p">:</span>
+            <span class="c1"># retrieve node actors at least once</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">node_actors</span> <span class="o">=</span> <span class="n">ray</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">head</span><span class="o">.</span><span class="n">list_scheduling_actors</span><span class="o">.</span><span class="n">remote</span><span class="p">())</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">chunked</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">handle</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">node_actors</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="c1"># set the value inside each node actor</span>
+                <span class="c1"># TODO: does it need to be blocking?</span>
+                <span class="n">handle</span><span class="o">.</span><span class="n">set</span><span class="o">.</span><span class="n">remote</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">chunked</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># TODO: implement chunked version</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span></div>
 </div>
 
 </pre></div>

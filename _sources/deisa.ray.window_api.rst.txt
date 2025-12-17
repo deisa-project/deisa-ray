@@ -1,7 +1,0 @@
-deisa.ray.window\_api module
-============================
-
-.. automodule:: deisa.ray.window_api
-   :members:
-   :show-inheritance:
-   :undoc-members:

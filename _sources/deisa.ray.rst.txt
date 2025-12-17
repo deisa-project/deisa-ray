@@ -8,13 +8,14 @@ Submodules
    :maxdepth: 4
 
    deisa.ray.bridge
+   deisa.ray.config
    deisa.ray.errors
    deisa.ray.head_node
    deisa.ray.ray_patch
    deisa.ray.scheduling_actor
    deisa.ray.types
    deisa.ray.utils
-   deisa.ray.window_api
+   deisa.ray.window_handler
 
 Module contents
 ---------------

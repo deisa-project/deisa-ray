@@ -5,7 +5,7 @@
     <meta name="color-scheme" content="light dark"><link rel="index" title="Index" href="../../../genindex.html"><link rel="search" title="Search" href="../../../search.html">
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.09.25 -->
-        <title>deisa.ray.utils - deisa-ray documentation</title>
+        <title>deisa.ray.config - deisa-ray documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=d111a655" />
     <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo.css?v=580074bf" />
     <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -239,155 +239,113 @@
           </label>
         </div>
         <article role="main" id="furo-main-content">
-          <h1>Source code for deisa.ray.utils</h1><div class="highlight"><pre>
-<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Dict</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">ray.util.scheduling_strategies</span><span class="w"> </span><span class="kn">import</span> <span class="n">NodeAffinitySchedulingStrategy</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">ray</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">random</span>
+          <h1>Source code for deisa.ray.config</h1><div class="highlight"><pre>
+<span></span><span class="c1"># deisa/config.py</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.errors</span><span class="w"> </span><span class="kn">import</span> <span class="n">ConfigError</span>
 
 
-<div class="viewcode-block" id="get_system_metadata">
-<a class="viewcode-back" href="../../../deisa.ray.utils.html#deisa.ray.utils.get_system_metadata">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">get_system_metadata</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">:</span>
+<div class="viewcode-block" id="Config">
+<a class="viewcode-back" href="../../../deisa.ray.config.html#deisa.ray.config.Config">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Config</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Return system-level metadata placeholder.</span>
+<span class="sd">    Process-wide configuration for the deisa library.</span>
 
-<span class="sd">    Notes</span>
-<span class="sd">    -----</span>
-<span class="sd">    Currently returns an empty dictionary; the hook exists to keep backward</span>
-<span class="sd">    compatibility with callers expecting environment metadata.</span>
+<span class="sd">    Mutable until locked. Instantiating Deisa() locks configuration to prevent</span>
+<span class="sd">    mid-run behavior changes.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">return</span> <span class="p">{}</span></div>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialise configuration defaults (all features disabled and unlocked).&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_locked</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_enable_experimental_distributed_scheduling</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">experimental_distributed_scheduling_enabled</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Read-only accessor for the experimental distributed scheduling flag.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        bool</span>
+<span class="sd">            ``True`` when distributed scheduling is enabled, ``False`` otherwise.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_enable_experimental_distributed_scheduling</span>
+
+<div class="viewcode-block" id="Config.enable_experimental_distributed_scheduling">
+<a class="viewcode-back" href="../../../deisa.ray.config.html#deisa.ray.config.Config.enable_experimental_distributed_scheduling">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">enable_experimental_distributed_scheduling</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">enabled</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Enable/disable experimental distributed scheduling.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        enabled : bool, optional</span>
+<span class="sd">            Desired state of the flag. Defaults to ``True``.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        ConfigError</span>
+<span class="sd">            If configuration has already been locked by instantiating ``Deisa``.</span>
+<span class="sd">        TypeError</span>
+<span class="sd">            If ``enabled`` is not a boolean.</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        &gt;&gt;&gt; deisa.config.enable_experimental_distributed_scheduling()      # enable</span>
+<span class="sd">        &gt;&gt;&gt; deisa.config.enable_experimental_distributed_scheduling(False) # disable</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_locked</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">ConfigError</span><span class="p">(</span>
+                <span class="s2">&quot;deisa.config is locked because Deisa() has already been instantiated. &quot;</span>
+                <span class="s2">&quot;Set configuration before creating a Deisa instance.&quot;</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">enabled</span><span class="p">,</span> <span class="nb">bool</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;enabled must be a bool&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_enable_experimental_distributed_scheduling</span> <span class="o">=</span> <span class="n">enabled</span></div>
+
+
+<div class="viewcode-block" id="Config.lock">
+<a class="viewcode-back" href="../../../deisa.ray.config.html#deisa.ray.config.Config.lock">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">lock</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Make configuration immutable for the remainder of the process.</span>
+
+<span class="sd">        Notes</span>
+<span class="sd">        -----</span>
+<span class="sd">        Called automatically when ``Deisa()`` is instantiated. Further</span>
+<span class="sd">        mutation attempts will raise :class:`ConfigError`.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_locked</span> <span class="o">=</span> <span class="kc">True</span></div>
+
+
+<div class="viewcode-block" id="Config.is_locked">
+<a class="viewcode-back" href="../../../deisa.ray.config.html#deisa.ray.config.Config.is_locked">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_locked</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Report whether the configuration has been locked.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        bool</span>
+<span class="sd">            ``True`` if :meth:`lock` has been called, otherwise ``False``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_locked</span></div>
+
+
+    <span class="c1"># ---- Test support (explicitly non-public) ----</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_reset_for_tests</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Reset config to defaults and unlock it.</span>
+
+<span class="sd">        Intended for unit tests only. Do not rely on this in production.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_locked</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_enable_experimental_distributed_scheduling</span> <span class="o">=</span> <span class="kc">False</span></div>
 
 
 
-<div class="viewcode-block" id="get_ready_actor_with_retry">
-<a class="viewcode-back" href="../../../deisa.ray.utils.html#deisa.ray.utils.get_ready_actor_with_retry">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">get_ready_actor_with_retry</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">namespace</span><span class="p">,</span> <span class="n">deadline_s</span><span class="o">=</span><span class="mi">180</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Get a Ray actor by name with retry logic and readiness check.</span>
-
-<span class="sd">    This function attempts to retrieve a Ray actor by name and namespace,</span>
-<span class="sd">    checking that it is ready before returning. It implements exponential</span>
-<span class="sd">    backoff retry logic with a deadline.</span>
-
-<span class="sd">    Parameters</span>
-<span class="sd">    ----------</span>
-<span class="sd">    name : str</span>
-<span class="sd">        The name of the actor to retrieve.</span>
-<span class="sd">    namespace : str</span>
-<span class="sd">        The namespace of the actor.</span>
-<span class="sd">    deadline_s : float, optional</span>
-<span class="sd">        Maximum time in seconds to wait for the actor to become available.</span>
-<span class="sd">        Default is 180.</span>
-
-<span class="sd">    Returns</span>
-<span class="sd">    -------</span>
-<span class="sd">    RayActorHandle</span>
-<span class="sd">        The handle to the ready actor.</span>
-
-<span class="sd">    Raises</span>
-<span class="sd">    ------</span>
-<span class="sd">    TimeoutError</span>
-<span class="sd">        If the actor is not found or not ready within the deadline.</span>
-
-<span class="sd">    Notes</span>
-<span class="sd">    -----</span>
-<span class="sd">    The function uses exponential backoff with jitter for retries. The delay</span>
-<span class="sd">    starts at 0.2 seconds and increases by a factor of 1.5 up to a maximum</span>
-<span class="sd">    of 5.0 seconds. A small random jitter (0-0.1 seconds) is added to avoid</span>
-<span class="sd">    thundering herd problems.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">start</span><span class="p">,</span> <span class="n">delay</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">(),</span> <span class="mf">0.2</span>
-    <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
-        <span class="k">try</span><span class="p">:</span>
-            <span class="n">actor</span> <span class="o">=</span> <span class="n">ray</span><span class="o">.</span><span class="n">get_actor</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">namespace</span><span class="o">=</span><span class="n">namespace</span><span class="p">)</span>
-            <span class="c1"># ready gate</span>
-            <span class="c1"># TODO for even more reliability, in the future we should handle</span>
-            <span class="c1"># actor exists, but unavailable</span>
-            <span class="c1"># actor exists, crashed, need to recreate</span>
-            <span class="n">ray</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">actor</span><span class="o">.</span><span class="n">ready</span><span class="o">.</span><span class="n">remote</span><span class="p">())</span>
-            <span class="k">return</span> <span class="n">actor</span>
-        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span> <span class="o">&gt;</span> <span class="n">deadline_s</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">TimeoutError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">namespace</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> not found in </span><span class="si">{</span><span class="n">deadline_s</span><span class="si">}</span><span class="s2">s&quot;</span><span class="p">)</span>
-            <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="n">delay</span> <span class="o">+</span> <span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">()</span> <span class="o">*</span> <span class="mf">0.1</span><span class="p">)</span>
-            <span class="n">delay</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">delay</span> <span class="o">*</span> <span class="mf">1.5</span><span class="p">,</span> <span class="mf">5.0</span><span class="p">)</span></div>
-
-
-
-<div class="viewcode-block" id="get_head_node_id">
-<a class="viewcode-back" href="../../../deisa.ray.utils.html#deisa.ray.utils.get_head_node_id">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">get_head_node_id</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Get the node ID of the Ray cluster head node.</span>
-
-<span class="sd">    Returns</span>
-<span class="sd">    -------</span>
-<span class="sd">    str</span>
-<span class="sd">        The node ID of the head node.</span>
-
-<span class="sd">    Raises</span>
-<span class="sd">    ------</span>
-<span class="sd">    AssertionError</span>
-<span class="sd">        If there is not exactly one head node in the cluster.</span>
-
-<span class="sd">    Notes</span>
-<span class="sd">    -----</span>
-<span class="sd">    This function queries Ray&#39;s state API to find the head node. It assumes</span>
-<span class="sd">    there is exactly one head node in the cluster.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">ray.util</span><span class="w"> </span><span class="kn">import</span> <span class="n">state</span>
-
-    <span class="n">nodes</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">list_nodes</span><span class="p">(</span><span class="n">filters</span><span class="o">=</span><span class="p">[(</span><span class="s2">&quot;is_head_node&quot;</span><span class="p">,</span> <span class="s2">&quot;=&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)])</span>
-
-    <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;There should be exactly one head node&quot;</span>
-
-    <span class="k">return</span> <span class="n">nodes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">node_id</span></div>
-
-
-
-<div class="viewcode-block" id="get_head_actor_options">
-<a class="viewcode-back" href="../../../deisa.ray.utils.html#deisa.ray.utils.get_head_actor_options">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">get_head_actor_options</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Return the options that should be used to start the head actor.</span>
-
-<span class="sd">    Returns</span>
-<span class="sd">    -------</span>
-<span class="sd">    dict</span>
-<span class="sd">        Dictionary of Ray actor options including:</span>
-<span class="sd">        - name: &quot;simulation_head&quot;</span>
-<span class="sd">        - namespace: &quot;deisa_ray&quot;</span>
-<span class="sd">        - scheduling_strategy: NodeAffinitySchedulingStrategy for the head node</span>
-<span class="sd">        - max_concurrency: Very high value to prevent blocking</span>
-<span class="sd">        - lifetime: &quot;detached&quot; to persist beyond function scope</span>
-<span class="sd">        - enable_task_events: False for performance</span>
-
-<span class="sd">    Notes</span>
-<span class="sd">    -----</span>
-<span class="sd">    The head actor is scheduled on the head node with a detached lifetime</span>
-<span class="sd">    to ensure it persists. High concurrency is set to prevent the actor</span>
-<span class="sd">    from being blocked when gathering many references.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span>
-        <span class="c1"># The workers will be able to access to this actor using its name</span>
-        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;simulation_head&quot;</span><span class="p">,</span>
-        <span class="n">namespace</span><span class="o">=</span><span class="s2">&quot;deisa_ray&quot;</span><span class="p">,</span>
-        <span class="c1"># Schedule the actor on this node</span>
-        <span class="n">scheduling_strategy</span><span class="o">=</span><span class="n">NodeAffinitySchedulingStrategy</span><span class="p">(</span>
-            <span class="n">node_id</span><span class="o">=</span><span class="n">get_head_node_id</span><span class="p">(),</span>
-            <span class="n">soft</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-        <span class="p">),</span>
-        <span class="c1"># Prevents the actor from being stuck when it needs to gather many refs</span>
-        <span class="n">max_concurrency</span><span class="o">=</span><span class="mi">1000_000_000</span><span class="p">,</span>
-        <span class="c1"># Prevents the actor from being deleted when the function ends</span>
-        <span class="n">lifetime</span><span class="o">=</span><span class="s2">&quot;detached&quot;</span><span class="p">,</span>
-        <span class="c1"># Disabled for performance reasons</span>
-        <span class="n">enable_task_events</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-    <span class="p">)</span></div>
-
+<span class="n">config</span> <span class="o">=</span> <span class="n">Config</span><span class="p">()</span>
 </pre></div>
         </article>
       </div>

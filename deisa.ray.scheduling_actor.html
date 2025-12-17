@@ -198,13 +198,14 @@
 <ul class="current">
 <li class="toctree-l1 current has-children"><a class="reference internal" href="deisa.ray.html">deisa.ray package</a><input aria-label="Toggle navigation of deisa.ray package" checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.bridge.html">deisa.ray.bridge module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.config.html">deisa.ray.config module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.errors.html">deisa.ray.errors module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.head_node.html">deisa.ray.head_node module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.ray_patch.html">deisa.ray.ray_patch module</a></li>
 <li class="toctree-l2 current current-page"><a class="current reference internal" href="#">deisa.ray.scheduling_actor module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.types.html">deisa.ray.types module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.utils.html">deisa.ray.utils module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="deisa.ray.window_api.html">deisa.ray.window_api module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.window_handler.html">deisa.ray.window_handler module</a></li>
 </ul>
 </li>
 </ul>
@@ -292,7 +293,7 @@ ID.</p>
 <dl class="py attribute">
 <dt class="sig sig-object py" id="deisa.ray.scheduling_actor.NodeActorBase.head">
 <span class="sig-name descname"><span class="pre">head</span></span><a class="headerlink" href="#deisa.ray.scheduling_actor.NodeActorBase.head" title="Link to this definition">¶</a></dt>
-<dd><p>Handle to the <code class="xref py py-class docutils literal notranslate"><span class="pre">SimulationHead</span></code> actor.</p>
+<dd><p>Handle to the head node (<code class="xref py py-class docutils literal notranslate"><span class="pre">HeadNodeActor</span></code>).</p>
 <dl class="field-list simple">
 <dt class="field-odd">Type<span class="colon">:</span></dt>
 <dd class="field-odd"><p>RayActorHandle</p>
@@ -301,13 +302,13 @@ ID.</p>
 </dd></dl>
 
 <dl class="py attribute">
-<dt class="sig sig-object py" id="deisa.ray.scheduling_actor.NodeActorBase.arrays">
-<span class="sig-name descname"><span class="pre">arrays</span></span><a class="headerlink" href="#deisa.ray.scheduling_actor.NodeActorBase.arrays" title="Link to this definition">¶</a></dt>
-<dd><p>Dictionary mapping array names to their <code class="xref py py-class docutils literal notranslate"><span class="pre">Array</span></code> instances,
-which track chunks and timesteps.</p>
+<dt class="sig sig-object py" id="deisa.ray.scheduling_actor.NodeActorBase.partial_arrays">
+<span class="sig-name descname"><span class="pre">partial_arrays</span></span><a class="headerlink" href="#deisa.ray.scheduling_actor.NodeActorBase.partial_arrays" title="Link to this definition">¶</a></dt>
+<dd><p>Per-array containers that capture metadata and chunk references owned
+by this node actor.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>AsyncDict[str, Array]</p>
+<dd class="field-odd"><p>AsyncDict[str, <a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.PartialArray" title="deisa.ray.types.PartialArray">PartialArray</a>]</p>
 </dd>
 </dl>
 </dd></dl>
@@ -329,8 +330,8 @@ analytics and simulation.</p>
 <em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">add_chunk</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bridge_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">array_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chunk_ref</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">ObjectRef</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timestep</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chunked</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">_ray_trace_ctx</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/deisa/ray/scheduling_actor.html#NodeActorBase.add_chunk"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#deisa.ray.scheduling_actor.NodeActorBase.add_chunk" title="Link to this definition">¶</a></dt>
 <dd><p>Add a chunk of data to this node actor.</p>
 <p>This method is called by Bridge instances to send chunks of arrays
-to this node actor. When all chunks from a node are received,
-the actor notifies the head node that chunks are ready.</p>
+to this node actor. When all chunks from a node are received, the
+actor forwards a position-&gt;double-ref mapping to the head node.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
@@ -353,22 +354,19 @@ the current workflow. Default is <code class="docutils literal notranslate"><spa
 </dl>
 <p class="rubric">Notes</p>
 <p>This method manages chunk collection and coordination:
-1. Stores the chunk reference in the local chunks dictionary
-2. Records chunk ownership information
-3. When all chunks from the node are received:</p>
+1. Wraps the single chunk ref in a double ref by calling</p>
 <blockquote>
-<div><ul class="simple">
-<li><p>Registers the array with the head node (first time only)</p></li>
-<li><p>Collects all owned chunks and sends them to the head node</p></li>
-<li><p>Converts chunk references to pickled bytes to free memory</p></li>
-<li><p>Notifies the head node that chunks are ready</p></li>
-</ul>
+<div><p><code class="xref py py-meth docutils literal notranslate"><span class="pre">_pack_object_ref()</span></code> remotely.</p>
 </div></blockquote>
-<ol class="arabic simple" start="4">
-<li><p>Waits for the chunks_ready_event if chunks are not yet complete</p></li>
+<ol class="arabic simple" start="2">
+<li><p>Stores the double ref in the per-timestep structure.</p></li>
+<li><p>When all local chunks have arrived, builds a
+<code class="docutils literal notranslate"><span class="pre">{chunk_position:</span> <span class="pre">double_ref}</span></code> mapping and sends it to the head
+actor via <code class="xref py py-meth docutils literal notranslate"><span class="pre">HeadNodeActor.chunks_ready()</span></code>.</p></li>
+<li><p>Pickles stored refs to drop in-memory handles and free memory.</p></li>
+<li><p>Signals or waits on the per-timestep event so callers block until
+the node’s share of chunks for the timestep is complete.</p></li>
 </ol>
-<p>The method blocks until all chunks for this timestep from this node
-are ready, ensuring proper synchronization.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -465,8 +463,9 @@ operational before returning its handle.</p>
 </dl>
 <p class="rubric">Notes</p>
 <p>Once all bridges on the node have registered, the node actor forwards
-the consolidated metadata to the head actor and signals readiness
-for this array. Subsequent callers will await the per-array event.</p>
+the consolidated metadata to the head actor and toggles the per-array
+event so concurrent callers can proceed. Until that point additional
+callers block on <code class="docutils literal notranslate"><span class="pre">ready_event</span></code>.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -552,7 +551,7 @@ compatibility with future signatures but are currently unused.</p>
 <li><a class="reference internal" href="#deisa.ray.scheduling_actor.NodeActorBase.actor_id"><code class="docutils literal notranslate"><span class="pre">NodeActorBase.actor_id</span></code></a></li>
 <li><a class="reference internal" href="#deisa.ray.scheduling_actor.NodeActorBase.actor_handle"><code class="docutils literal notranslate"><span class="pre">NodeActorBase.actor_handle</span></code></a></li>
 <li><a class="reference internal" href="#deisa.ray.scheduling_actor.NodeActorBase.head"><code class="docutils literal notranslate"><span class="pre">NodeActorBase.head</span></code></a></li>
-<li><a class="reference internal" href="#deisa.ray.scheduling_actor.NodeActorBase.arrays"><code class="docutils literal notranslate"><span class="pre">NodeActorBase.arrays</span></code></a></li>
+<li><a class="reference internal" href="#deisa.ray.scheduling_actor.NodeActorBase.partial_arrays"><code class="docutils literal notranslate"><span class="pre">NodeActorBase.partial_arrays</span></code></a></li>
 <li><a class="reference internal" href="#deisa.ray.scheduling_actor.NodeActorBase.feedback_non_chunked"><code class="docutils literal notranslate"><span class="pre">NodeActorBase.feedback_non_chunked</span></code></a></li>
 <li><a class="reference internal" href="#deisa.ray.scheduling_actor.NodeActorBase.add_chunk"><code class="docutils literal notranslate"><span class="pre">NodeActorBase.add_chunk()</span></code></a></li>
 <li><a class="reference internal" href="#deisa.ray.scheduling_actor.NodeActorBase.delete"><code class="docutils literal notranslate"><span class="pre">NodeActorBase.delete()</span></code></a></li>

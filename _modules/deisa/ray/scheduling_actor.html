@@ -197,13 +197,14 @@
 <ul>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../../../deisa.ray.html">deisa.ray package</a><input aria-label="Toggle navigation of deisa.ray package" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.bridge.html">deisa.ray.bridge module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.config.html">deisa.ray.config module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.errors.html">deisa.ray.errors module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.head_node.html">deisa.ray.head_node module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.ray_patch.html">deisa.ray.ray_patch module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.scheduling_actor.html">deisa.ray.scheduling_actor module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.types.html">deisa.ray.types module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.utils.html">deisa.ray.utils module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.window_api.html">deisa.ray.window_api module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.window_handler.html">deisa.ray.window_handler module</a></li>
 </ul>
 </li>
 </ul>
@@ -250,9 +251,9 @@
     <span class="n">GraphInfo</span><span class="p">,</span>
     <span class="n">ArrayPerTimestep</span><span class="p">,</span>
     <span class="n">PartialArray</span><span class="p">,</span>
-    <span class="n">DoubleRef</span><span class="p">,</span>
     <span class="n">RayActorHandle</span><span class="p">,</span>
     <span class="n">ActorID</span><span class="p">,</span>
+    <span class="n">DoubleRef</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_ready_actor_with_retry</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.ray_patch</span><span class="w"> </span><span class="kn">import</span> <span class="n">remote_ray_dask_get</span>
@@ -289,10 +290,10 @@
 <span class="sd">    actor_handle : RayActorHandle</span>
 <span class="sd">        Handle to this actor instance.</span>
 <span class="sd">    head : RayActorHandle</span>
-<span class="sd">        Handle to the :class:`SimulationHead` actor.</span>
-<span class="sd">    arrays : AsyncDict[str, Array]</span>
-<span class="sd">        Dictionary mapping array names to their :class:`Array` instances,</span>
-<span class="sd">        which track chunks and timesteps.</span>
+<span class="sd">        Handle to the head node (:class:`~deisa.ray.head_node.HeadNodeActor`).</span>
+<span class="sd">    partial_arrays : AsyncDict[str, PartialArray]</span>
+<span class="sd">        Per-array containers that capture metadata and chunk references owned</span>
+<span class="sd">        by this node actor.</span>
 <span class="sd">    feedback_non_chunked : dict</span>
 <span class="sd">        Dictionary for storing non-chunked feedback values shared between</span>
 <span class="sd">        analytics and simulation.</span>
@@ -308,6 +309,11 @@
 <span class="sd">            Unique identifier for this node actor (typically the node ID).</span>
 <span class="sd">        arrays_metadata : dict, optional</span>
 <span class="sd">            Reserved for future use; currently unused. Default is ``{}``.</span>
+
+<span class="sd">        Notes</span>
+<span class="sd">        -----</span>
+<span class="sd">        Registers the actor with the head node immediately so it can start</span>
+<span class="sd">        receiving metadata and chunk notifications.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">actor_id</span> <span class="o">=</span> <span class="n">actor_id</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">actor_handle</span> <span class="o">=</span> <span class="n">ray</span><span class="o">.</span><span class="n">get_runtime_context</span><span class="p">()</span><span class="o">.</span><span class="n">current_actor</span>
@@ -414,8 +420,8 @@
 <span class="sd">        array_name : str</span>
 <span class="sd">            Name of the array being assembled on this node.</span>
 <span class="sd">        nb_chunks_of_node : int</span>
-<span class="sd">            Number of chunks contributed by this node. Stored for sanity checks</span>
-<span class="sd">            when registering metadata.</span>
+<span class="sd">            Number of chunks contributed by this node. Stored on the actor for</span>
+<span class="sd">            later sanity checks when receiving payloads.</span>
 
 <span class="sd">        Returns</span>
 <span class="sd">        -------</span>
@@ -462,13 +468,15 @@
 <span class="sd">        Notes</span>
 <span class="sd">        -----</span>
 <span class="sd">        Once all bridges on the node have registered, the node actor forwards</span>
-<span class="sd">        the consolidated metadata to the head actor and signals readiness</span>
-<span class="sd">        for this array. Subsequent callers will await the per-array event.</span>
+<span class="sd">        the consolidated metadata to the head actor and toggles the per-array</span>
+<span class="sd">        event so concurrent callers can proceed. Until that point additional</span>
+<span class="sd">        callers block on ``ready_event``.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">partial_array</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_or_retrieve_partial_array</span><span class="p">(</span><span class="n">array_name</span><span class="p">,</span> <span class="n">nb_chunks_of_node</span><span class="p">)</span>
 
         <span class="c1"># add metadata for this array</span>
         <span class="n">partial_array</span><span class="o">.</span><span class="n">chunks_contained_meta</span><span class="o">.</span><span class="n">add</span><span class="p">((</span><span class="n">bridge_id</span><span class="p">,</span> <span class="n">chunk_position</span><span class="p">,</span> <span class="n">chunk_shape</span><span class="p">))</span>
+        <span class="n">partial_array</span><span class="o">.</span><span class="n">bid_to_pos</span><span class="p">[</span><span class="n">bridge_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">chunk_position</span>
 
         <span class="c1"># Technically, no race conditions should happen since its calls to the same actor method</span>
         <span class="c1"># happen synchrnously (in ray). Since the method is async, it will run the method one a at</span>
@@ -539,11 +547,11 @@
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_pack_object_ref</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">refs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">ray</span><span class="o">.</span><span class="n">ObjectRef</span><span class="p">]):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Pack a list of ObjectRefs into a single ObjectRef.</span>
+<span class="sd">        Return the first ObjectRef from a list, intended to be called remotely.</span>
 
-<span class="sd">        This method is used to create an ObjectRef containing the given</span>
-<span class="sd">        ObjectRefs, allowing the expected format in the task graph. It</span>
-<span class="sd">        returns the first ObjectRef from the list.</span>
+<span class="sd">        The remote invocation of this method produces a *double* Ray</span>
+<span class="sd">        ObjectRef, which keeps distributed scheduling non-blocking while</span>
+<span class="sd">        preserving the original single-ref payload inside the list.</span>
 
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
@@ -558,9 +566,9 @@
 
 <span class="sd">        Notes</span>
 <span class="sd">        -----</span>
-<span class="sd">        This is a method instead of a function with `num_cpus=0` to avoid</span>
-<span class="sd">        starting many new workers. The method is called remotely to create</span>
-<span class="sd">        the proper ObjectRef structure in the task graph.</span>
+<span class="sd">        Implemented as an actor method (rather than a separate remote</span>
+<span class="sd">        function) to avoid spinning up extra workers when generating the</span>
+<span class="sd">        double reference structure expected by the task graph.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="n">refs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
 
@@ -581,8 +589,8 @@
 <span class="sd">        Add a chunk of data to this node actor.</span>
 
 <span class="sd">        This method is called by Bridge instances to send chunks of arrays</span>
-<span class="sd">        to this node actor. When all chunks from a node are received,</span>
-<span class="sd">        the actor notifies the head node that chunks are ready.</span>
+<span class="sd">        to this node actor. When all chunks from a node are received, the</span>
+<span class="sd">        actor forwards a position-&gt;double-ref mapping to the head node.</span>
 
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
@@ -612,17 +620,15 @@
 <span class="sd">        Notes</span>
 <span class="sd">        -----</span>
 <span class="sd">        This method manages chunk collection and coordination:</span>
-<span class="sd">        1. Stores the chunk reference in the local chunks dictionary</span>
-<span class="sd">        2. Records chunk ownership information</span>
-<span class="sd">        3. When all chunks from the node are received:</span>
-<span class="sd">           - Registers the array with the head node (first time only)</span>
-<span class="sd">           - Collects all owned chunks and sends them to the head node</span>
-<span class="sd">           - Converts chunk references to pickled bytes to free memory</span>
-<span class="sd">           - Notifies the head node that chunks are ready</span>
-<span class="sd">        4. Waits for the chunks_ready_event if chunks are not yet complete</span>
-
-<span class="sd">        The method blocks until all chunks for this timestep from this node</span>
-<span class="sd">        are ready, ensuring proper synchronization.</span>
+<span class="sd">        1. Wraps the single chunk ref in a double ref by calling</span>
+<span class="sd">           :meth:`_pack_object_ref` remotely.</span>
+<span class="sd">        2. Stores the double ref in the per-timestep structure.</span>
+<span class="sd">        3. When all local chunks have arrived, builds a</span>
+<span class="sd">           ``{chunk_position: double_ref}`` mapping and sends it to the head</span>
+<span class="sd">           actor via :meth:`HeadNodeActor.chunks_ready`.</span>
+<span class="sd">        4. Pickles stored refs to drop in-memory handles and free memory.</span>
+<span class="sd">        5. Signals or waits on the per-timestep event so callers block until</span>
+<span class="sd">           the node&#39;s share of chunks for the timestep is complete.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">array_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">partial_arrays</span><span class="p">:</span>
             <span class="c1"># respect contract at the beginning</span>
@@ -637,26 +643,26 @@
             <span class="n">partial_array</span><span class="o">.</span><span class="n">per_timestep_arrays</span><span class="p">[</span><span class="n">timestep</span><span class="p">]</span> <span class="o">=</span> <span class="n">ArrayPerTimestep</span><span class="p">()</span>
         <span class="n">array_timestep</span> <span class="o">=</span> <span class="n">partial_array</span><span class="o">.</span><span class="n">per_timestep_arrays</span><span class="p">[</span><span class="n">timestep</span><span class="p">]</span>
 
-        <span class="c1"># in this function, chunk_ref is a [rayref]. Doing ray.get(chunk_ref[0]) would get the data.</span>
-        <span class="c1"># TODO why?</span>
-        <span class="c1"># the pack function returns chunk_ref[0] (the rayref to actual data). Note, I don&#39;t call it as self._pack_object_ref</span>
-        <span class="c1"># but rather, call it through the actor handle (so its a remote call). It memans that the local_chunk is a ref, s.t</span>
-        <span class="c1"># ray.get(ref) returns ANOTHER ref to the data. So, a ref of a ref.</span>
-        <span class="n">array_timestep</span><span class="o">.</span><span class="n">local_chunks</span><span class="p">[</span><span class="n">bridge_id</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">actor_handle</span><span class="o">.</span><span class="n">_pack_object_ref</span><span class="o">.</span><span class="n">remote</span><span class="p">(</span><span class="n">chunk_ref</span><span class="p">)</span>
+        <span class="c1"># Note: We need to use double refs everywhere since we don&#39;t want the distributed scheduling to block.</span>
+        <span class="c1"># Therefore we call an rpc on the same actor (returns a ref) to a task which unwraps the ref.</span>
+        <span class="n">double_ref_chunk</span><span class="p">:</span> <span class="n">DoubleRef</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">actor_handle</span><span class="o">.</span><span class="n">_pack_object_ref</span><span class="o">.</span><span class="n">remote</span><span class="p">(</span><span class="n">chunk_ref</span><span class="p">)</span>
+        <span class="n">array_timestep</span><span class="o">.</span><span class="n">local_chunks</span><span class="p">[</span><span class="n">bridge_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">double_ref_chunk</span>
 
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">array_timestep</span><span class="o">.</span><span class="n">local_chunks</span><span class="p">)</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">nb_chunks_of_node</span><span class="p">:</span>
-            <span class="n">chunks</span> <span class="o">=</span> <span class="p">[]</span>
-            <span class="k">for</span> <span class="n">bridge_id</span><span class="p">,</span> <span class="n">ref</span> <span class="ow">in</span> <span class="n">array_timestep</span><span class="o">.</span><span class="n">local_chunks</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-                <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ref</span><span class="p">,</span> <span class="n">ray</span><span class="o">.</span><span class="n">ObjectRef</span><span class="p">)</span>
-                <span class="n">chunks</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ref</span><span class="p">)</span>
-                <span class="n">array_timestep</span><span class="o">.</span><span class="n">local_chunks</span><span class="p">[</span><span class="n">bridge_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">ref</span><span class="p">)</span>
-            <span class="c1"># all_chunks_ref is a ref to a list of refs of refs.</span>
-            <span class="n">all_chunks_ref</span> <span class="o">=</span> <span class="n">ray</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="n">chunks</span><span class="p">)</span>
+            <span class="n">pos_to_ref</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">tuple</span><span class="p">,</span> <span class="n">DoubleRef</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+
+            <span class="k">for</span> <span class="n">bridge_id</span><span class="p">,</span> <span class="n">double_ref</span> <span class="ow">in</span> <span class="n">array_timestep</span><span class="o">.</span><span class="n">local_chunks</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">double_ref</span><span class="p">,</span> <span class="n">ray</span><span class="o">.</span><span class="n">ObjectRef</span><span class="p">)</span>
+
+                <span class="n">pos_to_ref</span><span class="p">[</span><span class="n">partial_array</span><span class="o">.</span><span class="n">bid_to_pos</span><span class="p">[</span><span class="n">bridge_id</span><span class="p">]]</span> <span class="o">=</span> <span class="n">double_ref</span>
+
+                <span class="n">array_timestep</span><span class="o">.</span><span class="n">local_chunks</span><span class="p">[</span><span class="n">bridge_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">double_ref</span><span class="p">)</span>
+
+            <span class="c1"># all_chunks_ref = ray.put(pos_to_ref)</span>
 
             <span class="c1"># TODO rename</span>
-            <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">head</span><span class="o">.</span><span class="n">chunks_ready</span><span class="o">.</span><span class="n">options</span><span class="p">(</span><span class="n">enable_task_events</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">remote</span><span class="p">(</span>
-                <span class="n">array_name</span><span class="p">,</span> <span class="n">timestep</span><span class="p">,</span> <span class="p">[</span><span class="n">all_chunks_ref</span><span class="p">]</span>
-            <span class="p">)</span>
+            <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">head</span><span class="o">.</span><span class="n">chunks_ready</span><span class="o">.</span><span class="n">options</span><span class="p">(</span><span class="n">enable_task_events</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">remote</span><span class="p">(</span><span class="n">array_name</span><span class="p">,</span> <span class="n">timestep</span><span class="p">,</span> <span class="n">pos_to_ref</span><span class="p">)</span>
+
             <span class="n">array_timestep</span><span class="o">.</span><span class="n">chunks_ready_event</span><span class="o">.</span><span class="n">set</span><span class="p">()</span>
             <span class="n">array_timestep</span><span class="o">.</span><span class="n">chunks_ready_event</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
         <span class="k">else</span><span class="p">:</span>
@@ -671,7 +677,7 @@
 <span class="sd">    Node actor with additional Dask graph scheduling behaviour.</span>
 
 <span class="sd">    This actor inherits all chunk-collection and feedback mechanisms from</span>
-<span class="sd">    :class:`NodeActor` and adds graph scheduling capabilities used by the</span>
+<span class="sd">    :class:`NodeActorBase` and adds graph scheduling capabilities used by the</span>
 <span class="sd">    custom Dask-on-Ray scheduler. When using a :class:`SchedulingActor`, the</span>
 <span class="sd">    custom scheduler distributes Dask task graphs across multiple actors.</span>
 <span class="sd">    When using a plain :class:`NodeActor`, standard Dask scheduling is used.</span>
@@ -686,9 +692,9 @@
 
 <span class="sd">    Attributes</span>
 <span class="sd">    ----------</span>
-<span class="sd">    scheduling_actors : list[RayActorHandle]</span>
-<span class="sd">        List of all scheduling actor handles, populated lazily when first</span>
-<span class="sd">        graph is scheduled.</span>
+<span class="sd">    scheduling_actors : dict[ActorID, RayActorHandle]</span>
+<span class="sd">        Mapping of actor IDs to scheduling actor handles, populated lazily</span>
+<span class="sd">        on first scheduling request.</span>
 <span class="sd">    graph_infos : AsyncDict[int, GraphInfo]</span>
 <span class="sd">        Dictionary mapping graph IDs to their :class:`GraphInfo` objects,</span>
 <span class="sd">        which track graph scheduling state and results.</span>
@@ -706,7 +712,7 @@
 <span class="sd">            Reserved for future extensions requiring array metadata at</span>
 <span class="sd">            construction time. Default is ``{}``.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="c1"># Delegate initialization to NodeActor, which sets up head node</span>
+        <span class="c1"># Delegate initialization to NodeActorBase, which sets up head node</span>
         <span class="c1"># registration, arrays, and feedback mechanisms.</span>
         <span class="k">await</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">actor_id</span><span class="o">=</span><span class="n">actor_id</span><span class="p">,</span> <span class="n">arrays_metadata</span><span class="o">=</span><span class="n">arrays_metadata</span><span class="p">)</span>
 
@@ -745,8 +751,8 @@
 <span class="sd">           - Replaces ChunkRef with actual chunk ObjectRefs from local storage</span>
 <span class="sd">           - Converts pickled chunk references back to ObjectRefs</span>
 <span class="sd">        4. Schedules the graph using remote_ray_dask_get</span>
-<span class="sd">        5. Stores the resulting ObjectRefs in GraphInfo</span>
-<span class="sd">        6. Sets the scheduled_event to signal completion</span>
+<span class="sd">        5. Stores the resulting *double* ObjectRefs in GraphInfo</span>
+<span class="sd">        6. Sets the scheduled_event to signal completion for dependents</span>
 
 <span class="sd">        The method handles cross-actor dependencies by delegating tasks to</span>
 <span class="sd">        the appropriate scheduling actors. Chunk references are retrieved</span>
@@ -800,6 +806,7 @@
 
 <span class="sd">        Notes</span>
 <span class="sd">        -----</span>
+<span class="sd">        The provided ``graph`` is mutated in place.</span>
 <span class="sd">        - ``ScheduledByOtherActor`` entries are rewritten to remote calls</span>
 <span class="sd">          to the owning scheduling actor.</span>
 <span class="sd">        - ``ChunkRef`` entries are replaced with the pickled or direct</span>
@@ -868,8 +875,9 @@
 <span class="sd">        This method is called by other scheduling actors when they need to</span>
 <span class="sd">        retrieve values from graphs scheduled by this actor. It waits for</span>
 <span class="sd">        the graph to be fully scheduled (via scheduled_event) before returning</span>
-<span class="sd">        the ObjectRef. The method is used to handle cross-actor dependencies</span>
-<span class="sd">        in distributed Dask computations.</span>
+<span class="sd">        the ObjectRef. Only one level of the double reference is unwrapped to</span>
+<span class="sd">        avoid blocking other actors, keeping cross-actor dependencies</span>
+<span class="sd">        non-blocking in distributed Dask computations.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">graph_info</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">graph_infos</span><span class="o">.</span><span class="n">wait_for_key</span><span class="p">(</span><span class="n">graph_id</span><span class="p">)</span>
 
@@ -893,7 +901,7 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Actor responsible for gathering chunks and exchanging data with analytics.</span>
 
-<span class="sd">    This is a Ray actor. Shared logic is implemented in NodeBase.</span>
+<span class="sd">    This is a Ray actor. Shared logic is implemented in :class:`NodeActorBase`.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">actor_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">arrays_metadata</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="p">{})</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>

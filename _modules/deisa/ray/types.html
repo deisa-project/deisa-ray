@@ -197,13 +197,14 @@
 <ul>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../../../deisa.ray.html">deisa.ray package</a><input aria-label="Toggle navigation of deisa.ray package" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.bridge.html">deisa.ray.bridge module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.config.html">deisa.ray.config module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.errors.html">deisa.ray.errors module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.head_node.html">deisa.ray.head_node module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.ray_patch.html">deisa.ray.ray_patch module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.scheduling_actor.html">deisa.ray.scheduling_actor module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.types.html">deisa.ray.types module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.utils.html">deisa.ray.utils module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.window_api.html">deisa.ray.window_api module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.window_handler.html">deisa.ray.window_handler module</a></li>
 </ul>
 </li>
 </ul>
@@ -250,6 +251,7 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray</span><span class="w"> </span><span class="kn">import</span> <span class="n">Timestep</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">dask.array</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">da</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray._async_dict</span><span class="w"> </span><span class="kn">import</span> <span class="n">AsyncDict</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">collections</span><span class="w"> </span><span class="kn">import</span> <span class="n">defaultdict</span>
 
 <span class="nb">type</span> <span class="n">DoubleRef</span> <span class="o">=</span> <span class="n">ray</span><span class="o">.</span><span class="n">ObjectRef</span>
 <span class="nb">type</span> <span class="n">ActorID</span> <span class="o">=</span> <span class="nb">str</span>
@@ -266,30 +268,26 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Internal class tracking chunks for a specific array and timestep.</span>
 
-<span class="sd">    This class manages the collection of chunks for a particular array</span>
-<span class="sd">    at a specific timestep within a scheduling actor.</span>
+<span class="sd">    Tracks the per-timestep chunks owned by a single scheduling actor. Each</span>
+<span class="sd">    instance is keyed by ``timestep`` inside a :class:`PartialArray`.</span>
 
 <span class="sd">    Attributes</span>
 <span class="sd">    ----------</span>
 <span class="sd">    chunks_ready_event : asyncio.Event</span>
-<span class="sd">        Event that is triggered when all chunks for this timestep are ready.</span>
-<span class="sd">    local_chunks : AsyncDict[tuple[int, ...], ray.ObjectRef | bytes]</span>
-<span class="sd">        Dictionary mapping chunk positions to their Ray object references</span>
-<span class="sd">        or pickled bytes. The chunks are stored as bytes after being sent</span>
-<span class="sd">        to the head node to free memory.</span>
-
-<span class="sd">    Notes</span>
-<span class="sd">    -----</span>
-<span class="sd">    This is an internal class used by SchedulingActor to track chunk</span>
-<span class="sd">    collection for arrays. Chunks are initially stored as ObjectRefs and</span>
-<span class="sd">    later converted to pickled bytes to free memory.</span>
+<span class="sd">        Triggered when all chunks for this timestep owned by the node actor</span>
+<span class="sd">        have arrived and been forwarded to the head actor.</span>
+<span class="sd">    local_chunks : AsyncDict[int, ray.ObjectRef | bytes]</span>
+<span class="sd">        Mapping of ``bridge_id`` to the double ObjectRef for that chunk. Once</span>
+<span class="sd">        forwarded to the head actor the value is replaced with pickled bytes</span>
+<span class="sd">        to free memory.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create the readiness event and the async storage for local chunks.&quot;&quot;&quot;</span>
         <span class="c1"># Triggered when all the chunks are ready</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">chunks_ready_event</span><span class="p">:</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">Event</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">Event</span><span class="p">()</span>
 
-        <span class="c1"># {position: chunk}</span>
+        <span class="c1"># {bridgeID: chunk}</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">local_chunks</span><span class="p">:</span> <span class="n">AsyncDict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">ray</span><span class="o">.</span><span class="n">ObjectRef</span> <span class="o">|</span> <span class="nb">bytes</span><span class="p">]</span> <span class="o">=</span> <span class="n">AsyncDict</span><span class="p">()</span></div>
 
 
@@ -300,37 +298,35 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Internal class tracking metadata and chunks for an array.</span>
 
-<span class="sd">    This class manages the registration state and chunk ownership information</span>
-<span class="sd">    for a specific array within a scheduling actor.</span>
+<span class="sd">    Maintains metadata for a single array on one scheduling actor, including</span>
+<span class="sd">    the set of locally owned chunks and per-timestep chunk collections.</span>
 
 <span class="sd">    Attributes</span>
 <span class="sd">    ----------</span>
-<span class="sd">    is_registered : bool</span>
-<span class="sd">        Indicates whether the `set_owned_chunks` method has been called</span>
-<span class="sd">        for this array, registering it with the head node.</span>
-<span class="sd">    owned_chunks : set[tuple[tuple[int, ...], tuple[int, ...]]]</span>
-<span class="sd">        Set of tuples, each containing (chunk_position, chunk_size) for</span>
-<span class="sd">        chunks owned by this actor for this array.</span>
-<span class="sd">    timesteps : AsyncDict[Timestep, _ArrayTimestep]</span>
-<span class="sd">        Dictionary mapping timesteps to their _ArrayTimestep objects,</span>
-<span class="sd">        which track the chunks for each timestep.</span>
-
-<span class="sd">    Notes</span>
-<span class="sd">    -----</span>
-<span class="sd">    This is an internal class used by SchedulingActor to track array state</span>
-<span class="sd">    and chunk ownership. Each array is registered once with the head node</span>
-<span class="sd">    when the first timestep&#39;s chunks are ready.</span>
+<span class="sd">    ready_event : asyncio.Event</span>
+<span class="sd">        Set once all local bridges have provided metadata for the array and</span>
+<span class="sd">        the head actor has been notified.</span>
+<span class="sd">    chunks_contained_meta : set[tuple[int, tuple[int, ...], tuple[int, ...]]]</span>
+<span class="sd">        Metadata tuples ``(bridge_id, chunk_position, chunk_size)`` for the</span>
+<span class="sd">        chunks owned by this actor.</span>
+<span class="sd">    bid_to_pos : dict[int, tuple]</span>
+<span class="sd">        Maps ``bridge_id`` to the corresponding chunk position for quick</span>
+<span class="sd">        lookup when forwarding payloads.</span>
+<span class="sd">    per_timestep_arrays : AsyncDict[Timestep, ArrayPerTimestep]</span>
+<span class="sd">        Per-timestep structures that hold chunk references as they arrive.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="c1"># TODO add types</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialise per-array metadata containers and readiness flag.&quot;&quot;&quot;</span>
         <span class="c1"># Indicates if register_partial_array method has been called for this array.</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">ready_event</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">Event</span><span class="p">()</span>
 
         <span class="c1"># Chunks owned by this actor for this array.</span>
         <span class="c1"># {(bridge_id, chunk position, chunk size), ...}</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">chunks_contained_meta</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]]]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bid_to_pos</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">per_timestep_arrays</span><span class="p">:</span> <span class="n">AsyncDict</span><span class="p">[</span><span class="n">Timestep</span><span class="p">,</span> <span class="n">ArrayPerTimestep</span><span class="p">]</span> <span class="o">=</span> <span class="n">AsyncDict</span><span class="p">()</span></div>
 
@@ -370,26 +366,20 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Information about graphs and their scheduling.</span>
 
-<span class="sd">    This class tracks the state and results of a Dask task graph that is</span>
-<span class="sd">    being scheduled by a scheduling actor.</span>
+<span class="sd">    Tracks scheduling status and produced references for a Dask task graph</span>
+<span class="sd">    scheduled by a :class:`SchedulingActor`.</span>
 
 <span class="sd">    Attributes</span>
 <span class="sd">    ----------</span>
 <span class="sd">    scheduled_event : asyncio.Event</span>
-<span class="sd">        Event that is set when the graph has been scheduled and all tasks</span>
-<span class="sd">        have been submitted.</span>
+<span class="sd">        Event set once the graph has been submitted to Ray.</span>
 <span class="sd">    refs : dict[str, ray.ObjectRef]</span>
-<span class="sd">        Dictionary mapping task keys to their Ray object references. These</span>
-<span class="sd">        references point to the results of the scheduled tasks.</span>
-
-<span class="sd">    Notes</span>
-<span class="sd">    -----</span>
-<span class="sd">    This class is used internally by SchedulingActor to track the progress</span>
-<span class="sd">    of graph scheduling and store the resulting object references for later</span>
-<span class="sd">    retrieval.</span>
+<span class="sd">        Mapping from task key to the *double* Ray ObjectRef returned by the</span>
+<span class="sd">        patched Dask-on-Ray scheduler.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create the scheduling event and storage for result references.&quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">scheduled_event</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">Event</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">refs</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">ray</span><span class="o">.</span><span class="n">ObjectRef</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span></div>
 
@@ -491,21 +481,24 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Information about a Dask array being built.</span>
 
-<span class="sd">    This class tracks the metadata and state of a Dask array as it is</span>
-<span class="sd">    constructed from chunks sent by scheduling actors.</span>
+<span class="sd">    Tracks metadata and per-timestep state for a Dask array assembled from</span>
+<span class="sd">    chunks sent by scheduling actors.</span>
 
 <span class="sd">    Parameters</span>
 <span class="sd">    ----------</span>
-<span class="sd">    definition : ArrayDefinition</span>
-<span class="sd">        The definition of the array, including its name and preprocessing</span>
-<span class="sd">        function.</span>
+<span class="sd">    name : str</span>
+<span class="sd">        Array name registered with the head actor.</span>
+<span class="sd">    f_preprocessing : Callable</span>
+<span class="sd">        Preprocessing callback applied to each chunk.</span>
 
 <span class="sd">    Attributes</span>
 <span class="sd">    ----------</span>
-<span class="sd">    definition : ArrayDefinition</span>
-<span class="sd">        The array definition.</span>
+<span class="sd">    name : str</span>
+<span class="sd">        Array name without timestep suffix.</span>
+<span class="sd">    f_preprocessing : Callable</span>
+<span class="sd">        Preprocessing callback supplied at registration.</span>
 <span class="sd">    fully_defined : asyncio.Event</span>
-<span class="sd">        Event that is set when all chunk owners are known.</span>
+<span class="sd">        Set when every chunk owner has been registered.</span>
 <span class="sd">    nb_chunks_per_dim : tuple[int, ...] or None</span>
 <span class="sd">        Number of chunks per dimension. Set when first chunk owner is</span>
 <span class="sd">        registered.</span>
@@ -518,19 +511,34 @@
 <span class="sd">    dtype : np.dtype or None</span>
 <span class="sd">        The numpy dtype of the array chunks. Set when first chunk owner</span>
 <span class="sd">        is registered.</span>
-<span class="sd">    scheduling_actors_id : dict[tuple[int, ...], int]</span>
-<span class="sd">        Mapping from chunk position to the ID of the scheduling actor</span>
-<span class="sd">        responsible for that chunk.</span>
+<span class="sd">    position_to_node_actorID : dict[tuple[int, ...], int]</span>
+<span class="sd">        Mapping from chunk position to the scheduling actor responsible</span>
+<span class="sd">        for that chunk.</span>
+<span class="sd">    position_to_bridgeID : dict[tuple, int]</span>
+<span class="sd">        Mapping from chunk position to the producing bridge ID.</span>
 <span class="sd">    nb_scheduling_actors : int or None</span>
 <span class="sd">        Number of unique scheduling actors owning chunks of this array.</span>
 <span class="sd">        Set when all chunk owners are known.</span>
 <span class="sd">    chunk_refs : dict[Timestep, list[ray.ObjectRef]]</span>
-<span class="sd">        For each timestep, a list of Ray object references to the chunks.</span>
-<span class="sd">        These references are used to keep chunks in memory and are cleared</span>
-<span class="sd">        when the array is built.</span>
+<span class="sd">        For each timestep, the list of per-actor references that keep</span>
+<span class="sd">        chunk payloads alive in the object store.</span>
+<span class="sd">    pos_to_ref_by_timestep : defaultdict</span>
+<span class="sd">        For each timestep, the (position, ref) pairs provided by scheduling</span>
+<span class="sd">        actors. Used when distributed scheduling is disabled.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">f_preprocessing</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialise per-array metadata containers.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        name : str</span>
+<span class="sd">            Array name as registered with the head actor.</span>
+<span class="sd">        f_preprocessing : Callable</span>
+<span class="sd">            Preprocessing callback applied to each chunk before analytics</span>
+<span class="sd">            consume the array.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">f_preprocessing</span> <span class="o">=</span> <span class="n">f_preprocessing</span>
 
@@ -562,6 +570,8 @@
         <span class="c1"># global reference is added to the Dask graph. Then, the list is cleared.</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">chunk_refs</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Timestep</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="n">ray</span><span class="o">.</span><span class="n">ObjectRef</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
 
+        <span class="bp">self</span><span class="o">.</span><span class="n">pos_to_ref_by_timestep</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
+
 <div class="viewcode-block" id="DaskArrayData.update_meta">
 <a class="viewcode-back" href="../../../deisa.ray.types.html#deisa.ray.types.DaskArrayData.update_meta">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">update_meta</span><span class="p">(</span>
@@ -590,8 +600,10 @@
 <span class="sd">            The position of the chunk in the array decomposition.</span>
 <span class="sd">        size : tuple[int, ...]</span>
 <span class="sd">            The size of the chunk along each dimension.</span>
-<span class="sd">        scheduling_actor_id : int</span>
-<span class="sd">            The ID of the scheduling actor that owns this chunk.</span>
+<span class="sd">        node_actor_id : int</span>
+<span class="sd">            Scheduling actor that owns this chunk.</span>
+<span class="sd">        bridge_id : int</span>
+<span class="sd">            Bridge identifier that produced the chunk (used for lookups).</span>
 
 <span class="sd">        Raises</span>
 <span class="sd">        ------</span>
@@ -624,7 +636,7 @@
 
 <div class="viewcode-block" id="DaskArrayData.add_chunk_ref">
 <a class="viewcode-back" href="../../../deisa.ray.types.html#deisa.ray.types.DaskArrayData.add_chunk_ref">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">add_chunk_ref</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">chunk_ref</span><span class="p">:</span> <span class="n">ray</span><span class="o">.</span><span class="n">ObjectRef</span><span class="p">,</span> <span class="n">timestep</span><span class="p">:</span> <span class="n">Timestep</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">add_chunk_ref</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">chunk_ref</span><span class="p">:</span> <span class="n">ray</span><span class="o">.</span><span class="n">ObjectRef</span><span class="p">,</span> <span class="n">timestep</span><span class="p">:</span> <span class="n">Timestep</span><span class="p">,</span> <span class="n">pos_to_ref</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Add a reference sent by a scheduling actor.</span>
 
@@ -634,6 +646,9 @@
 <span class="sd">            Ray object reference to a chunk sent by a scheduling actor.</span>
 <span class="sd">        timestep : Timestep</span>
 <span class="sd">            The timestep this chunk belongs to.</span>
+<span class="sd">        pos_to_ref : dict[tuple, ray.ObjectRef]</span>
+<span class="sd">            Mapping of chunk position to the (double) Ray ObjectRef provided</span>
+<span class="sd">            by the scheduling actor for this timestep.</span>
 
 <span class="sd">        Returns</span>
 <span class="sd">        -------</span>
@@ -648,6 +663,7 @@
 <span class="sd">        and all have sent their chunks for this timestep.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">chunk_refs</span><span class="p">[</span><span class="n">timestep</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">chunk_ref</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pos_to_ref_by_timestep</span><span class="p">[</span><span class="n">timestep</span><span class="p">]</span> <span class="o">+=</span> <span class="nb">list</span><span class="p">(</span><span class="n">pos_to_ref</span><span class="o">.</span><span class="n">items</span><span class="p">())</span>
 
         <span class="c1"># We don&#39;t know all the owners yet</span>
         <span class="c1"># TODO this method is useless now because we no longer &quot;send&quot; this data at every timestep.</span>
@@ -667,7 +683,9 @@
 
 <div class="viewcode-block" id="DaskArrayData.get_full_array">
 <a class="viewcode-back" href="../../../deisa.ray.types.html#deisa.ray.types.DaskArrayData.get_full_array">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">get_full_array</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">timestep</span><span class="p">:</span> <span class="n">Timestep</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">is_preparation</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">da</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_full_array</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">timestep</span><span class="p">:</span> <span class="n">Timestep</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">distributing_scheduling_enabled</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span> <span class="n">is_preparation</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">da</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Return the full Dask array for a given timestep.</span>
 
@@ -675,6 +693,10 @@
 <span class="sd">        ----------</span>
 <span class="sd">        timestep : Timestep</span>
 <span class="sd">            The timestep for which the full array should be returned.</span>
+<span class="sd">        distributing_scheduling_enabled : bool</span>
+<span class="sd">            When ``True``, emit a graph containing :class:`ChunkRef` tasks</span>
+<span class="sd">            for distributed scheduling. When ``False``, materialise the</span>
+<span class="sd">            actual chunk payloads and build a local Dask array.</span>
 <span class="sd">        is_preparation : bool, optional</span>
 <span class="sd">            If True, the array will not contain ObjectRefs to the actual data.</span>
 <span class="sd">            This is used for preparation arrays where only the structure is</span>
@@ -695,11 +717,12 @@
 
 <span class="sd">        Notes</span>
 <span class="sd">        -----</span>
-<span class="sd">        The array is built using a HighLevelGraph with ChunkRef tasks. When</span>
-<span class="sd">        `is_preparation` is False, the chunk references are stored in Ray&#39;s</span>
-<span class="sd">        object store and cleared from the local `chunk_refs` dictionary.</span>
-<span class="sd">        The array name includes the timestep to allow the same array name</span>
-<span class="sd">        to be used for different timesteps.</span>
+<span class="sd">        When distributed scheduling is enabled the graph uses :class:`ChunkRef`</span>
+<span class="sd">        placeholders that keep data owner information. Otherwise the concrete</span>
+<span class="sd">        chunk payloads are inlined. Chunk reference lists are deleted after</span>
+<span class="sd">        embedding in the graph to avoid leaking memory. ``is_preparation`` skips</span>
+<span class="sd">        storing payload refs entirely so analytics can inspect shapes/chunks</span>
+<span class="sd">        without materialising data.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">position_to_node_actorID</span><span class="p">)</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">nb_chunks</span>
         <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">nb_chunks</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">nb_chunks_per_dim</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
@@ -708,28 +731,36 @@
             <span class="n">all_chunks</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">all_chunks</span> <span class="o">=</span> <span class="n">ray</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">chunk_refs</span><span class="p">[</span><span class="n">timestep</span><span class="p">])</span>
-            <span class="c1"># TODO why is this done? is it so once array goes out of scope for user, everything is cleaned up?</span>
-            <span class="c1"># is this the reason for the pickle dump in the beginning?</span>
             <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">chunk_refs</span><span class="p">[</span><span class="n">timestep</span><span class="p">]</span>
 
         <span class="c1"># We need to add the timestep since the same name can be used several times for different</span>
         <span class="c1"># timesteps</span>
         <span class="n">dask_name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">timestep</span><span class="si">}</span><span class="s2">&quot;</span>
 
-        <span class="n">graph</span> <span class="o">=</span> <span class="p">{</span>
-            <span class="c1"># We need to repeat the name and position in the value since the key might be removed</span>
-            <span class="c1"># by the Dask optimizer</span>
-            <span class="p">(</span><span class="n">dask_name</span><span class="p">,)</span>
-            <span class="o">+</span> <span class="n">position</span><span class="p">:</span> <span class="n">ChunkRef</span><span class="p">(</span>  <span class="c1"># note only first ChunkRef instance contains actual refs, the others contain only metadata.</span>
-                <span class="n">actor_id</span><span class="p">,</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
-                <span class="n">timestep</span><span class="p">,</span>
-                <span class="n">position</span><span class="p">,</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">position_to_bridgeID</span><span class="p">[</span><span class="n">position</span><span class="p">],</span>
-                <span class="n">_all_chunks</span><span class="o">=</span><span class="n">all_chunks</span> <span class="k">if</span> <span class="n">it</span> <span class="o">==</span> <span class="mi">0</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
-            <span class="p">)</span>
-            <span class="k">for</span> <span class="n">it</span><span class="p">,</span> <span class="p">(</span><span class="n">position</span><span class="p">,</span> <span class="n">actor_id</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">position_to_node_actorID</span><span class="o">.</span><span class="n">items</span><span class="p">())</span>
-        <span class="p">}</span>
+        <span class="k">if</span> <span class="n">distributing_scheduling_enabled</span><span class="p">:</span>
+            <span class="n">graph</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="c1"># We need to repeat the name and position in the value since the key might be removed</span>
+                <span class="c1"># by the Dask optimizer</span>
+                <span class="p">(</span><span class="n">dask_name</span><span class="p">,)</span>
+                <span class="o">+</span> <span class="n">position</span><span class="p">:</span> <span class="n">ChunkRef</span><span class="p">(</span>  <span class="c1"># note only first ChunkRef instance contains actual refs, the others contain only metadata.</span>
+                    <span class="n">actor_id</span><span class="p">,</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                    <span class="n">timestep</span><span class="p">,</span>
+                    <span class="n">position</span><span class="p">,</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">position_to_bridgeID</span><span class="p">[</span><span class="n">position</span><span class="p">],</span>
+                    <span class="n">_all_chunks</span><span class="o">=</span><span class="n">all_chunks</span> <span class="k">if</span> <span class="n">it</span> <span class="o">==</span> <span class="mi">0</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="k">for</span> <span class="n">it</span><span class="p">,</span> <span class="p">(</span><span class="n">position</span><span class="p">,</span> <span class="n">actor_id</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">position_to_node_actorID</span><span class="o">.</span><span class="n">items</span><span class="p">())</span>
+            <span class="p">}</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># TODO: this could be an antipattern (calling ray.get in for loop). Could maybe put all the</span>
+            <span class="c1"># double refs in a list and call ray.wait() or ray.get() on the list?</span>
+            <span class="c1"># something that submits all the refs one go.</span>
+            <span class="n">graph</span> <span class="o">=</span> <span class="p">{(</span><span class="n">dask_name</span><span class="p">,)</span> <span class="o">+</span> <span class="n">position</span><span class="p">:</span> <span class="n">ray</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">dr</span><span class="p">)</span> <span class="k">for</span> <span class="n">position</span><span class="p">,</span> <span class="n">dr</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">pos_to_ref_by_timestep</span><span class="p">[</span><span class="n">timestep</span><span class="p">]}</span>
+
+        <span class="c1"># Needed for prepare iteration otherwise key lookup fails since iteration does not yet exist</span>
+        <span class="c1"># TODO ensure flow is as expected</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pos_to_ref_by_timestep</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">timestep</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
 
         <span class="n">dsk</span> <span class="o">=</span> <span class="n">HighLevelGraph</span><span class="o">.</span><span class="n">from_collections</span><span class="p">(</span><span class="n">dask_name</span><span class="p">,</span> <span class="n">graph</span><span class="p">,</span> <span class="n">dependencies</span><span class="o">=</span><span class="p">())</span>
 
