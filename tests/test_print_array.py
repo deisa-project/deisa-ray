@@ -27,10 +27,7 @@ def head_script(enable_distributed_scheduling) -> None:
         arr = timestep * np.array([[1, 2], [3, 4]])
         assert (arr == np.array(x)).all()
 
-        # rebuilding with "wrong" structure
-        # assert np.array2string(x) == np.array2string(arr)
-
-        # NOTE: Test for 2d/3d/4d/... arrays
+        # TODO: Test for 2d/3d/4d/... arrays
 
     d.register_callback(
         simulation_callback,
@@ -40,13 +37,9 @@ def head_script(enable_distributed_scheduling) -> None:
     d.execute_callbacks()
 
 
-# TODO: fix for distributed scheduling
 @pytest.mark.parametrize(
     "nb_nodes, enable_distributed_scheduling",
-    [
-        # (1, True),
-        (1, False)
-    ],
+    [(1, True), (1, False)],
 )
 def test_deisa_ray(nb_nodes: int, enable_distributed_scheduling, ray_cluster) -> None:  # noqa: F811
     head_ref = head_script.remote(enable_distributed_scheduling)

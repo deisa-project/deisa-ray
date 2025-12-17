@@ -6,6 +6,8 @@ import ray
 from dask.core import get_dependencies
 from deisa.ray.scheduling_actor import ChunkRef, ScheduledByOtherActor
 from deisa.ray.types import DoubleRef, ActorID, GraphKey, GraphValue, RayActorHandle
+from ray.util.dask.scheduler_utils import nested_get
+from dask.core import flatten
 
 
 def random_partitioning(dsk, scheduling_actors: dict) -> dict[str, int]:
@@ -150,7 +152,7 @@ def log(message: str, debug_logs_path: str | None) -> None:
             f.write(f"{time.time()} {message}\n")
 
 
-def process_keys(keys_needed: list) -> list:
+def process_keys(keys_needed) -> set:
     """
     Normalize the list of keys requested from the Dask graph.
 
@@ -165,30 +167,15 @@ def process_keys(keys_needed: list) -> list:
     list
         Flattened list of concrete task keys.
     """
-    assert isinstance(keys_needed, list)
 
-    # unnest keys in case of non-aggregate operation
-    # TODO: keys are generally a list of needed keys. In case of a simple aggregation, this is a list of one element.
-    # however, when doing a non aggregating operation, the keys are wrapped in another list. For example, [[k0, k1], [k2,k3]]
-    # investigate whether this is associated to the number of nodes/actors or the chunking?
-    def unnest(keys: list) -> list:
-        if len(keys) == 1:
-            if isinstance(keys[0], tuple):
-                return [keys[0]]
-            else:
-                return unnest(keys[0])
-        else:
-            if isinstance(keys, list):
-                res: list = []
-                for i in keys:
-                    if isinstance(i, list):
-                        for j in i:
-                            res.append(j)
-                    else:
-                        res.append(i)
-                return res
-
-    return unnest(keys_needed)
+    # Taken directly from ray. Look here:
+    # https://github.com/ray-project/ray/blob/261beeba59067af0473bf0f3ae95b674844dc5f5/python/ray/util/dask/scheduler_utils.py#L280
+    if isinstance(keys_needed, list):
+        result_flat = set(flatten(keys_needed))
+    else:
+        result_flat = {keys_needed}
+    results = set(result_flat)
+    return results
 
 
 def get_scheduling_actors_mapping():
@@ -345,22 +332,29 @@ def deisa_ray_get(full_dask_graph: dict, keys_needed: list, **kwargs):
         graph_id=graph_id,
     )
 
-    keys_needed = process_keys(keys_needed)
+    flattened_keys = process_keys(keys_needed)
 
     # repack keys in case of non-aggregate operation
 
-    result_refs: list[DoubleRef] = []
+    result_refs: dict[GraphKey, DoubleRef] = {}
 
-    for key in keys_needed:
+    for key in flattened_keys:
         actor_id: ActorID = graph_key_to_actor_id_map[key]
         actor_handle = scheduling_actor_id_to_handle[actor_id]
-        result_refs.append(actor_handle.get_value.remote(graph_id, key))
+        result_refs[key] = actor_handle.get_value.remote(graph_id, key)
 
-    # NOTE : not sure how to handle persist
+    # TODO: not sure why ray_persist would need double refs as result. I would imagine I would need to
+    # call ray.get() at least once on all values in the dict.
     if kwargs.get("ray_persist"):
-        return result_refs
+        # Used to return results in same shape as keys_needed
+        return nested_get(keys_needed, result_refs)
 
-    res = []
-    for double_ref in result_refs:
-        res.append(ray.get(ray.get(double_ref)))
-    return [res]
+    # unwrap twice using batched ray.get and repack into dict
+    keys = list(result_refs.keys())
+    outer_refs = list(result_refs.values())  # materialize once, preserves order
+    inner_refs = ray.get(outer_refs)  # 1st batched get
+    vals = ray.get(inner_refs)  # 2nd batched get
+    results = dict(zip(keys, vals))
+
+    # Used to return results in same shape as keys_needed
+    return nested_get(keys_needed, results)
