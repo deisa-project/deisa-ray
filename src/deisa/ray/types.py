@@ -308,7 +308,7 @@ class DaskArrayData:
         # global reference is added to the Dask graph. Then, the list is cleared.
         self.chunk_refs: dict[Timestep, list[ray.ObjectRef]] = {}
 
-        self.pos_to_ref_by_timestep = defaultdict(list)
+        self.pos_to_ref_by_timestep: dict[Timestep, list[tuple[tuple, ray.ObjectRef]]] = defaultdict(list)
 
     def update_meta(
         self,
@@ -369,7 +369,9 @@ class DaskArrayData:
             else:
                 assert self.chunks_size[i][pos] == size[pos]
 
-    def add_chunk_ref(self, chunk_ref: ray.ObjectRef, timestep: Timestep, pos_to_ref) -> bool:
+    def add_chunk_ref(
+        self, chunk_ref: ray.ObjectRef, timestep: Timestep, pos_to_ref: dict[tuple, ray.ObjectRef]
+    ) -> bool:
         """
         Add a reference sent by a scheduling actor.
 
@@ -486,7 +488,7 @@ class DaskArrayData:
             # TODO: this could be an antipattern (calling ray.get in for loop). Could maybe put all the
             # double refs in a list and call ray.wait() or ray.get() on the list?
             # something that submits all the refs one go.
-            graph = {(dask_name,) + position: ray.get(dr) for position, dr in self.pos_to_ref_by_timestep[timestep]}
+            graph = {(dask_name,) + position: r for position, r in self.pos_to_ref_by_timestep[timestep]}
 
         # Needed for prepare iteration otherwise key lookup fails since iteration does not yet exist
         # TODO ensure flow is as expected
