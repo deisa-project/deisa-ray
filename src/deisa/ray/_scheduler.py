@@ -1,10 +1,8 @@
 import random
-import time
-from collections import Counter
 from typing import Callable
 import ray
 from dask.core import get_dependencies
-from deisa.ray.scheduling_actor import ChunkRef, ScheduledByOtherActor
+from deisa.ray.scheduling_actor import ScheduledByOtherActor
 from deisa.ray.types import DoubleRef, ActorID, GraphKey, GraphValue, RayActorHandle
 
 
@@ -45,7 +43,7 @@ def random_partitioning(dsk, scheduling_actors: dict) -> dict[str, int]:
     This strategy provides load balancing but does not consider task
     dependencies or data locality.
     """
-    nb_tasks = len({k for k, v in dsk.items() if not isinstance(v, ChunkRef)})
+    nb_tasks = len({k for k, v in dsk.items()})
     nb_scheduling_actors = len(scheduling_actors)
     actor_names = list(scheduling_actors.keys())
 
@@ -55,10 +53,7 @@ def random_partitioning(dsk, scheduling_actors: dict) -> dict[str, int]:
     partition = {}
 
     for key, val in dsk.items():
-        if isinstance(val, ChunkRef):
-            partition[key] = val.actor_id
-        else:
-            partition[key] = actors.pop()
+        partition[key] = actors.pop()
 
     return partition
 
@@ -106,32 +101,58 @@ def greedy_partitioning(dsk, scheduling_actors: dict) -> dict[str, int]:
     task B will also be assigned to actor 0 (assuming no other dependencies
     suggest a different actor).
     """
-    partition = {k: -1 for k in dsk.keys()}
+
+    nb_tasks = len({k for k, v in dsk.items()})
+    nb_scheduling_actors = len(scheduling_actors)
     actor_names = list(scheduling_actors.keys())
 
-    def explore(k) -> int:
-        if partition[k] != -1:
-            return partition[k]
+    actors = [actor_names[i % nb_scheduling_actors] for i in range(nb_tasks)]
+    random.shuffle(actors)
 
-        val = dsk[k]
+    partition = {}
 
-        if isinstance(val, ChunkRef):
-            partition[k] = val.actor_id
-        else:
-            actors_dependencies = [explore(dep) for dep in get_dependencies(dsk, k)]
-
-            if not actors_dependencies:
-                # The task is a leaf, we use a random actor
-                partition[k] = random.choice(actor_names)
-            else:
-                partition[k] = Counter(actors_dependencies).most_common(1)[0][0]
-
-        return partition[k]
-
-    for key in dsk.keys():
-        explore(key)
+    for key, val in dsk.items():
+        if key not in partition:
+            partition[key] = actors.pop()
 
     return partition
+
+
+#    partition = {k: -1 for k in dsk.keys()}
+#    actor_names = list(scheduling_actors.keys())
+#
+#    # TODO : FIX partition strategy, actors_dependencies not initialize as intended
+#    def explore(k) -> int:
+#        if partition[k] != -1:
+#            return partition[k]
+#
+#        val = dsk[k]
+#
+#        if isinstance(val, Task):
+#            dep = val.dependencies
+#            if not dep:
+#                if isinstance(val.args[0], dict):
+#                    for k, v in val.args[0].items():
+#                        if isinstance(v, DataNode) and isinstance(v.value, ChunkRef):
+#                            chunkref = v.value
+#                            partition[k] = chunkref.actor_id
+#        else:
+#            actors_dependencies = [explore(dep)
+#                                   for dep in get_dependencies(dsk, k)]
+#
+#            if not actors_dependencies:
+#                # The task is a leaf, we use a random actor
+#                partition[k] = random.choice(actor_names)
+#            else:
+#                partition[k] = Counter(
+#                    actors_dependencies).most_common(1)[0][0]
+#
+#        return partition[k]
+#
+#    for key in dsk.keys():
+#        explore(key)
+#
+#    return partition
 
 
 def log(message: str, debug_logs_path: str | None) -> None:
@@ -147,7 +168,7 @@ def log(message: str, debug_logs_path: str | None) -> None:
     """
     if debug_logs_path is not None:
         with open(debug_logs_path, "a") as f:
-            f.write(f"{time.time()} {message}\n")
+            f.write(f"{message}\n")
 
 
 def process_keys(keys_needed: list) -> list:
@@ -204,7 +225,8 @@ def get_scheduling_actors_mapping():
     head_node = ray.get_actor("simulation_head", namespace="deisa_ray")  # noqa: F841
 
     # Find the scheduling actors
-    scheduling_actor_id_to_handle: dict[ActorID, RayActorHandle] = ray.get(head_node.list_scheduling_actors.remote())
+    scheduling_actor_id_to_handle: dict[ActorID, RayActorHandle] = ray.get(
+        head_node.list_scheduling_actors.remote())
     assert isinstance(scheduling_actor_id_to_handle, dict)
 
     return scheduling_actor_id_to_handle
@@ -243,12 +265,14 @@ def partition_and_schedule_graph(
 
         for dep in get_dependencies(full_dask_graph, k):
             if graph_key_to_actor_id_map[dep] != actor_id:
-                partitioned_graphs[actor_id][dep] = ScheduledByOtherActor(graph_key_to_actor_id_map[dep])
+                partitioned_graphs[actor_id][dep] = ScheduledByOtherActor(
+                    graph_key_to_actor_id_map[dep])
 
     for actorID, actor_handle in scheduling_actor_id_to_handle.items():
         if partitioned_graphs[actorID]:
             # give subgraph to actor for scheduling
-            actor_handle.schedule_graph.remote(graph_id, partitioned_graphs[actorID])
+            actor_handle.schedule_graph.remote(
+                graph_id, partitioned_graphs[actorID])
 
 
 def deisa_ray_get(full_dask_graph: dict, keys_needed: list, **kwargs):
@@ -328,12 +352,15 @@ def deisa_ray_get(full_dask_graph: dict, keys_needed: list, **kwargs):
     """
     graph_id = random.randint(0, 2**128 - 1)
     partitioning_strategy: Callable = {"random": random_partitioning, "greedy": greedy_partitioning}[
-        kwargs.get("deisa_ray_partitioning_strategy", "greedy")
+        kwargs.get("deisa_ray_partitioning_strategy", "random")
     ]
 
-    scheduling_actor_id_to_handle: dict[ActorID, RayActorHandle] = get_scheduling_actors_mapping()
+    scheduling_actor_id_to_handle: dict[ActorID,
+                                        RayActorHandle] = get_scheduling_actors_mapping()
 
-    full_dask_graph = {k: v for k, v in sorted(full_dask_graph.items())}
+    full_dask_graph = full_dask_graph.dask
+
+    # full_dask_graph = {k: v for k, v in sorted(full_dask_graph.items())}
     graph_key_to_actor_id_map: dict[GraphKey, ActorID] = partitioning_strategy(
         full_dask_graph, scheduling_actor_id_to_handle
     )
@@ -345,10 +372,6 @@ def deisa_ray_get(full_dask_graph: dict, keys_needed: list, **kwargs):
         graph_id=graph_id,
     )
 
-    keys_needed = process_keys(keys_needed)
-
-    # repack keys in case of non-aggregate operation
-
     result_refs: list[DoubleRef] = []
 
     for key in keys_needed:
@@ -358,9 +381,9 @@ def deisa_ray_get(full_dask_graph: dict, keys_needed: list, **kwargs):
 
     # NOTE : not sure how to handle persist
     if kwargs.get("ray_persist"):
-        return result_refs
+        return ray.get(result_refs)
 
     res = []
     for double_ref in result_refs:
         res.append(ray.get(ray.get(double_ref)))
-    return [res]
+    return res

@@ -1,9 +1,11 @@
 import ray
 import ray.util.dask.scheduler
+from dask._task_spec import Task, DataNode
+from collections.abc import Mapping
 
 
 @ray.remote(num_cpus=0, enable_task_events=False)
-def patched_dask_task_wrapper(func, repack, key, ray_pretask_cbs, ray_posttask_cbs, *args, first_call=True):
+def patched_dask_task_wrapper(task, repack, key, ray_pretask_cbs, ray_posttask_cbs, *arg_object_refs, first_call=True):
     """
     Patched version of the original dask_task_wrapper function.
 
@@ -44,20 +46,43 @@ def patched_dask_task_wrapper(func, repack, key, ray_pretask_cbs, ray_posttask_c
     This allows proper resource allocation for Dask tasks in Ray.
     """
 
+    print(f"first_call = {first_call}, ARGS = {arg_object_refs}", flush=True)
     if first_call:
-        assert all([isinstance(a, ray.ObjectRef) for a in args])
+        assert all([isinstance(a, ray.ObjectRef) for a in arg_object_refs])
         # Use one CPU for the actual computation
         return patched_dask_task_wrapper.options(num_cpus=1).remote(
-            func, repack, key, ray_pretask_cbs, ray_posttask_cbs, *args, first_call=False
+            task, repack, key, ray_pretask_cbs, ray_posttask_cbs, *
+            arg_object_refs, first_call=False
         )
 
     if ray_pretask_cbs is not None:
-        pre_states = [cb(key, args) if cb is not None else None for cb in ray_pretask_cbs]
-    repacked_args, repacked_deps = repack(args)
-    # Recursively execute Dask-inlined tasks.
-    actual_args = [ray.util.dask.scheduler._execute_task(a, repacked_deps) for a in repacked_args]
-    # Execute the actual underlying Dask task.
-    result = func(*actual_args)
+        pre_states = [
+            cb(key, arg_object_refs) if cb is not None else None
+            for cb in ray_pretask_cbs
+        ]
+    (repacked_deps,) = repack(arg_object_refs)
+    # De-reference the potentially nested arguments recursively.
+
+    def _dereference_args(x):
+        if isinstance(x, Task):
+            x.args = _dereference_args(x.args)
+            return x
+        elif isinstance(x, Mapping):
+            return {k: _dereference_args(v) for k, v in x.items()}
+        elif isinstance(x, tuple):
+            return tuple(_dereference_args(x) for x in x)
+        elif isinstance(x, ray.ObjectRef):
+            return ray.get(x)
+        elif isinstance(x, DataNode):
+            if isinstance(x.value, ray.ObjectRef):
+                value = ray.get(x.value)
+                return DataNode(key=x.key, value=value)
+            return x
+        else:
+            return x
+
+    task = _dereference_args(task)
+    result = task(repacked_deps)
 
     if ray_posttask_cbs is not None:
         for cb, pre_state in zip(ray_posttask_cbs, pre_states):
@@ -102,5 +127,4 @@ def remote_ray_dask_get(dsk, keys):
 
     # note: ray_dask_get(..., persist = True) return a tuple of ray refs,
     # if set to false, patched_dask_task_wrapper fails for some reason.
-    # TODO: understand why
     return ray.util.dask.ray_dask_get(dsk, keys, ray_persist=True)

@@ -14,7 +14,8 @@ def head_script(enable_distributed_scheduling) -> None:
     from deisa.ray.types import WindowArrayDefinition
     import deisa.ray as deisa
 
-    deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
+    deisa.config.enable_experimental_distributed_scheduling(
+        enable_distributed_scheduling)
 
     d = Deisa()
 
@@ -64,4 +65,5 @@ def test_deisa_ray(nb_nodes: int, enable_distributed_scheduling: bool, ray_clust
 
     # Check that the right number of scheduling actors were created
     simulation_head = ray.get_actor("simulation_head", namespace="deisa_ray")
-    assert len(ray.get(simulation_head.list_scheduling_actors.remote())) == nb_nodes
+    assert len(
+        ray.get(simulation_head.list_scheduling_actors.remote())) == nb_nodes

@@ -14,40 +14,6 @@ from deisa.ray.config import config
 import logging
 
 
-@ray.remote(num_cpus=0, max_retries=0)
-def _call_prepare_iteration(prepare_iteration: Callable, array: da.Array, timestep: int):
-    """
-    Call the prepare_iteration function with the given array and timestep.
-
-    This is a Ray remote function that executes the prepare_iteration
-    callback with a Dask array. It configures Dask to use the Deisa-Ray
-    scheduler before calling the function.
-
-    Parameters
-    ----------
-    prepare_iteration : Callable
-        The function to call. Should accept a Dask array and a timestep
-        keyword argument.
-    array : da.Array
-        The Dask array to pass to the prepare_iteration function.
-    timestep : int
-        The current timestep to pass to the prepare_iteration function.
-
-    Returns
-    -------
-    Any
-        The result of calling `prepare_iteration(array, timestep=timestep)`.
-
-    Notes
-    -----
-    This function is executed as a Ray remote task with no CPU requirements
-    and no retries. It configures Dask to use the Deisa-Ray scheduler before
-    executing the prepare_iteration callback.
-    """
-    dask.config.set(scheduler=deisa_ray_get, shuffle="tasks")
-    return prepare_iteration(array, timestep=timestep)
-
-
 class Deisa:
     def __init__(
         self,
@@ -119,7 +85,8 @@ class Deisa:
         # readyness gate for head actor - only return when its alive
         ray.get(
             self.head.exchange_config.remote(
-                {"experimental_distributed_scheduling_enabled": self._experimental_distributed_scheduling_enabled}
+                {"experimental_distributed_scheduling_enabled":
+                    self._experimental_distributed_scheduling_enabled}
             )
         )
 
@@ -132,7 +99,8 @@ class Deisa:
 
     def _ray_start_impl(self) -> None:
         if not ray.is_initialized():
-            ray.init(address="auto", log_to_driver=False, logging_level=logging.ERROR)
+            ray.init(address="auto", log_to_driver=False,
+                     logging_level=logging.ERROR)
 
     def register_callback(
         self,
@@ -168,7 +136,6 @@ class Deisa:
             simulation_callback=simulation_callback,
             arrays_description=arrays_description,
             max_iterations=max_iterations,
-            prepare_iteration=prepare_iteration,
             preparation_advance=preparation_advance,
         )
         self.registered_callbacks.append(cfg)
@@ -208,7 +175,8 @@ class Deisa:
         self._ensure_connected()
 
         if not self.registered_callbacks:
-            raise RuntimeError("Please register at least one callback before calling execute_callbacks()")
+            raise RuntimeError(
+                "Please register at least one callback before calling execute_callbacks()")
 
         if len(self.registered_callbacks) > 1:
             raise RuntimeError(
@@ -220,43 +188,27 @@ class Deisa:
         simulation_callback = cfg.simulation_callback
         arrays_description = cfg.arrays_description
         max_iterations = cfg.max_iterations
-        prepare_iteration = cfg.prepare_iteration
-        preparation_advance = cfg.preparation_advance
 
         max_pending_arrays = 2 * len(arrays_description)
 
         # Convert the definitions to the type expected by the head node
-        head_arrays_description = [(definition.name, definition.preprocess) for definition in arrays_description]
+        head_arrays_description = [
+            (definition.name, definition.preprocess) for definition in arrays_description]
 
         # TODO maybe this goes in the register callbacks
-        ray.get(self.head.register_arrays.remote(head_arrays_description, max_pending_arrays))
+        ray.get(self.head.register_arrays.remote(
+            head_arrays_description, max_pending_arrays))
 
         arrays_by_iteration: dict[int, dict[str, da.Array]] = {}
 
-        if prepare_iteration is not None:
-            preparation_results: dict[int, ray.ObjectRef] = {}
-
-            for timestep in range(min(preparation_advance, max_iterations)):
-                # Get the next array from the head node
-                array: da.Array = ray.get(self.head.get_preparation_array.remote(arrays_description[0].name, timestep))
-                preparation_results[timestep] = _call_prepare_iteration.remote(prepare_iteration, array, timestep)
-
         for iteration in range(max_iterations):
-            # Start preparing in advance
-            if iteration + preparation_advance < max_iterations and prepare_iteration is not None:
-                array = self.head.get_preparation_array.remote(
-                    arrays_description[0].name, iteration + preparation_advance
-                )
-                preparation_results[iteration + preparation_advance] = _call_prepare_iteration.remote(
-                    prepare_iteration, array, iteration + preparation_advance
-                )
-
             # Get new arrays
             while len(arrays_by_iteration.get(iteration, {})) < len(arrays_description):
                 name: str
                 timestep: int
                 array: da.Array
-                name, timestep, array = ray.get(self.head.get_next_array.remote())
+                name, timestep, array = ray.get(
+                    self.head.get_next_array.remote())
 
                 if timestep not in arrays_by_iteration:
                     arrays_by_iteration[timestep] = {}
@@ -276,11 +228,7 @@ class Deisa:
                         for timestep in range(max(iteration - description.window_size + 1, 0), iteration + 1)
                     ]
 
-            if prepare_iteration is not None:
-                preparation_result = ray.get(preparation_results[iteration])
-                simulation_callback(**all_arrays, timestep=timestep, preparation_result=preparation_result)
-            else:
-                simulation_callback(**all_arrays, timestep=timestep)
+            simulation_callback(**all_arrays, timestep=timestep)
 
             del all_arrays
 
@@ -321,7 +269,8 @@ class Deisa:
         # TODO test
         if not self.node_actors:
             # retrieve node actors at least once
-            self.node_actors = ray.get(self.head.list_scheduling_actors.remote())
+            self.node_actors = ray.get(
+                self.head.list_scheduling_actors.remote())
 
         if not chunked:
             for _, handle in self.node_actors.items():

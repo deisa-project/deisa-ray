@@ -1,10 +1,8 @@
-import pickle
 import ray
 from deisa.ray._async_dict import AsyncDict
 from deisa.ray.types import (
     GraphKey,
     GraphValue,
-    ChunkRef,
     ScheduledByOtherActor,
     GraphInfo,
     ArrayPerTimestep,
@@ -17,6 +15,7 @@ from deisa.ray.utils import get_ready_actor_with_retry
 from deisa.ray.ray_patch import remote_ray_dask_get
 from deisa.ray.errors import ContractError
 from typing import Dict, Hashable, Any
+from dask.task_spec import DataNode
 
 
 class NodeActorBase:
@@ -74,7 +73,8 @@ class NodeActorBase:
         self.actor_id = actor_id
         self.actor_handle = ray.get_runtime_context().current_actor
 
-        self.head = get_ready_actor_with_retry(name="simulation_head", namespace="deisa_ray")
+        self.head = get_ready_actor_with_retry(
+            name="simulation_head", namespace="deisa_ray")
         await self.head.register_scheduling_actor.remote(actor_id, self.actor_handle)
 
         # Keeps track of array metadata AND ref per timestep.
@@ -217,10 +217,12 @@ class NodeActorBase:
         event so concurrent callers can proceed. Until that point additional
         callers block on ``ready_event``.
         """
-        partial_array = self._create_or_retrieve_partial_array(array_name, nb_chunks_of_node)
+        partial_array = self._create_or_retrieve_partial_array(
+            array_name, nb_chunks_of_node)
 
         # add metadata for this array
-        partial_array.chunks_contained_meta.add((bridge_id, chunk_position, chunk_shape))
+        partial_array.chunks_contained_meta.add(
+            (bridge_id, chunk_position, chunk_shape))
         partial_array.bid_to_pos[bridge_id] = chunk_position
 
         # Technically, no race conditions should happen since its calls to the same actor method
@@ -369,8 +371,10 @@ class NodeActorBase:
         if array_name not in self.partial_arrays:
             # respect contract at the beginning
             raise ContractError(
-                f"User requested to add chunk for {array_name} but this array has"
-                f"not been described. Please call register_array({array_name}) before calling"
+                f"User requested to add chunk for {
+                    array_name} but this array has"
+                f"not been described. Please call register_array({
+                    array_name}) before calling"
                 "add_chunk()."
             )
         partial_array = self.partial_arrays[array_name]
@@ -381,7 +385,8 @@ class NodeActorBase:
 
         # Note: We need to use double refs everywhere since we don't want the distributed scheduling to block.
         # Therefore we call an rpc on the same actor (returns a ref) to a task which unwraps the ref.
-        double_ref_chunk: DoubleRef = self.actor_handle._pack_object_ref.remote(chunk_ref)
+        double_ref_chunk: DoubleRef = self.actor_handle._pack_object_ref.remote(
+            chunk_ref)
         array_timestep.local_chunks[bridge_id] = double_ref_chunk
 
         if len(array_timestep.local_chunks) == self.nb_chunks_of_node:
@@ -392,9 +397,7 @@ class NodeActorBase:
 
                 pos_to_ref[partial_array.bid_to_pos[bridge_id]] = double_ref
 
-                array_timestep.local_chunks[bridge_id] = pickle.dumps(double_ref)
-
-            # all_chunks_ref = ray.put(pos_to_ref)
+                array_timestep.local_chunks[bridge_id] = double_ref
 
             # TODO rename
             await self.head.chunks_ready.options(enable_task_events=False).remote(array_name, timestep, pos_to_ref)
@@ -515,7 +518,8 @@ class SchedulingActor(NodeActorBase):
         # is that patched_dask_task_wrapper calls itself remotely. So:
         # patched_dask_task_wrapper(doubleRef) returns patched_dask_task_wrapper.remote(singleRef)
         # but the second time its called as a remote function, it returns a value.
-        # so, the function returns a ref -> result. But, since we set ray_persist, we get a ref to the output of the function.        # function. Therefore, we get a ref -> ref -> result.
+        # so, the function returns a ref -> result. But, since we set ray_persist, we get a ref to the output of the function.
+        # Therefore, we get a ref -> ref -> result.
         # Incindentally, this is why, removing ray_persist = True from remote_ray_dask_get makes everything fail (because we then
         # get a tuple of single refs instead of double). We need double refs to keep the entire graph consistent.
         doubleRefs_of_results: tuple[DoubleRef] = await remote_ray_dask_get.remote(graph, keys_needed)
@@ -548,34 +552,13 @@ class SchedulingActor(NodeActorBase):
         - When a stored ref is still in-memory, it is pickled to ensure
           ownership transfer and memory release after scheduling.
         """
+
         for key, val in graph.items():
-            # Adapt external keys
             if isinstance(val, ScheduledByOtherActor):
                 actor = self.scheduling_actors[val.actor_id]
-                graph[key] = actor.get_value.options(enable_task_events=False).remote(graph_id, key)
-
-            # Replace the false chunks by the real ObjectRefs
-            if isinstance(val, ChunkRef):
-                assert val.actor_id == self.actor_id
-
-                # TODO: maybe awaiting is not necessary. When would the key not be present in the
-                # AsyncDict?
-                array = await self.partial_arrays.wait_for_key(val.array_name)
-
-                array_timestep = await array.per_timestep_arrays.wait_for_key(val.timestep)
-
-                # should be pickled ref of ref
-                ref = await array_timestep.local_chunks.wait_for_key(val.bridge_id)
-
-                # TODO what does this mean?
-                if isinstance(ref, bytes):  # This may not be the case depending on the asyncio scheduling order
-                    # technically, here its an actual ray ref which is a ref of ref.
-                    ref = pickle.loads(ref)
-                else:
-                    ref = pickle.loads(pickle.dumps(ref))  # To free the memory automatically
-
-                # replace ChunkRef by actual ref (still ref of ref)
-                graph[key] = ref
+                ref = actor.get_value.options(
+                    enable_task_events=False).remote(graph_id, key)
+                graph[key] = DataNode(key, ref)
 
     # this function does a 1 level unpacking of a ref of ref among other things.
     # TODO rename this function to something better. It is called by other scheduling actors to retrieve

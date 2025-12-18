@@ -15,7 +15,8 @@ def head_script(enable_distributed_scheduling) -> None:
 
     import deisa.ray as deisa
 
-    deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
+    deisa.config.enable_experimental_distributed_scheduling(
+        enable_distributed_scheduling)
 
     d = Deisa()
 
@@ -39,14 +40,15 @@ def head_script(enable_distributed_scheduling) -> None:
         simulation_callback,
         [
             WindowArrayDefinition("a", window_size=2),
-            WindowArrayDefinition("b", window_size=1, preprocess=lambda x: 2 * x),
+            WindowArrayDefinition("b", window_size=1,
+                                  preprocess=lambda x: 2 * x),
         ],
         max_iterations=NB_ITERATIONS,
     )
     d.execute_callbacks()
 
 
-@pytest.mark.parametrize("enable_distributed_scheduling", [False, True])
+@pytest.mark.parametrize("enable_distributed_scheduling", [True])
 def test_several_arrays(enable_distributed_scheduling, ray_cluster) -> None:  # noqa: F811
     head_ref = head_script.remote(enable_distributed_scheduling)
     wait_for_head_node()

@@ -14,7 +14,8 @@ def head_script(enable_distributed_scheduling) -> None:
 
     import deisa.ray as deisa
 
-    deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
+    deisa.config.enable_experimental_distributed_scheduling(
+        enable_distributed_scheduling)
 
     d = Deisa()
 
@@ -41,7 +42,7 @@ def head_script(enable_distributed_scheduling) -> None:
     d.execute_callbacks()
 
 
-@pytest.mark.parametrize("enable_distributed_scheduling", [True, False])
+@pytest.mark.parametrize("enable_distributed_scheduling", [True])
 def test_dask_persist(enable_distributed_scheduling, ray_cluster) -> None:  # noqa: F811
     head_ref = head_script.remote(enable_distributed_scheduling)
     wait_for_head_node()

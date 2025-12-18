@@ -78,10 +78,12 @@ class PartialArray:
 
         # Chunks owned by this actor for this array.
         # {(bridge_id, chunk position, chunk size), ...}
-        self.chunks_contained_meta: set[tuple[int, tuple[int, ...], tuple[int, ...]]] = set()
+        self.chunks_contained_meta: set[tuple[int,
+                                              tuple[int, ...], tuple[int, ...]]] = set()
         self.bid_to_pos: dict[int, tuple] = {}
 
-        self.per_timestep_arrays: AsyncDict[Timestep, ArrayPerTimestep] = AsyncDict()
+        self.per_timestep_arrays: AsyncDict[Timestep,
+                                            ArrayPerTimestep] = AsyncDict()
 
 
 @dataclass
@@ -132,47 +134,6 @@ class GraphInfo:
 
 
 @dataclass
-class ChunkRef:
-    """
-    Represents a chunk of an array in a Dask task graph.
-
-    This class is used as a placeholder in Dask task graphs to represent a
-    chunk of data. The task corresponding to this object must be scheduled
-    by the actor who has the actual data. This class is used since Dask
-    tends to inline simple tuples, which would prevent proper scheduling.
-
-    Parameters
-    ----------
-    actor_id : int
-        The ID of the scheduling actor that owns this chunk.
-    array_name : str
-        The real name of the array, without the timestep suffix.
-    timestep : Timestep
-        The timestep this chunk belongs to.
-    position : tuple[int, ...]
-        The position of the chunk in the array decomposition.
-    _all_chunks : ray.ObjectRef or None, optional
-        ObjectRef containing all chunks for this timestep. Set for one chunk
-        only to avoid duplication. Default is None.
-
-    Notes
-    -----
-    This class is used to prevent Dask from inlining simple tuples in the
-    task graph, which would break the scheduling mechanism. The behavior
-    may change in newer versions of Dask.
-    """
-
-    actor_id: int
-    array_name: str  # The real name, without the timestep
-    timestep: Timestep
-    position: tuple[int, ...]
-    bridge_id: int
-
-    # Set for one chunk only.
-    _all_chunks: ray.ObjectRef | None = None
-
-
-@dataclass
 class WindowArrayDefinition:
     """
     Description of an array with optional windowing support.
@@ -211,7 +172,6 @@ class _CallbackConfig:
     simulation_callback: Callable
     arrays_description: list[WindowArrayDefinition]
     max_iterations: int
-    prepare_iteration: Callable | None
     preparation_advance: int
 
 
@@ -354,7 +314,8 @@ class DaskArrayData:
             self.nb_chunks = math.prod(nb_chunks_per_dim)
 
             self.dtype = dtype
-            self.chunks_size = [[None for _ in range(n)] for n in nb_chunks_per_dim]
+            self.chunks_size = [
+                [None for _ in range(n)] for n in nb_chunks_per_dim]
         else:
             assert self.nb_chunks_per_dim == nb_chunks_per_dim
             assert self.dtype == dtype
@@ -407,14 +368,15 @@ class DaskArrayData:
 
         # done once only and then never again - move it somewhere else?
         if self.nb_scheduling_actors is None:
-            self.nb_scheduling_actors = len(set(self.position_to_node_actorID.values()))
+            self.nb_scheduling_actors = len(
+                set(self.position_to_node_actorID.values()))
 
         # each actor produces a single ref - once I have as many refs as scheduling actors,
         # I mark the array as ready to be formed.
         return len(self.chunk_refs[timestep]) == self.nb_scheduling_actors
 
     def get_full_array(
-        self, timestep: Timestep, *, distributing_scheduling_enabled: bool, is_preparation: bool = False
+        self, timestep: Timestep,
     ) -> da.Array:
         """
         Return the full Dask array for a given timestep.
@@ -423,10 +385,6 @@ class DaskArrayData:
         ----------
         timestep : Timestep
             The timestep for which the full array should be returned.
-        distributing_scheduling_enabled : bool
-            When ``True``, emit a graph containing :class:`ChunkRef` tasks
-            for distributed scheduling. When ``False``, materialise the
-            actual chunk payloads and build a local Dask array.
         is_preparation : bool, optional
             If True, the array will not contain ObjectRefs to the actual data.
             This is used for preparation arrays where only the structure is
@@ -457,42 +415,24 @@ class DaskArrayData:
         assert len(self.position_to_node_actorID) == self.nb_chunks
         assert self.nb_chunks is not None and self.nb_chunks_per_dim is not None
 
-        if is_preparation:
-            all_chunks = None
-        else:
-            all_chunks = ray.put(self.chunk_refs[timestep])
-            del self.chunk_refs[timestep]
+        del self.chunk_refs[timestep]
 
         # We need to add the timestep since the same name can be used several times for different
         # timesteps
         dask_name = f"{self.name}_{timestep}"
 
-        if distributing_scheduling_enabled:
-            graph = {
-                # We need to repeat the name and position in the value since the key might be removed
-                # by the Dask optimizer
-                (dask_name,)
-                + position: ChunkRef(  # note only first ChunkRef instance contains actual refs, the others contain only metadata.
-                    actor_id,
-                    self.name,
-                    timestep,
-                    position,
-                    self.position_to_bridgeID[position],
-                    _all_chunks=all_chunks if it == 0 else None,
-                )
-                for it, (position, actor_id) in enumerate(self.position_to_node_actorID.items())
-            }
-        else:
-            # TODO: this could be an antipattern (calling ray.get in for loop). Could maybe put all the
-            # double refs in a list and call ray.wait() or ray.get() on the list?
-            # something that submits all the refs one go.
-            graph = {(dask_name,) + position: ray.get(dr) for position, dr in self.pos_to_ref_by_timestep[timestep]}
+        # TODO: this could be an antipattern (calling ray.get in for loop). Could maybe put all the
+        # double refs in a list and call ray.wait() or ray.get() on the list?
+        # something that submits all the refs one go.
+        graph = {(dask_name,) + position: ray.get(dr)
+                 for position, dr in self.pos_to_ref_by_timestep[timestep]}
 
         # Needed for prepare iteration otherwise key lookup fails since iteration does not yet exist
         # TODO ensure flow is as expected
         self.pos_to_ref_by_timestep.pop(timestep, None)
 
-        dsk = HighLevelGraph.from_collections(dask_name, graph, dependencies=())
+        dsk = HighLevelGraph.from_collections(
+            dask_name, graph, dependencies=())
 
         full_array = da.Array(
             dsk,

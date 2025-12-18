@@ -72,7 +72,8 @@ class HeadNodeActor:
         self.new_array_created = asyncio.Event()
 
         # All the newly created arrays
-        self.arrays_ready: asyncio.Queue[tuple[str, Timestep, da.Array]] = asyncio.Queue()
+        self.arrays_ready: asyncio.Queue[tuple[str,
+                                               Timestep, da.Array]] = asyncio.Queue()
         self.registered_arrays: dict[str, DaskArrayData] = {}
 
     # TODO rename or move creation of global container elsewhere
@@ -101,7 +102,8 @@ class HeadNodeActor:
         the provided definitions.
         """
         # regulate how far ahead sim can go wrt to analytics
-        self.new_pending_array_semaphore = asyncio.Semaphore(max_pending_arrays)
+        self.new_pending_array_semaphore = asyncio.Semaphore(
+            max_pending_arrays)
 
         for name, f_preprocessing in arrays_definitions:
             self.registered_arrays[name] = DaskArrayData(name, f_preprocessing)
@@ -162,7 +164,8 @@ class HeadNodeActor:
         array_name: str,
         dtype: np.dtype,
         nb_chunks_per_dim: tuple[int, ...],
-        chunks_meta: list[tuple[int, tuple[int, ...], tuple[int, ...]]],  # [(chunk position, chunk size), ...]
+        # [(chunk position, chunk size), ...]
+        chunks_meta: list[tuple[int, tuple[int, ...], tuple[int, ...]]],
     ):
         """
         Register chunk ownership for a single array on behalf of one actor.
@@ -193,7 +196,8 @@ class HeadNodeActor:
         array = self.registered_arrays[array_name]
 
         for bridge_id, position, size in chunks_meta:
-            array.update_meta(nb_chunks_per_dim, dtype, position, size, actor_id_who_owns, bridge_id)
+            array.update_meta(nb_chunks_per_dim, dtype, position,
+                              size, actor_id_who_owns, bridge_id)
 
     def exchange_config(self, config: dict) -> None:
         """
@@ -212,7 +216,8 @@ class HeadNodeActor:
         the head actor aware of cluster-wide feature flags.
         """
         self.config = config
-        self._experimental_distributed_scheduling_enabled = config["experimental_distributed_scheduling_enabled"]
+        self._experimental_distributed_scheduling_enabled = config[
+            "experimental_distributed_scheduling_enabled"]
 
     async def chunks_ready(self, array_name: str, timestep: Timestep, pos_to_ref: dict[tuple, ray.ObjectRef]) -> None:
         """
@@ -249,7 +254,8 @@ class HeadNodeActor:
             # TODO what happens if new_array_created for an array of a prev iter is set?
             # could it influence this iter?
             # need to reason more about this condition
-            t1 = asyncio.create_task(self.new_pending_array_semaphore.acquire())
+            t1 = asyncio.create_task(
+                self.new_pending_array_semaphore.acquire())
             t2 = asyncio.create_task(self.new_array_created.wait())
 
             done, pending = await asyncio.wait([t1, t2], return_when=asyncio.FIRST_COMPLETED)
@@ -271,16 +277,16 @@ class HeadNodeActor:
 
         # ray.get(ref_to_list_of_chunks) -> [ref_of_ref_chunk_i, ref_ref_chunk_i+1, ...] (belonging to actor that owns it)
         # so I unpack it and give this ray ref.
-        is_ready = array.add_chunk_ref(ref_to_list_of_chunks, timestep, pos_to_ref)
+        is_ready = array.add_chunk_ref(
+            ref_to_list_of_chunks, timestep, pos_to_ref)
 
         if is_ready:
-            print(self._experimental_distributed_scheduling_enabled)
             self.arrays_ready.put_nowait(
                 (
                     array_name,
                     timestep,
                     array.get_full_array(
-                        timestep, distributing_scheduling_enabled=self._experimental_distributed_scheduling_enabled
+                        timestep
                     ),
                 )
             )
@@ -330,39 +336,3 @@ class HeadNodeActor:
         array = await self.arrays_ready.get()
         self.new_pending_array_semaphore.release()
         return array
-
-    async def get_preparation_array(self, array_name: str, timestep: Timestep) -> da.Array:
-        """
-        Return the full Dask array for a given timestep, used for preparation.
-
-        This method returns a Dask array structure without actual data
-        references, which is useful for preparation tasks that need to know
-        the array structure but don't need the actual data.
-
-        Parameters
-        ----------
-        array_name : str
-            The name of the array.
-        timestep : Timestep
-            The timestep for which the full array should be returned.
-
-        Returns
-        -------
-        da.Array
-            A Dask array representing the structure of the array for the
-            given timestep. This array does not contain ObjectRefs to actual
-            data (is_preparation=True).
-
-        Notes
-        -----
-        Waits for ``fully_defined`` on the corresponding
-        :class:`~deisa.ray.types.DaskArrayData` before returning. The
-        ``distributing_scheduling_enabled`` flag mirrors the runtime config
-        provided via :meth:`exchange_config`.
-        """
-        await self.registered_arrays[array_name].fully_defined.wait()
-        return self.registered_arrays[array_name].get_full_array(
-            timestep,
-            is_preparation=True,
-            distributing_scheduling_enabled=self._experimental_distributed_scheduling_enabled,
-        )
