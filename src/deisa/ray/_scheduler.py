@@ -1,6 +1,7 @@
 import random
 from typing import Callable
 import ray
+from collections import Counter
 from dask.core import get_dependencies
 from deisa.ray.scheduling_actor import ScheduledByOtherActor
 from deisa.ray.types import ActorID, GraphKey, GraphValue, RayActorHandle
@@ -55,6 +56,9 @@ def random_partitioning(dsk, scheduling_actors: dict) -> dict[str, int]:
     partition = {}
 
     for key, val in dsk.items():
+        deps = get_dependencies(dsk, key)
+        if deps == set():
+            print(f" Val = {val.args}", flush=True)
         partition[key] = actors.pop()
 
     return partition
@@ -103,6 +107,7 @@ def greedy_partitioning(dsk, scheduling_actors: dict) -> dict[str, int]:
     task B will also be assigned to actor 0 (assuming no other dependencies
     suggest a different actor).
     """
+    partition = {k: -1 for k in dsk.keys()}
 
     nb_tasks = len({k for k, v in dsk.items()})
     nb_scheduling_actors = len(scheduling_actors)
@@ -111,11 +116,28 @@ def greedy_partitioning(dsk, scheduling_actors: dict) -> dict[str, int]:
     actors = [actor_names[i % nb_scheduling_actors] for i in range(nb_tasks)]
     random.shuffle(actors)
 
-    partition = {}
+    def explore(k) -> int:
+        if partition[k] != -1:
+            return partition[k]
 
-    for key, val in dsk.items():
-        if key not in partition:
-            partition[key] = actors.pop()
+        deps = get_dependencies(dsk, k)
+        if deps == set():
+            partition[k] = actors.pop()
+        else:
+            actors_dependencies = [explore(dep)
+                                   for dep in get_dependencies(dsk, k)]
+
+            if not actors_dependencies:
+                # The task is a leaf, we use a random actor
+                partition[k] = random.choice(actor_names)
+            else:
+                partition[k] = Counter(
+                    actors_dependencies).most_common(1)[0][0]
+
+        return partition[k]
+
+    for key in dsk.keys():
+        explore(key)
 
     return partition
 
@@ -299,7 +321,7 @@ def deisa_ray_get(full_dask_graph: dict, keys_needed: list, **kwargs):
     """
     graph_id = random.randint(0, 2**128 - 1)
     partitioning_strategy: Callable = {"random": random_partitioning, "greedy": greedy_partitioning}[
-        kwargs.get("deisa_ray_partitioning_strategy", "random")
+        kwargs.get("deisa_ray_partitioning_strategy", "greedy")
     ]
 
     scheduling_actor_id_to_handle: dict[ActorID,
@@ -320,7 +342,6 @@ def deisa_ray_get(full_dask_graph: dict, keys_needed: list, **kwargs):
     )
     flattened_keys = process_keys(keys_needed)
 
-    # repack keys in case of non-aggregate operation
     result_refs: dict[GraphKey, ray.ObjectRef] = {}
 
     for key in flattened_keys:
@@ -333,7 +354,6 @@ def deisa_ray_get(full_dask_graph: dict, keys_needed: list, **kwargs):
         # Used to return results in same shape as keys_needed
         return nested_get(keys_needed, result_refs)
 
-    print(f"result_refs = {result_refs}", flush=True)
     # unwrap once using batched ray.get and repack into dict
     keys = list(result_refs.keys())
     refs = list(result_refs.values())  # materialize once, preserves order
