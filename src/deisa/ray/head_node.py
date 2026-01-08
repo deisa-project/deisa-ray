@@ -286,7 +286,7 @@ class HeadNodeActor:
                     array_name,
                     timestep,
                     array.get_full_array(
-                        timestep
+                        timestep, distributing_scheduling_enabled=self._experimental_distributed_scheduling_enabled
                     ),
                 )
             )

@@ -175,6 +175,12 @@ class _CallbackConfig:
     preparation_advance: int
 
 
+@dataclass
+class ChunkRef:
+    ref: ray.ObjectRef
+    actorid: str
+
+
 class DaskArrayData:
     """
     Information about a Dask array being built.
@@ -379,7 +385,7 @@ class DaskArrayData:
         return len(self.chunk_refs[timestep]) == self.nb_scheduling_actors
 
     def get_full_array(
-        self, timestep: Timestep,
+        self, timestep: Timestep, *, distributing_scheduling_enabled: bool
     ) -> da.Array:
         """
         Return the full Dask array for a given timestep.
@@ -424,8 +430,15 @@ class DaskArrayData:
 
         del self.chunk_refs[timestep]
 
-        graph = {(dask_name,) + position: ref for position,
-                 ref in self.pos_to_ref_by_timestep[timestep]}
+        if distributing_scheduling_enabled:
+            graph = {(dask_name,) + position:
+                     ChunkRef(ref=ref,
+                              actorid=self.position_to_node_actorID[next((pos for pos, r in self.pos_to_ref_by_timestep[timestep] if r == ref), None)])
+                     for position,
+                     ref in self.pos_to_ref_by_timestep[timestep]}
+        else:
+            graph = {(dask_name,) + position: ref for position,
+                     ref in self.pos_to_ref_by_timestep[timestep]}
 
         # Needed for prepare iteration otherwise key lookup fails since iteration does not yet exist
         # TODO ensure flow is as expected

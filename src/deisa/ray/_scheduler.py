@@ -2,11 +2,11 @@ import random
 from typing import Callable
 import ray
 from collections import Counter
-from dask.core import get_dependencies
+from dask.core import get_dependencies, flatten
 from deisa.ray.scheduling_actor import ScheduledByOtherActor
-from deisa.ray.types import ActorID, GraphKey, GraphValue, RayActorHandle
+from deisa.ray.types import ChunkRef, ActorID, GraphKey, GraphValue, RayActorHandle
 from ray.util.dask.scheduler_utils import nested_get
-from dask.core import flatten
+from dask._task_spec import DataNode, Task
 
 
 def random_partitioning(dsk, scheduling_actors: dict) -> dict[str, int]:
@@ -57,10 +57,23 @@ def random_partitioning(dsk, scheduling_actors: dict) -> dict[str, int]:
 
     for key, val in dsk.items():
         deps = get_dependencies(dsk, key)
-        if deps == set():
-            print(f" Val = {val.args}", flush=True)
-        partition[key] = actors.pop()
-
+        if isinstance(val, DataNode) and isinstance(val.value, ChunkRef):
+            chunkref: ChunkRef = val.value
+            partition[key] = chunkref.actorid
+            dsk[key] = DataNode(key, chunkref.ref)
+        elif deps == set() and isinstance(val, Task):
+            data_node = next(
+                (v for v in val.args[0].values()
+                 if isinstance(v, DataNode) and isinstance(v.value, ChunkRef)), None
+            )
+            if data_node is not None:
+                chunkref: ChunkRef = data_node.value
+                partition[key] = chunkref.actorid
+                dsk[key] = DataNode(key, chunkref.ref)
+            else:
+                partition[key] = actors.pop()
+        else:
+            partition[key] = actors.pop()
     return partition
 
 
@@ -121,8 +134,21 @@ def greedy_partitioning(dsk, scheduling_actors: dict) -> dict[str, int]:
             return partition[k]
 
         deps = get_dependencies(dsk, k)
-        if deps == set():
-            partition[k] = actors.pop()
+        if isinstance(dsk[k], DataNode) and isinstance(dsk[k].value, ChunkRef):
+            chunkref: ChunkRef = dsk[k].value
+            partition[k] = chunkref.actorid
+            dsk[k] = DataNode(k, chunkref.ref)
+        elif deps == set() and isinstance(dsk[k], Task):
+            data_node = next(
+                (v for v in dsk[k].args[0].values()
+                 if isinstance(v, DataNode) and isinstance(v.value, ChunkRef)), None
+            )
+            if data_node is not None:
+                chunkref: ChunkRef = data_node.value
+                partition[k] = chunkref.actorid
+                dsk[k] = DataNode(k, chunkref.ref)
+            else:
+                partition[k] = random.choice(actor_names)
         else:
             actors_dependencies = [explore(dep)
                                    for dep in get_dependencies(dsk, k)]
@@ -133,12 +159,10 @@ def greedy_partitioning(dsk, scheduling_actors: dict) -> dict[str, int]:
             else:
                 partition[k] = Counter(
                     actors_dependencies).most_common(1)[0][0]
-
         return partition[k]
 
     for key in dsk.keys():
         explore(key)
-
     return partition
 
 
@@ -329,6 +353,12 @@ def deisa_ray_get(full_dask_graph: dict, keys_needed: list, **kwargs):
 
     full_dask_graph = full_dask_graph.dask
 
+    print("\n##############BEGIN HERE \n", flush=True)
+    for key, value in full_dask_graph.items():
+        args = ""
+        if isinstance(value, Task):
+            args = value.args
+        print(f"{key} ==> {value} || {args}", flush=True)
     # full_dask_graph = {k: v for k, v in sorted(full_dask_graph.items())}
     graph_key_to_actor_id_map: dict[GraphKey, ActorID] = partitioning_strategy(
         full_dask_graph, scheduling_actor_id_to_handle
@@ -340,6 +370,14 @@ def deisa_ray_get(full_dask_graph: dict, keys_needed: list, **kwargs):
         scheduling_actor_id_to_handle=scheduling_actor_id_to_handle,
         graph_id=graph_id,
     )
+
+    print("\n", flush=True)
+    for key, value in full_dask_graph.items():
+        args = ""
+        if isinstance(value, Task):
+            args = value.args
+        print(f"{key} ==> {value} || {args}", flush=True)
+
     flattened_keys = process_keys(keys_needed)
 
     result_refs: dict[GraphKey, ray.ObjectRef] = {}

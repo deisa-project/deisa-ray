@@ -621,9 +621,8 @@ class SchedulingActor(NodeActorBase):
         # However, to make the entire graph "coherent", I need to make leaf nodes refs of refs as well. Then it all becomes
         # cohesive.
         # I am missing why we need the pickling and how memory is released.
-        double_ref = graph_info.refs[key]
-        ref_to_result = await double_ref
-        return ref_to_result
+        ref = graph_info.refs[key]
+        return await ref
 
 
 @ray.remote
