@@ -274,7 +274,6 @@ class HeadNodeActor:
         is_ready = array.add_chunk_ref(ref_to_list_of_chunks, timestep, pos_to_ref)
 
         if is_ready:
-            print(self._experimental_distributed_scheduling_enabled)
             self.arrays_ready.put_nowait(
                 (
                     array_name,
