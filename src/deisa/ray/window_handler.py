@@ -223,6 +223,9 @@ class Deisa:
         prepare_iteration = cfg.prepare_iteration
         preparation_advance = cfg.preparation_advance
 
+        # TODO: make it per array and default to 0. Aka: sim cannot go ahead of analytics.
+        # This is consistent with the regime we "expect" where sim is more compute heavy than
+        # analytics.
         max_pending_arrays = 2 * len(arrays_description)
 
         # Convert the definitions to the type expected by the head node
