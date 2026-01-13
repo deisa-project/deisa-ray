@@ -8,6 +8,7 @@ from deisa.ray.scheduling_actor import ChunkRef, ScheduledByOtherActor
 from deisa.ray.types import ActorID, GraphKey, GraphValue, RayActorHandle
 from ray.util.dask.scheduler_utils import nested_get
 from dask.core import flatten
+from dask._task_spec import DataNode, Task
 
 
 def random_partitioning(dsk, scheduling_actors: dict) -> dict[str, int]:
@@ -47,7 +48,7 @@ def random_partitioning(dsk, scheduling_actors: dict) -> dict[str, int]:
     This strategy provides load balancing but does not consider task
     dependencies or data locality.
     """
-    nb_tasks = len({k for k, v in dsk.items() if not isinstance(v, ChunkRef)})
+    nb_tasks = len({k for k, v in dsk.items()})
     nb_scheduling_actors = len(scheduling_actors)
     actor_names = list(scheduling_actors.keys())
 
@@ -57,11 +58,23 @@ def random_partitioning(dsk, scheduling_actors: dict) -> dict[str, int]:
     partition = {}
 
     for key, val in dsk.items():
-        if isinstance(val, ChunkRef):
-            partition[key] = val.actor_id
+        deps = get_dependencies(dsk, key)
+        if isinstance(val, DataNode) and isinstance(val.value, ChunkRef):
+            chunkref: ChunkRef = val.value
+            partition[key] = chunkref.actorid
+            dsk[key] = DataNode(key, chunkref.ref)
+        elif deps == set() and isinstance(val, Task):
+            data_node = next(
+                (v for v in val.args[0].values() if isinstance(v, DataNode) and isinstance(v.value, ChunkRef)), None
+            )
+            if data_node is not None:
+                chunkref: ChunkRef = data_node.value
+                partition[key] = chunkref.actorid
+                dsk[key] = DataNode(key, chunkref.ref)
+            else:
+                partition[key] = actors.pop()
         else:
             partition[key] = actors.pop()
-
     return partition
 
 
@@ -109,16 +122,33 @@ def greedy_partitioning(dsk, scheduling_actors: dict) -> dict[str, int]:
     suggest a different actor).
     """
     partition = {k: -1 for k in dsk.keys()}
+
+    nb_tasks = len({k for k, v in dsk.items()})
+    nb_scheduling_actors = len(scheduling_actors)
     actor_names = list(scheduling_actors.keys())
+
+    actors = [actor_names[i % nb_scheduling_actors] for i in range(nb_tasks)]
+    random.shuffle(actors)
 
     def explore(k) -> int:
         if partition[k] != -1:
             return partition[k]
 
-        val = dsk[k]
-
-        if isinstance(val, ChunkRef):
-            partition[k] = val.actor_id
+        deps = get_dependencies(dsk, k)
+        if isinstance(dsk[k], DataNode) and isinstance(dsk[k].value, ChunkRef):
+            chunkref: ChunkRef = dsk[k].value
+            partition[k] = chunkref.actorid
+            dsk[k] = DataNode(k, chunkref.ref)
+        elif deps == set() and isinstance(dsk[k], Task):
+            data_node = next(
+                (v for v in dsk[k].args[0].values() if isinstance(v, DataNode) and isinstance(v.value, ChunkRef)), None
+            )
+            if data_node is not None:
+                chunkref: ChunkRef = data_node.value
+                partition[k] = chunkref.actorid
+                dsk[k] = DataNode(k, chunkref.ref)
+            else:
+                partition[k] = random.choice(actor_names)
         else:
             actors_dependencies = [explore(dep) for dep in get_dependencies(dsk, k)]
 
@@ -127,12 +157,10 @@ def greedy_partitioning(dsk, scheduling_actors: dict) -> dict[str, int]:
                 partition[k] = random.choice(actor_names)
             else:
                 partition[k] = Counter(actors_dependencies).most_common(1)[0][0]
-
         return partition[k]
 
     for key in dsk.keys():
         explore(key)
-
     return partition
 
 
@@ -320,7 +348,7 @@ def deisa_ray_get(full_dask_graph: dict, keys_needed: list, **kwargs):
 
     scheduling_actor_id_to_handle: dict[ActorID, RayActorHandle] = get_scheduling_actors_mapping()
 
-    full_dask_graph = {k: v for k, v in sorted(full_dask_graph.items())}
+    full_dask_graph = full_dask_graph.dask
     graph_key_to_actor_id_map: dict[GraphKey, ActorID] = partitioning_strategy(
         full_dask_graph, scheduling_actor_id_to_handle
     )
