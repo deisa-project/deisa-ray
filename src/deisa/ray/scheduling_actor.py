@@ -565,11 +565,16 @@ class SchedulingActor(NodeActorBase):
                 graph[key] = actor.get_value.options(enable_task_events=False).remote(graph_id, key)
 
             # Replace the false chunks by the real ObjectRefs
-            if isinstance(val, ChunkRef):
-                assert val.actor_id == self.actor_id
+            # TODO we never enter this condition due to new dask version
+            # so for now prepare iteration (in the future) will not work.
+            # FOR FUTURE WHOEVER: if trying to enable prepare iteration stuff, you need to make sure
+            # that the function enters the if below somehow, because the awaits are made so that
+            # the actor will wait until the refs are created and the leaf nodes will therefore exist.
+            # only then, can the tasks proceed. However, the graph itself is already created.
 
-                # TODO: maybe awaiting is not necessary. When would the key not be present in the
-                # AsyncDict?
+            if isinstance(val, ChunkRef):
+                assert val.actorid == self.actor_id
+
                 array = await self.partial_arrays.wait_for_key(val.array_name)
 
                 array_timestep = await array.per_timestep_arrays.wait_for_key(val.timestep)
@@ -577,9 +582,7 @@ class SchedulingActor(NodeActorBase):
                 # should be pickled ref of ref
                 ref = await array_timestep.local_chunks.wait_for_key(val.bridge_id)
 
-                # TODO what does this mean?
                 if isinstance(ref, bytes):  # This may not be the case depending on the asyncio scheduling order
-                    # technically, here its an actual ray ref which is a ref of ref.
                     ref = pickle.loads(ref)
                 else:
                     ref = pickle.loads(pickle.dumps(ref))  # To free the memory automatically
