@@ -78,10 +78,12 @@ class PartialArray:
 
         # Chunks owned by this actor for this array.
         # {(bridge_id, chunk position, chunk size), ...}
-        self.chunks_contained_meta: set[tuple[int, tuple[int, ...], tuple[int, ...]]] = set()
+        self.chunks_contained_meta: set[tuple[int,
+                                              tuple[int, ...], tuple[int, ...]]] = set()
         self.bid_to_pos: dict[int, tuple] = {}
 
-        self.per_timestep_arrays: AsyncDict[Timestep, ArrayPerTimestep] = AsyncDict()
+        self.per_timestep_arrays: AsyncDict[Timestep,
+                                            ArrayPerTimestep] = AsyncDict()
 
 
 @dataclass
@@ -305,7 +307,8 @@ class DaskArrayData:
         # global reference is added to the Dask graph. Then, the list is cleared.
         self.chunk_refs: dict[Timestep, list[ray.ObjectRef]] = {}
 
-        self.pos_to_ref_by_timestep: dict[Timestep, list[tuple[tuple, ray.ObjectRef]]] = defaultdict(list)
+        self.pos_to_ref_by_timestep: dict[Timestep,
+                                          list[tuple[tuple, ray.ObjectRef]]] = defaultdict(list)
 
     def update_meta(
         self,
@@ -351,7 +354,8 @@ class DaskArrayData:
             self.nb_chunks = math.prod(nb_chunks_per_dim)
 
             self.dtype = dtype
-            self.chunks_size = [[None for _ in range(n)] for n in nb_chunks_per_dim]
+            self.chunks_size = [
+                [None for _ in range(n)] for n in nb_chunks_per_dim]
         else:
             assert self.nb_chunks_per_dim == nb_chunks_per_dim
             assert self.dtype == dtype
@@ -406,7 +410,8 @@ class DaskArrayData:
 
         # done once only and then never again - move it somewhere else?
         if self.nb_scheduling_actors is None:
-            self.nb_scheduling_actors = len(set(self.position_to_node_actorID.values()))
+            self.nb_scheduling_actors = len(
+                set(self.position_to_node_actorID.values()))
 
         # each actor produces a single ref - once I have as many refs as scheduling actors,
         # I mark the array as ready to be formed.
@@ -445,7 +450,8 @@ class DaskArrayData:
         When distributed scheduling is enabled the graph uses :class:`ChunkRef`
         placeholders that keep data owner information. Otherwise the concrete
         chunk payloads are inlined. Chunk reference lists are deleted after
-        embedding in the graph to avoid leaking memory. ``is_preparation`` skips
+        embedding in the graph to avoid leaking memory.
+        (is_preparation not used for now) ``is_preparation`` skips
         storing payload refs entirely so analytics can inspect shapes/chunks
         without materialising data.
         """
@@ -463,7 +469,8 @@ class DaskArrayData:
                 (dask_name,) + position: ChunkRef(
                     ref=ref,
                     actorid=self.position_to_node_actorID[
-                        next((pos for pos, r in self.pos_to_ref_by_timestep[timestep] if r == ref), None)
+                        next(
+                            (pos for pos, r in self.pos_to_ref_by_timestep[timestep] if r == ref), None)
                     ],
                     array_name=self.name,
                     timestep=timestep,
@@ -472,13 +479,15 @@ class DaskArrayData:
                 for position, ref in self.pos_to_ref_by_timestep[timestep]
             }
         else:
-            graph = {(dask_name,) + position: ref for position, ref in self.pos_to_ref_by_timestep[timestep]}
+            graph = {(dask_name,) + position: ref for position,
+                     ref in self.pos_to_ref_by_timestep[timestep]}
 
         # Needed for prepare iteration otherwise key lookup fails since iteration does not yet exist
         # TODO ensure flow is as expected
         self.pos_to_ref_by_timestep.pop(timestep, None)
 
-        dsk = HighLevelGraph.from_collections(dask_name, graph, dependencies=())
+        dsk = HighLevelGraph.from_collections(
+            dask_name, graph, dependencies=())
 
         full_array = da.Array(
             dsk,
