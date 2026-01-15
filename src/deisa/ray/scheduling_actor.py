@@ -553,7 +553,7 @@ class SchedulingActor(NodeActorBase):
         The provided ``graph`` is mutated in place.
         - ``ScheduledByOtherActor`` entries are rewritten to remote calls
           to the owning scheduling actor.
-        - ``ChunkRef`` entries are replaced with the pickled or direct
+        - (not used for now) ``ChunkRef`` entries are replaced with the pickled or direct
           ObjectRefs stored locally for the relevant timestep/position.
         - When a stored ref is still in-memory, it is pickled to ensure
           ownership transfer and memory release after scheduling.
@@ -582,10 +582,12 @@ class SchedulingActor(NodeActorBase):
                 # should be pickled ref of ref
                 ref = await array_timestep.local_chunks.wait_for_key(val.bridge_id)
 
-                if isinstance(ref, bytes):  # This may not be the case depending on the asyncio scheduling order
+                # This may not be the case depending on the asyncio scheduling order
+                if isinstance(ref, bytes):
                     ref = pickle.loads(ref)
                 else:
-                    ref = pickle.loads(pickle.dumps(ref))  # To free the memory automatically
+                    # To free the memory automatically
+                    ref = pickle.loads(pickle.dumps(ref))
 
                 # replace ChunkRef by actual ref (still ref of ref)
                 graph[key] = ref
