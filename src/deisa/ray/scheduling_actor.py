@@ -73,7 +73,8 @@ class NodeActorBase:
         self.actor_id = actor_id
         self.actor_handle = ray.get_runtime_context().current_actor
 
-        self.head = get_ready_actor_with_retry(name="simulation_head", namespace="deisa_ray")
+        self.head = get_ready_actor_with_retry(
+            name="simulation_head", namespace="deisa_ray")
         await self.head.register_scheduling_actor.remote(actor_id, self.actor_handle)
 
         # Keeps track of array metadata AND ref per timestep.
@@ -216,10 +217,12 @@ class NodeActorBase:
         event so concurrent callers can proceed. Until that point additional
         callers block on ``ready_event``.
         """
-        partial_array = self._create_or_retrieve_partial_array(array_name, nb_chunks_of_node)
+        partial_array = self._create_or_retrieve_partial_array(
+            array_name, nb_chunks_of_node)
 
         # add metadata for this array
-        partial_array.chunks_contained_meta.add((bridge_id, chunk_position, chunk_shape))
+        partial_array.chunks_contained_meta.add(
+            (bridge_id, chunk_position, chunk_shape))
         partial_array.bid_to_pos[bridge_id] = chunk_position
 
         # Technically, no race conditions should happen since its calls to the same actor method
@@ -368,8 +371,10 @@ class NodeActorBase:
         if array_name not in self.partial_arrays:
             # respect contract at the beginning
             raise ContractError(
-                f"User requested to add chunk for {array_name} but this array has"
-                f"not been described. Please call register_array({array_name}) before calling"
+                f"User requested to add chunk for {
+                    array_name} but this array has"
+                f"not been described. Please call register_array({
+                    array_name}) before calling"
                 "add_chunk()."
             )
         partial_array = self.partial_arrays[array_name]
@@ -528,7 +533,8 @@ class SchedulingActor(NodeActorBase):
         # Incindentally, this is why, removing ray_persist = True from remote_ray_dask_get makes everything fail (because we then
         # get a tuple of single refs instead of double). We need double refs to keep the entire graph consistent.
         # doubleRefs_of_results: tuple[DoubleRef] = await remote_ray_dask_get.remote(graph, keys_needed)
-        refs_to_results: list[ray.ObjectRef] = ray_dask_get(graph, keys_needed, ray_persist=True)
+        refs_to_results: list[ray.ObjectRef] = ray_dask_get(
+            graph, keys_needed, ray_persist=True)
 
         # store the refs in a dictionary so other actors can retrieve them
         for key, ref in zip(keys_needed, refs_to_results):
@@ -553,7 +559,7 @@ class SchedulingActor(NodeActorBase):
         The provided ``graph`` is mutated in place.
         - ``ScheduledByOtherActor`` entries are rewritten to remote calls
           to the owning scheduling actor.
-        - ``ChunkRef`` entries are replaced with the pickled or direct
+        - (not used for now) ``ChunkRef`` entries are replaced with the pickled or direct
           ObjectRefs stored locally for the relevant timestep/position.
         - When a stored ref is still in-memory, it is pickled to ensure
           ownership transfer and memory release after scheduling.
@@ -562,7 +568,8 @@ class SchedulingActor(NodeActorBase):
             # Adapt external keys
             if isinstance(val, ScheduledByOtherActor):
                 actor = self.scheduling_actors[val.actor_id]
-                graph[key] = actor.get_value.options(enable_task_events=False).remote(graph_id, key)
+                graph[key] = actor.get_value.options(
+                    enable_task_events=False).remote(graph_id, key)
 
             # Replace the false chunks by the real ObjectRefs
             # TODO we never enter this condition due to new dask version
@@ -582,10 +589,12 @@ class SchedulingActor(NodeActorBase):
                 # should be pickled ref of ref
                 ref = await array_timestep.local_chunks.wait_for_key(val.bridge_id)
 
-                if isinstance(ref, bytes):  # This may not be the case depending on the asyncio scheduling order
+                # This may not be the case depending on the asyncio scheduling order
+                if isinstance(ref, bytes):
                     ref = pickle.loads(ref)
                 else:
-                    ref = pickle.loads(pickle.dumps(ref))  # To free the memory automatically
+                    # To free the memory automatically
+                    ref = pickle.loads(pickle.dumps(ref))
 
                 # replace ChunkRef by actual ref (still ref of ref)
                 graph[key] = ref
