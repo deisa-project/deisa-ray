@@ -16,14 +16,14 @@ def random_partitioning(dsk, scheduling_actors: dict) -> dict[str, int]:
     Partition a Dask task graph randomly across scheduling actors.
 
     This partitioning strategy assigns tasks randomly to scheduling actors,
-    with the exception of ChunkRef tasks which are assigned to their
+    with the exception of leaf tasks which are assigned to their
     designated actor.
 
     Parameters
     ----------
     dsk : dict
         The Dask task graph dictionary. Keys are task identifiers, values
-        are tasks or ChunkRef objects.
+        are tasks or other Dask objects.
     scheduling_actors : dict
         Dictionary mapping actor IDs to their actor handles. The keys are
         used to assign tasks to actors.
@@ -38,11 +38,11 @@ def random_partitioning(dsk, scheduling_actors: dict) -> dict[str, int]:
     -----
     The partitioning process:
 
-    1. Counts non-ChunkRef tasks
+    1. Counts tasks
     2. Creates a list of actor IDs, cycling through actors to distribute
        tasks evenly
     3. Shuffles the actor assignments randomly
-    4. Assigns ChunkRef tasks to their designated actor (from ChunkRef.actor_id)
+    4. Assigns ChunkRef tasks to their designated actor (from ChunkRef.actorid)
     5. Assigns other tasks to randomly shuffled actors
 
     This strategy provides load balancing but does not consider task
@@ -90,7 +90,7 @@ def greedy_partitioning(dsk, scheduling_actors: dict) -> dict[str, int]:
     ----------
     dsk : dict
         The Dask task graph dictionary. Keys are task identifiers, values
-        are tasks or ChunkRef objects.
+        are tasks or other Dask objects.
     scheduling_actors : dict
         Dictionary mapping actor IDs to their actor handles. The keys are
         used to assign tasks to actors.
@@ -105,11 +105,11 @@ def greedy_partitioning(dsk, scheduling_actors: dict) -> dict[str, int]:
     -----
     The partitioning process uses a greedy recursive algorithm:
 
-    1. ChunkRef tasks are assigned to their designated actor (from ChunkRef.actor_id)
+    1. ChunkRef tasks are assigned to their designated actor (from ChunkRef.actorid)
     2. For other tasks, the algorithm explores dependencies recursively
     3. Tasks are assigned to the actor that appears most frequently among
        their dependencies (using Counter.most_common)
-    4. Leaf tasks (no dependencies) are assigned to a random actor
+    4. Leaf tasks (no dependencies) that are not ChunkRef are assigned to a random actor
 
     This strategy aims to minimize cross-actor communication by co-locating
     dependent tasks on the same actor. It provides better data locality than
@@ -312,14 +312,13 @@ def deisa_ray_get(full_dask_graph: dict, keys_needed: list, **kwargs):
     -----
     The scheduler performs the following steps:
 
-    1. Sorts the graph by keys for deterministic scheduling
-    2. Retrieves the head node and scheduling actors
-    3. Partitions the graph using the selected strategy (random or greedy)
-    4. Creates partitioned graphs for each actor, replacing cross-actor
+    1. Retrieves the head node and scheduling actors
+    2. Partitions the graph using the selected strategy (random or greedy)
+    3. Creates partitioned graphs for each actor, replacing cross-actor
        dependencies with ScheduledByOtherActor placeholders
-    5. Schedules the partitioned graphs on their respective actors
-    6. Retrieves the result for the requested key from the appropriate actor
-    7. Optionally returns ObjectRefs or computed values
+    4. Schedules the partitioned graphs on their respective actors
+    5. Retrieves the result for the requested key from the appropriate actor
+    6. Optionally returns ObjectRefs or computed values
 
     The function supports debug logging to a file if `deisa_ray_debug_logs`
     is provided. Log entries include timestamps and major scheduling steps.

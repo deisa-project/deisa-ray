@@ -445,7 +445,8 @@ class DaskArrayData:
         When distributed scheduling is enabled the graph uses :class:`ChunkRef`
         placeholders that keep data owner information. Otherwise the concrete
         chunk payloads are inlined. Chunk reference lists are deleted after
-        embedding in the graph to avoid leaking memory. ``is_preparation`` skips
+        embedding in the graph to avoid leaking memory.
+        (is_preparation not used for now) ``is_preparation`` skips
         storing payload refs entirely so analytics can inspect shapes/chunks
         without materialising data.
         """
