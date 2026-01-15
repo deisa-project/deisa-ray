@@ -366,11 +366,25 @@ dataframe = [
 ]
 
 [[package]]
+name = "deisa-core"
+version = "0.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "dask" },
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/99/48/3c3744bc0156691ad0e7ad3074cc3ce15f8c7fdc497c1713cc0e9ad2b6a9/deisa_core-0.2.0.tar.gz", hash = "sha256:94df0fdbdaf1c48df82adc1b72c1fdea6c68dc65cb99f080f535886a8235cfb6", size = 5772, upload-time = "2025-12-22T09:41:16.028Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6a/14/da542a08c1498a2c951b9d58d338906f1517d950268a51cd5104b31cd73a/deisa_core-0.2.0-py3-none-any.whl", hash = "sha256:9ede52637d57c8616f8f88c679176dfe6c257534fb86c3f73a62383752087d44", size = 7254, upload-time = "2025-12-22T09:41:14.875Z" },
+]
+
+[[package]]
 name = "deisa-ray"
 version = "0.0.1"
 source = { editable = "." }
 dependencies = [
     { name = "dask", extra = ["dataframe"] },
+    { name = "deisa-core" },
     { name = "numpy" },
     { name = "ray", extra = ["default"] },
 ]
@@ -393,6 +407,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "dask", extras = ["dataframe"], specifier = "==2025.5.0" },
+    { name = "deisa-core", specifier = ">=0.2.0" },
     { name = "numpy" },
     { name = "ray", extras = ["default"], specifier = "==2.48.0" },
 ]

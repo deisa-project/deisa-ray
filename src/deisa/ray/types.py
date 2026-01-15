@@ -10,6 +10,7 @@ from deisa.ray import Timestep
 import dask.array as da
 from deisa.ray._async_dict import AsyncDict
 from collections import defaultdict
+from deisa.core.interfaces import SupportsSlidingWindow
 
 type DoubleRef = ray.ObjectRef
 type ActorID = str
@@ -205,11 +206,12 @@ class WindowArrayDefinition:
 
 @dataclass
 class _CallbackConfig:
-    simulation_callback: Callable
+    simulation_callback: SupportsSlidingWindow.Callback
     arrays_description: list[WindowArrayDefinition]
     max_iterations: int
     prepare_iteration: Callable | None
     preparation_advance: int
+    exception_handler: SupportsSlidingWindow.ExceptionHandler
 
 
 class DaskArrayData:

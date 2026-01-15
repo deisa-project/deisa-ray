@@ -1,5 +1,5 @@
 import gc
-from typing import Any, Callable, Hashable, Optional
+from typing import Any, Callable, Hashable, Optional, Literal
 
 import dask
 import dask.array as da
@@ -12,6 +12,8 @@ from deisa.ray.utils import get_head_actor_options
 from deisa.ray.types import ActorID, RayActorHandle, WindowArrayDefinition, _CallbackConfig
 from deisa.ray.config import config
 import logging
+import deisa.core.interface import SupportsSlidingWindow
+from deisa.ray.errors import _default_exception_handler
 
 
 @ray.remote(num_cpus=0, max_retries=0)
@@ -136,8 +138,10 @@ class Deisa:
 
     def register_callback(
         self,
-        simulation_callback: Callable,
+        simulation_callback: SupportsSlidingWindow.Callback,
         arrays_description: list[WindowArrayDefinition],
+        exception_handler: Optional[SupportsSlidingWindow.ExceptionHandler] = None,
+        when: Literal['AND', 'OR'] = 'AND',
         *,
         max_iterations=1000_000_000,
         prepare_iteration: Callable | None = None,
@@ -170,6 +174,7 @@ class Deisa:
             max_iterations=max_iterations,
             prepare_iteration=prepare_iteration,
             preparation_advance=preparation_advance,
+            exception_handler = exception_handler or _default_exception_handler,
         )
         self.registered_callbacks.append(cfg)
 
@@ -222,6 +227,7 @@ class Deisa:
         max_iterations = cfg.max_iterations
         prepare_iteration = cfg.prepare_iteration
         preparation_advance = cfg.preparation_advance
+        exception_handler = cfg.exception_handler
 
         # TODO: make it per array and default to 0. Aka: sim cannot go ahead of analytics.
         # This is consistent with the regime we "expect" where sim is more compute heavy than
@@ -279,12 +285,20 @@ class Deisa:
                         for timestep in range(max(iteration - description.window_size + 1, 0), iteration + 1)
                     ]
 
-            if prepare_iteration is not None:
-                preparation_result = ray.get(preparation_results[iteration])
-                simulation_callback(**all_arrays, timestep=timestep, preparation_result=preparation_result)
-            else:
-                simulation_callback(**all_arrays, timestep=timestep)
-
+            try:
+                if prepare_iteration is not None:
+                    preparation_result = ray.get(preparation_results[iteration])
+                    simulation_callback(**all_arrays, timestep=timestep, preparation_result=preparation_result)
+                else:
+                    simulation_callback(**all_arrays, timestep=timestep)
+            except TimeoutError:
+                pass
+            except BaseException as e:
+                try: 
+                    exception_handler(e)
+                except BaseException as e:
+                    _default_exception_handler(e)
+            
             del all_arrays
 
             # Remove the oldest arrays
