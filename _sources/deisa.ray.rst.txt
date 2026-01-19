@@ -11,7 +11,6 @@ Submodules
    deisa.ray.config
    deisa.ray.errors
    deisa.ray.head_node
-   deisa.ray.ray_patch
    deisa.ray.scheduling_actor
    deisa.ray.types
    deisa.ray.utils

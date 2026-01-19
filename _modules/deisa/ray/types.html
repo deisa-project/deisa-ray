@@ -200,7 +200,6 @@
 <li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.config.html">deisa.ray.config module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.errors.html">deisa.ray.errors module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.head_node.html">deisa.ray.head_node module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.ray_patch.html">deisa.ray.ray_patch module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.scheduling_actor.html">deisa.ray.scheduling_actor module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.types.html">deisa.ray.types module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.utils.html">deisa.ray.utils module</a></li>
@@ -418,14 +417,11 @@
 <span class="sd">    may change in newer versions of Dask.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="n">actor_id</span><span class="p">:</span> <span class="nb">int</span>
-    <span class="n">array_name</span><span class="p">:</span> <span class="nb">str</span>  <span class="c1"># The real name, without the timestep</span>
-    <span class="n">timestep</span><span class="p">:</span> <span class="n">Timestep</span>
-    <span class="n">position</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
-    <span class="n">bridge_id</span><span class="p">:</span> <span class="nb">int</span>
-
-    <span class="c1"># Set for one chunk only.</span>
-    <span class="n">_all_chunks</span><span class="p">:</span> <span class="n">ray</span><span class="o">.</span><span class="n">ObjectRef</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span></div>
+    <span class="n">ref</span><span class="p">:</span> <span class="n">ray</span><span class="o">.</span><span class="n">ObjectRef</span>
+    <span class="n">actorid</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">array_name</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">timestep</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">bridge_id</span><span class="p">:</span> <span class="nb">int</span></div>
 
 
 
@@ -570,7 +566,7 @@
         <span class="c1"># global reference is added to the Dask graph. Then, the list is cleared.</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">chunk_refs</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Timestep</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="n">ray</span><span class="o">.</span><span class="n">ObjectRef</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
 
-        <span class="bp">self</span><span class="o">.</span><span class="n">pos_to_ref_by_timestep</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pos_to_ref_by_timestep</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Timestep</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">tuple</span><span class="p">,</span> <span class="n">ray</span><span class="o">.</span><span class="n">ObjectRef</span><span class="p">]]]</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
 
 <div class="viewcode-block" id="DaskArrayData.update_meta">
 <a class="viewcode-back" href="../../../deisa.ray.types.html#deisa.ray.types.DaskArrayData.update_meta">[docs]</a>
@@ -636,7 +632,9 @@
 
 <div class="viewcode-block" id="DaskArrayData.add_chunk_ref">
 <a class="viewcode-back" href="../../../deisa.ray.types.html#deisa.ray.types.DaskArrayData.add_chunk_ref">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">add_chunk_ref</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">chunk_ref</span><span class="p">:</span> <span class="n">ray</span><span class="o">.</span><span class="n">ObjectRef</span><span class="p">,</span> <span class="n">timestep</span><span class="p">:</span> <span class="n">Timestep</span><span class="p">,</span> <span class="n">pos_to_ref</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">add_chunk_ref</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">chunk_ref</span><span class="p">:</span> <span class="n">ray</span><span class="o">.</span><span class="n">ObjectRef</span><span class="p">,</span> <span class="n">timestep</span><span class="p">:</span> <span class="n">Timestep</span><span class="p">,</span> <span class="n">pos_to_ref</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">tuple</span><span class="p">,</span> <span class="n">ray</span><span class="o">.</span><span class="n">ObjectRef</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Add a reference sent by a scheduling actor.</span>
 
@@ -693,10 +691,6 @@
 <span class="sd">        ----------</span>
 <span class="sd">        timestep : Timestep</span>
 <span class="sd">            The timestep for which the full array should be returned.</span>
-<span class="sd">        distributing_scheduling_enabled : bool</span>
-<span class="sd">            When ``True``, emit a graph containing :class:`ChunkRef` tasks</span>
-<span class="sd">            for distributed scheduling. When ``False``, materialise the</span>
-<span class="sd">            actual chunk payloads and build a local Dask array.</span>
 <span class="sd">        is_preparation : bool, optional</span>
 <span class="sd">            If True, the array will not contain ObjectRefs to the actual data.</span>
 <span class="sd">            This is used for preparation arrays where only the structure is</span>
@@ -720,43 +714,35 @@
 <span class="sd">        When distributed scheduling is enabled the graph uses :class:`ChunkRef`</span>
 <span class="sd">        placeholders that keep data owner information. Otherwise the concrete</span>
 <span class="sd">        chunk payloads are inlined. Chunk reference lists are deleted after</span>
-<span class="sd">        embedding in the graph to avoid leaking memory. ``is_preparation`` skips</span>
+<span class="sd">        embedding in the graph to avoid leaking memory.</span>
+<span class="sd">        (is_preparation not used for now) ``is_preparation`` skips</span>
 <span class="sd">        storing payload refs entirely so analytics can inspect shapes/chunks</span>
 <span class="sd">        without materialising data.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">position_to_node_actorID</span><span class="p">)</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">nb_chunks</span>
         <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">nb_chunks</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">nb_chunks_per_dim</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
 
-        <span class="k">if</span> <span class="n">is_preparation</span><span class="p">:</span>
-            <span class="n">all_chunks</span> <span class="o">=</span> <span class="kc">None</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">all_chunks</span> <span class="o">=</span> <span class="n">ray</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">chunk_refs</span><span class="p">[</span><span class="n">timestep</span><span class="p">])</span>
-            <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">chunk_refs</span><span class="p">[</span><span class="n">timestep</span><span class="p">]</span>
-
         <span class="c1"># We need to add the timestep since the same name can be used several times for different</span>
         <span class="c1"># timesteps</span>
         <span class="n">dask_name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">timestep</span><span class="si">}</span><span class="s2">&quot;</span>
 
+        <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">chunk_refs</span><span class="p">[</span><span class="n">timestep</span><span class="p">]</span>
+
         <span class="k">if</span> <span class="n">distributing_scheduling_enabled</span><span class="p">:</span>
             <span class="n">graph</span> <span class="o">=</span> <span class="p">{</span>
-                <span class="c1"># We need to repeat the name and position in the value since the key might be removed</span>
-                <span class="c1"># by the Dask optimizer</span>
-                <span class="p">(</span><span class="n">dask_name</span><span class="p">,)</span>
-                <span class="o">+</span> <span class="n">position</span><span class="p">:</span> <span class="n">ChunkRef</span><span class="p">(</span>  <span class="c1"># note only first ChunkRef instance contains actual refs, the others contain only metadata.</span>
-                    <span class="n">actor_id</span><span class="p">,</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
-                    <span class="n">timestep</span><span class="p">,</span>
-                    <span class="n">position</span><span class="p">,</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">position_to_bridgeID</span><span class="p">[</span><span class="n">position</span><span class="p">],</span>
-                    <span class="n">_all_chunks</span><span class="o">=</span><span class="n">all_chunks</span> <span class="k">if</span> <span class="n">it</span> <span class="o">==</span> <span class="mi">0</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+                <span class="p">(</span><span class="n">dask_name</span><span class="p">,)</span> <span class="o">+</span> <span class="n">position</span><span class="p">:</span> <span class="n">ChunkRef</span><span class="p">(</span>
+                    <span class="n">ref</span><span class="o">=</span><span class="n">ref</span><span class="p">,</span>
+                    <span class="n">actorid</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">position_to_node_actorID</span><span class="p">[</span>
+                        <span class="nb">next</span><span class="p">((</span><span class="n">pos</span> <span class="k">for</span> <span class="n">pos</span><span class="p">,</span> <span class="n">r</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">pos_to_ref_by_timestep</span><span class="p">[</span><span class="n">timestep</span><span class="p">]</span> <span class="k">if</span> <span class="n">r</span> <span class="o">==</span> <span class="n">ref</span><span class="p">),</span> <span class="kc">None</span><span class="p">)</span>
+                    <span class="p">],</span>
+                    <span class="n">array_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                    <span class="n">timestep</span><span class="o">=</span><span class="n">timestep</span><span class="p">,</span>
+                    <span class="n">bridge_id</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">position_to_bridgeID</span><span class="p">[</span><span class="n">position</span><span class="p">],</span>
                 <span class="p">)</span>
-                <span class="k">for</span> <span class="n">it</span><span class="p">,</span> <span class="p">(</span><span class="n">position</span><span class="p">,</span> <span class="n">actor_id</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">position_to_node_actorID</span><span class="o">.</span><span class="n">items</span><span class="p">())</span>
+                <span class="k">for</span> <span class="n">position</span><span class="p">,</span> <span class="n">ref</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">pos_to_ref_by_timestep</span><span class="p">[</span><span class="n">timestep</span><span class="p">]</span>
             <span class="p">}</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="c1"># TODO: this could be an antipattern (calling ray.get in for loop). Could maybe put all the</span>
-            <span class="c1"># double refs in a list and call ray.wait() or ray.get() on the list?</span>
-            <span class="c1"># something that submits all the refs one go.</span>
-            <span class="n">graph</span> <span class="o">=</span> <span class="p">{(</span><span class="n">dask_name</span><span class="p">,)</span> <span class="o">+</span> <span class="n">position</span><span class="p">:</span> <span class="n">ray</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">dr</span><span class="p">)</span> <span class="k">for</span> <span class="n">position</span><span class="p">,</span> <span class="n">dr</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">pos_to_ref_by_timestep</span><span class="p">[</span><span class="n">timestep</span><span class="p">]}</span>
+            <span class="n">graph</span> <span class="o">=</span> <span class="p">{(</span><span class="n">dask_name</span><span class="p">,)</span> <span class="o">+</span> <span class="n">position</span><span class="p">:</span> <span class="n">ref</span> <span class="k">for</span> <span class="n">position</span><span class="p">,</span> <span class="n">ref</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">pos_to_ref_by_timestep</span><span class="p">[</span><span class="n">timestep</span><span class="p">]}</span>
 
         <span class="c1"># Needed for prepare iteration otherwise key lookup fails since iteration does not yet exist</span>
         <span class="c1"># TODO ensure flow is as expected</span>

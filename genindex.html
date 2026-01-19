@@ -199,7 +199,6 @@
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.config.html">deisa.ray.config module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.errors.html">deisa.ray.errors module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.head_node.html">deisa.ray.head_node module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="deisa.ray.ray_patch.html">deisa.ray.ray_patch module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.scheduling_actor.html">deisa.ray.scheduling_actor module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.types.html">deisa.ray.types module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.utils.html">deisa.ray.utils module</a></li>
@@ -252,11 +251,11 @@
         <li><a href="deisa.ray.scheduling_actor.html#deisa.ray.scheduling_actor.NodeActorBase.actor_id">actor_id (deisa.ray.scheduling_actor.NodeActorBase attribute)</a>
 
         <ul>
-          <li><a href="deisa.ray.types.html#deisa.ray.types.ChunkRef.actor_id">(deisa.ray.types.ChunkRef attribute)</a>
-</li>
           <li><a href="deisa.ray.types.html#deisa.ray.types.ScheduledByOtherActor.actor_id">(deisa.ray.types.ScheduledByOtherActor attribute)</a>
 </li>
         </ul></li>
+        <li><a href="deisa.ray.types.html#deisa.ray.types.ChunkRef.actorid">actorid (deisa.ray.types.ChunkRef attribute)</a>
+</li>
     </ul></td>
     <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="deisa.ray.scheduling_actor.html#deisa.ray.scheduling_actor.NodeActorBase.add_chunk">add_chunk() (deisa.ray.scheduling_actor.NodeActorBase method)</a>
@@ -356,20 +355,13 @@
           <li><a href="deisa.ray.errors.html#module-deisa.ray.errors">module</a>
 </li>
         </ul></li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
         <li>
     deisa.ray.head_node
 
         <ul>
           <li><a href="deisa.ray.head_node.html#module-deisa.ray.head_node">module</a>
-</li>
-        </ul></li>
-    </ul></td>
-    <td style="width: 33%; vertical-align: top;"><ul>
-        <li>
-    deisa.ray.ray_patch
-
-        <ul>
-          <li><a href="deisa.ray.ray_patch.html#module-deisa.ray.ray_patch">module</a>
 </li>
         </ul></li>
         <li>
@@ -524,8 +516,6 @@
 </li>
           <li><a href="deisa.ray.head_node.html#module-deisa.ray.head_node">deisa.ray.head_node</a>
 </li>
-          <li><a href="deisa.ray.ray_patch.html#module-deisa.ray.ray_patch">deisa.ray.ray_patch</a>
-</li>
           <li><a href="deisa.ray.scheduling_actor.html#module-deisa.ray.scheduling_actor">deisa.ray.scheduling_actor</a>
 </li>
           <li><a href="deisa.ray.types.html#module-deisa.ray.types">deisa.ray.types</a>
@@ -577,8 +567,6 @@
 </li>
         <li><a href="deisa.ray.types.html#deisa.ray.types.DaskArrayData.pos_to_ref_by_timestep">pos_to_ref_by_timestep (deisa.ray.types.DaskArrayData attribute)</a>
 </li>
-        <li><a href="deisa.ray.types.html#deisa.ray.types.ChunkRef.position">position (deisa.ray.types.ChunkRef attribute)</a>
-</li>
     </ul></td>
     <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="deisa.ray.types.html#deisa.ray.types.DaskArrayData.position_to_bridgeID">position_to_bridgeID (deisa.ray.types.DaskArrayData attribute)</a>
@@ -602,6 +590,8 @@
         <li><a href="deisa.ray.scheduling_actor.html#deisa.ray.scheduling_actor.NodeActorBase.ready">ready() (deisa.ray.scheduling_actor.NodeActorBase method)</a>
 </li>
         <li><a href="deisa.ray.types.html#deisa.ray.types.PartialArray.ready_event">ready_event (deisa.ray.types.PartialArray attribute)</a>
+</li>
+        <li><a href="deisa.ray.types.html#deisa.ray.types.ChunkRef.ref">ref (deisa.ray.types.ChunkRef attribute)</a>
 </li>
     </ul></td>
     <td style="width: 33%; vertical-align: top;"><ul>

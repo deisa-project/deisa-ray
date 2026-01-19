@@ -201,7 +201,6 @@
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.config.html">deisa.ray.config module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.errors.html">deisa.ray.errors module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.head_node.html">deisa.ray.head_node module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="deisa.ray.ray_patch.html">deisa.ray.ray_patch module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.scheduling_actor.html">deisa.ray.scheduling_actor module</a></li>
 <li class="toctree-l2 current current-page"><a class="current reference internal" href="#">deisa.ray.types module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.utils.html">deisa.ray.utils module</a></li>
@@ -284,7 +283,7 @@ to free memory.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="deisa.ray.types.ChunkRef">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">deisa.ray.types.</span></span><span class="sig-name descname"><span class="pre">ChunkRef</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">actor_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">array_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timestep</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Hashable</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">position</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bridge_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">_all_chunks</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ObjectRef</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/deisa/ray/types.html#ChunkRef"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#deisa.ray.types.ChunkRef" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">deisa.ray.types.</span></span><span class="sig-name descname"><span class="pre">ChunkRef</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ObjectRef</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">actorid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">array_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timestep</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bridge_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/deisa/ray/types.html#ChunkRef"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#deisa.ray.types.ChunkRef" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
 <p>Represents a chunk of an array in a Dask task graph.</p>
 <p>This class is used as a placeholder in Dask task graphs to represent a
@@ -308,8 +307,8 @@ only to avoid duplication. Default is None.</p></li>
 task graph, which would break the scheduling mechanism. The behavior
 may change in newer versions of Dask.</p>
 <dl class="py attribute">
-<dt class="sig sig-object py" id="deisa.ray.types.ChunkRef.actor_id">
-<span class="sig-name descname"><span class="pre">actor_id</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#deisa.ray.types.ChunkRef.actor_id" title="Link to this definition">¶</a></dt>
+<dt class="sig sig-object py" id="deisa.ray.types.ChunkRef.actorid">
+<span class="sig-name descname"><span class="pre">actorid</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#deisa.ray.types.ChunkRef.actorid" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
@@ -323,13 +322,13 @@ may change in newer versions of Dask.</p>
 <dd></dd></dl>
 
 <dl class="py attribute">
-<dt class="sig sig-object py" id="deisa.ray.types.ChunkRef.position">
-<span class="sig-name descname"><span class="pre">position</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#deisa.ray.types.ChunkRef.position" title="Link to this definition">¶</a></dt>
+<dt class="sig sig-object py" id="deisa.ray.types.ChunkRef.ref">
+<span class="sig-name descname"><span class="pre">ref</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ObjectRef</span></em><a class="headerlink" href="#deisa.ray.types.ChunkRef.ref" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="deisa.ray.types.ChunkRef.timestep">
-<span class="sig-name descname"><span class="pre">timestep</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Hashable</span></em><a class="headerlink" href="#deisa.ray.types.ChunkRef.timestep" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">timestep</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#deisa.ray.types.ChunkRef.timestep" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 </dd></dl>
@@ -491,7 +490,7 @@ actors. Used when distributed scheduling is disabled.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="deisa.ray.types.DaskArrayData.add_chunk_ref">
-<span class="sig-name descname"><span class="pre">add_chunk_ref</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">chunk_ref</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ObjectRef</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timestep</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Hashable</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pos_to_ref</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="_modules/deisa/ray/types.html#DaskArrayData.add_chunk_ref"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#deisa.ray.types.DaskArrayData.add_chunk_ref" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">add_chunk_ref</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">chunk_ref</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ObjectRef</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timestep</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Hashable</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pos_to_ref</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">tuple</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">ObjectRef</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="_modules/deisa/ray/types.html#DaskArrayData.add_chunk_ref"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#deisa.ray.types.DaskArrayData.add_chunk_ref" title="Link to this definition">¶</a></dt>
 <dd><p>Add a reference sent by a scheduling actor.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -524,9 +523,6 @@ and all have sent their chunks for this timestep.</p>
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>timestep</strong> (<em>Timestep</em>) – The timestep for which the full array should be returned.</p></li>
-<li><p><strong>distributing_scheduling_enabled</strong> (<em>bool</em>) – When <code class="docutils literal notranslate"><span class="pre">True</span></code>, emit a graph containing <a class="reference internal" href="#deisa.ray.types.ChunkRef" title="deisa.ray.types.ChunkRef"><code class="xref py py-class docutils literal notranslate"><span class="pre">ChunkRef</span></code></a> tasks
-for distributed scheduling. When <code class="docutils literal notranslate"><span class="pre">False</span></code>, materialise the
-actual chunk payloads and build a local Dask array.</p></li>
 <li><p><strong>is_preparation</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, the array will not contain ObjectRefs to the actual data.
 This is used for preparation arrays where only the structure is
 needed. Default is False.</p></li>
@@ -549,7 +545,8 @@ in Ray’s object store.</p>
 <p>When distributed scheduling is enabled the graph uses <a class="reference internal" href="#deisa.ray.types.ChunkRef" title="deisa.ray.types.ChunkRef"><code class="xref py py-class docutils literal notranslate"><span class="pre">ChunkRef</span></code></a>
 placeholders that keep data owner information. Otherwise the concrete
 chunk payloads are inlined. Chunk reference lists are deleted after
-embedding in the graph to avoid leaking memory. <code class="docutils literal notranslate"><span class="pre">is_preparation</span></code> skips
+embedding in the graph to avoid leaking memory.
+(is_preparation not used for now) <code class="docutils literal notranslate"><span class="pre">is_preparation</span></code> skips
 storing payload refs entirely so analytics can inspect shapes/chunks
 without materialising data.</p>
 </dd></dl>
@@ -804,10 +801,10 @@ function (no preprocessing).</p></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#deisa.ray.types.ChunkRef"><code class="docutils literal notranslate"><span class="pre">ChunkRef</span></code></a><ul>
-<li><a class="reference internal" href="#deisa.ray.types.ChunkRef.actor_id"><code class="docutils literal notranslate"><span class="pre">ChunkRef.actor_id</span></code></a></li>
+<li><a class="reference internal" href="#deisa.ray.types.ChunkRef.actorid"><code class="docutils literal notranslate"><span class="pre">ChunkRef.actorid</span></code></a></li>
 <li><a class="reference internal" href="#deisa.ray.types.ChunkRef.array_name"><code class="docutils literal notranslate"><span class="pre">ChunkRef.array_name</span></code></a></li>
 <li><a class="reference internal" href="#deisa.ray.types.ChunkRef.bridge_id"><code class="docutils literal notranslate"><span class="pre">ChunkRef.bridge_id</span></code></a></li>
-<li><a class="reference internal" href="#deisa.ray.types.ChunkRef.position"><code class="docutils literal notranslate"><span class="pre">ChunkRef.position</span></code></a></li>
+<li><a class="reference internal" href="#deisa.ray.types.ChunkRef.ref"><code class="docutils literal notranslate"><span class="pre">ChunkRef.ref</span></code></a></li>
 <li><a class="reference internal" href="#deisa.ray.types.ChunkRef.timestep"><code class="docutils literal notranslate"><span class="pre">ChunkRef.timestep</span></code></a></li>
 </ul>
 </li>

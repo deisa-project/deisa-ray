@@ -201,7 +201,6 @@
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.config.html">deisa.ray.config module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.errors.html">deisa.ray.errors module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.head_node.html">deisa.ray.head_node module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="deisa.ray.ray_patch.html">deisa.ray.ray_patch module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.scheduling_actor.html">deisa.ray.scheduling_actor module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.types.html">deisa.ray.types module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.utils.html">deisa.ray.utils module</a></li>
@@ -250,36 +249,38 @@
 <h1>Analytics<a class="headerlink" href="#analytics" title="Link to this heading">¶</a></h1>
 <section id="simple-example">
 <h2>Simple example<a class="headerlink" href="#simple-example" title="Link to this heading">¶</a></h2>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.head_node</span><span class="w"> </span><span class="kn">import</span> <span class="n">init</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.window_api</span><span class="w"> </span><span class="kn">import</span> <span class="n">ArrayDefinition</span><span class="p">,</span> <span class="n">run_simulation</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.window_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">Deisa</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">WindowArrayDefinition</span>
 
-<span class="n">init</span><span class="p">()</span>
+<span class="n">deisa</span> <span class="o">=</span> <span class="n">Deisa</span><span class="p">()</span>
 
 <span class="k">def</span><span class="w"> </span><span class="nf">simulation_callback</span><span class="p">(</span><span class="n">array</span><span class="p">:</span> <span class="n">da</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span> <span class="n">timestep</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
     <span class="n">x</span> <span class="o">=</span> <span class="n">array</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
     <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Sum:&quot;</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
 
-<span class="n">run_simulation</span><span class="p">(</span>
+<span class="n">deisa</span><span class="o">.</span><span class="n">register_callback</span><span class="p">(</span>
     <span class="n">simulation_callback</span><span class="p">,</span>
-    <span class="p">[</span><span class="n">ArrayDefinition</span><span class="p">(</span><span class="s2">&quot;array&quot;</span><span class="p">)],</span>
+    <span class="p">[</span><span class="n">WindowArrayDefinition</span><span class="p">(</span><span class="s2">&quot;array&quot;</span><span class="p">)],</span>
 <span class="p">)</span>
+<span class="n">deisa</span><span class="o">.</span><span class="n">execute_callbacks</span><span class="p">()</span>
 </pre></div>
 </div>
 </section>
 <section id="several-arrays">
 <h2>Several arrays<a class="headerlink" href="#several-arrays" title="Link to this heading">¶</a></h2>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.head_node</span><span class="w"> </span><span class="kn">import</span> <span class="n">init</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.window_api</span><span class="w"> </span><span class="kn">import</span> <span class="n">ArrayDefinition</span><span class="p">,</span> <span class="n">run_simulation</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.window_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">Deisa</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">WindowArrayDefinition</span>
 
-<span class="n">init</span><span class="p">()</span>
+<span class="n">deisa</span> <span class="o">=</span> <span class="n">Deisa</span><span class="p">()</span>
 
 <span class="k">def</span><span class="w"> </span><span class="nf">simulation_callback</span><span class="p">(</span><span class="n">a</span><span class="p">:</span> <span class="n">da</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span> <span class="n">b</span><span class="p">:</span> <span class="n">da</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span> <span class="n">timestep</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
     <span class="n">r</span> <span class="o">=</span> <span class="p">(</span><span class="n">a</span> <span class="o">-</span> <span class="n">b</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
 
-<span class="n">run_simulation</span><span class="p">(</span>
+<span class="n">deisa</span><span class="o">.</span><span class="n">register_callback</span><span class="p">(</span>
     <span class="n">simulation_callback</span><span class="p">,</span>
-    <span class="p">[</span><span class="n">ArrayDefinition</span><span class="p">(</span><span class="s2">&quot;a&quot;</span><span class="p">),</span> <span class="n">ArrayDefinition</span><span class="p">(</span><span class="s2">&quot;b&quot;</span><span class="p">)]</span>
+    <span class="p">[</span><span class="n">WindowArrayDefinition</span><span class="p">(</span><span class="s2">&quot;a&quot;</span><span class="p">),</span> <span class="n">WindowArrayDefinition</span><span class="p">(</span><span class="s2">&quot;b&quot;</span><span class="p">)]</span>
 <span class="p">)</span>
+<span class="n">deisa</span><span class="o">.</span><span class="n">execute_callbacks</span><span class="p">()</span>
 </pre></div>
 </div>
 </section>
@@ -287,10 +288,10 @@
 <h2>Sliding window<a class="headerlink" href="#sliding-window" title="Link to this heading">¶</a></h2>
 <p>If the analysis requires access to several iterations (for example, to compute
 a time derivative), it is possible to use the <code class="docutils literal notranslate"><span class="pre">window_size</span></code> parameter.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.head_node</span><span class="w"> </span><span class="kn">import</span> <span class="n">init</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.window_api</span><span class="w"> </span><span class="kn">import</span> <span class="n">ArrayDefinition</span><span class="p">,</span> <span class="n">run_simulation</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.window_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">Deisa</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">WindowArrayDefinition</span>
 
-<span class="n">init</span><span class="p">()</span>
+<span class="n">deisa</span> <span class="o">=</span> <span class="n">Deisa</span><span class="p">()</span>
 
 <span class="k">def</span><span class="w"> </span><span class="nf">simulation_callback</span><span class="p">(</span><span class="n">arrays</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">da</span><span class="o">.</span><span class="n">Array</span><span class="p">],</span> <span class="n">timestep</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
     <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">arrays</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>  <span class="c1"># For the first iteration</span>
@@ -301,22 +302,23 @@ a time derivative), it is possible to use the <code class="docutils literal notr
 
     <span class="o">...</span>
 
-<span class="n">run_simulation</span><span class="p">(</span>
+<span class="n">deisa</span><span class="o">.</span><span class="n">register_callback</span><span class="p">(</span>
     <span class="n">simulation_callback</span><span class="p">,</span>
     <span class="p">[</span>
-        <span class="n">ArrayDefinition</span><span class="p">(</span><span class="s2">&quot;array&quot;</span><span class="p">,</span> <span class="n">window_size</span><span class="o">=</span><span class="mi">2</span><span class="p">),</span>  <span class="c1"># Enable sliding window</span>
+        <span class="n">WindowArrayDefinition</span><span class="p">(</span><span class="s2">&quot;array&quot;</span><span class="p">,</span> <span class="n">window_size</span><span class="o">=</span><span class="mi">2</span><span class="p">),</span>  <span class="c1"># Enable sliding window</span>
     <span class="p">],</span>
 <span class="p">)</span>
+<span class="n">deisa</span><span class="o">.</span><span class="n">execute_callbacks</span><span class="p">()</span>
 </pre></div>
 </div>
 </section>
 <section id="dask-persist">
 <h2>Dask persist<a class="headerlink" href="#dask-persist" title="Link to this heading">¶</a></h2>
 <p>Dask’s <code class="docutils literal notranslate"><span class="pre">persist</span></code> is supported:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.head_node</span><span class="w"> </span><span class="kn">import</span> <span class="n">init</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.window_api</span><span class="w"> </span><span class="kn">import</span> <span class="n">ArrayDefinition</span><span class="p">,</span> <span class="n">run_simulation</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.window_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">Deisa</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">WindowArrayDefinition</span>
 
-<span class="n">init</span><span class="p">()</span>
+<span class="n">deisa</span> <span class="o">=</span> <span class="n">Deisa</span><span class="p">()</span>
 
 <span class="k">def</span><span class="w"> </span><span class="nf">simulation_callback</span><span class="p">(</span><span class="n">array</span><span class="p">:</span> <span class="n">da</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span> <span class="n">timestep</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
     <span class="n">x</span> <span class="o">=</span> <span class="n">array</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">persist</span><span class="p">()</span>
@@ -327,68 +329,12 @@ a time derivative), it is possible to use the <code class="docutils literal notr
     <span class="n">x_final</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
     <span class="k">assert</span> <span class="n">x_final</span> <span class="o">==</span> <span class="mi">10</span> <span class="o">*</span> <span class="n">timestep</span>
 
-<span class="n">run_simulation</span><span class="p">(</span>
+<span class="n">deisa</span><span class="o">.</span><span class="n">register_callback</span><span class="p">(</span>
     <span class="n">simulation_callback</span><span class="p">,</span>
-    <span class="p">[</span><span class="n">ArrayDefinition</span><span class="p">(</span><span class="s2">&quot;array&quot;</span><span class="p">)],</span>
+    <span class="p">[</span><span class="n">WindowArrayDefinition</span><span class="p">(</span><span class="s2">&quot;array&quot;</span><span class="p">)],</span>
     <span class="n">max_iterations</span><span class="o">=</span><span class="n">NB_ITERATIONS</span><span class="p">,</span>
 <span class="p">)</span>
-</pre></div>
-</div>
-</section>
-<section id="preprocessing-callbacks">
-<h2>Preprocessing callbacks<a class="headerlink" href="#preprocessing-callbacks" title="Link to this heading">¶</a></h2>
-<p>A preprocessing callback is a function that is applied on each chunk of data.
-The function is executed locally, on the machine where the data is produced as
-soon as it is available.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.head_node</span><span class="w"> </span><span class="kn">import</span> <span class="n">init</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.window_api</span><span class="w"> </span><span class="kn">import</span> <span class="n">ArrayDefinition</span><span class="p">,</span> <span class="n">run_simulation</span>
-
-<span class="n">init</span><span class="p">()</span>
-
-<span class="k">def</span><span class="w"> </span><span class="nf">simulation_callback</span><span class="p">(</span><span class="n">array</span><span class="p">:</span> <span class="n">da</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span> <span class="n">timestep</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
-    <span class="o">...</span>
-
-<span class="n">run_simulation</span><span class="p">(</span>
-    <span class="n">simulation_callback</span><span class="p">,</span>
-    <span class="p">[</span><span class="n">ArrayDefinition</span><span class="p">(</span><span class="s2">&quot;array&quot;</span><span class="p">,</span> <span class="n">preprocess</span><span class="o">=</span><span class="k">lambda</span> <span class="n">chunk</span><span class="p">:</span> <span class="mi">10</span> <span class="o">*</span> <span class="n">chunk</span><span class="p">)],</span>
-<span class="p">)</span>
-</pre></div>
-</div>
-</section>
-<section id="improving-performance-prepare-an-iteration">
-<h2>Improving performance: prepare an iteration<a class="headerlink" href="#improving-performance-prepare-an-iteration" title="Link to this heading">¶</a></h2>
-<p>It is possible to define a callback that will be executed a bit before the data
-is ready. The return value of this callback will be passed as an argument to
-the actual simulation callback.</p>
-<p>This is particularly useful when combined with Dask’s <code class="docutils literal notranslate"><span class="pre">persist</span></code> API: since
-the preparation callback is executed before the data is available, and since
-several preparation callbacks can be executed in parallel in different Ray
-workers, it becomes possible to hide the time taken to build the task graph,
-send it to the workers, etc., to avoid slowing down the simulation.</p>
-<p>In most situations, this is negligible, but it can start to matter with
-simulations running on hundreds of nodes, with task graphs composed of
-thousands of tasks.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.head_node</span><span class="w"> </span><span class="kn">import</span> <span class="n">init</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.window_api</span><span class="w"> </span><span class="kn">import</span> <span class="n">ArrayDefinition</span><span class="p">,</span> <span class="n">run_simulation</span>
-
-<span class="n">init</span><span class="p">()</span>
-
-<span class="k">def</span><span class="w"> </span><span class="nf">prepare_iteration</span><span class="p">(</span><span class="n">array</span><span class="p">:</span> <span class="n">da</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">timestep</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">da</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
-    <span class="c1"># We can&#39;t use compute here since the data is not available yet</span>
-    <span class="k">return</span> <span class="n">array</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">persist</span><span class="p">()</span>
-
-<span class="k">def</span><span class="w"> </span><span class="nf">simulation_callback</span><span class="p">(</span>
-    <span class="n">array</span><span class="p">:</span> <span class="n">da</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">timestep</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">preparation_result</span><span class="p">:</span> <span class="n">da</span><span class="o">.</span><span class="n">Array</span>
-<span class="p">):</span>
-    <span class="nb">print</span><span class="p">(</span><span class="n">preparation_result</span><span class="o">.</span><span class="n">compute</span><span class="p">())</span>
-
-<span class="n">run_simulation</span><span class="p">(</span>
-    <span class="n">simulation_callback</span><span class="p">,</span>
-    <span class="p">[</span><span class="n">ArrayDefinition</span><span class="p">(</span><span class="s2">&quot;array&quot;</span><span class="p">)],</span>
-    <span class="n">max_iterations</span><span class="o">=</span><span class="n">NB_ITERATIONS</span><span class="p">,</span>
-    <span class="n">prepare_iteration</span><span class="o">=</span><span class="n">prepare_iteration</span><span class="p">,</span>
-    <span class="n">preparation_advance</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
-<span class="p">)</span>
+<span class="n">deisa</span><span class="o">.</span><span class="n">execute_callbacks</span><span class="p">()</span>
 </pre></div>
 </div>
 </section>
@@ -454,8 +400,6 @@ thousands of tasks.</p>
 <li><a class="reference internal" href="#several-arrays">Several arrays</a></li>
 <li><a class="reference internal" href="#sliding-window">Sliding window</a></li>
 <li><a class="reference internal" href="#dask-persist">Dask persist</a></li>
-<li><a class="reference internal" href="#preprocessing-callbacks">Preprocessing callbacks</a></li>
-<li><a class="reference internal" href="#improving-performance-prepare-an-iteration">Improving performance: prepare an iteration</a></li>
 </ul>
 </li>
 </ul>

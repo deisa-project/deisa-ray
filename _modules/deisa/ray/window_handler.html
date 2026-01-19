@@ -200,7 +200,6 @@
 <li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.config.html">deisa.ray.config module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.errors.html">deisa.ray.errors module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.head_node.html">deisa.ray.head_node module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.ray_patch.html">deisa.ray.ray_patch module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.scheduling_actor.html">deisa.ray.scheduling_actor module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.types.html">deisa.ray.types module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.utils.html">deisa.ray.utils module</a></li>
@@ -475,6 +474,9 @@
         <span class="n">prepare_iteration</span> <span class="o">=</span> <span class="n">cfg</span><span class="o">.</span><span class="n">prepare_iteration</span>
         <span class="n">preparation_advance</span> <span class="o">=</span> <span class="n">cfg</span><span class="o">.</span><span class="n">preparation_advance</span>
 
+        <span class="c1"># TODO: make it per array and default to 0. Aka: sim cannot go ahead of analytics.</span>
+        <span class="c1"># This is consistent with the regime we &quot;expect&quot; where sim is more compute heavy than</span>
+        <span class="c1"># analytics.</span>
         <span class="n">max_pending_arrays</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">arrays_description</span><span class="p">)</span>
 
         <span class="c1"># Convert the definitions to the type expected by the head node</span>

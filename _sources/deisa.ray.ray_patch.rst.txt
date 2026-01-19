@@ -1,7 +1,0 @@
-deisa.ray.ray\_patch module
-===========================
-
-.. automodule:: deisa.ray.ray_patch
-   :members:
-   :show-inheritance:
-   :undoc-members:

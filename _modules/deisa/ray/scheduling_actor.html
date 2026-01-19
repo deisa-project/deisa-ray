@@ -200,7 +200,6 @@
 <li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.config.html">deisa.ray.config module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.errors.html">deisa.ray.errors module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.head_node.html">deisa.ray.head_node module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.ray_patch.html">deisa.ray.ray_patch module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.scheduling_actor.html">deisa.ray.scheduling_actor module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.types.html">deisa.ray.types module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.utils.html">deisa.ray.utils module</a></li>
@@ -242,6 +241,7 @@
           <h1>Source code for deisa.ray.scheduling_actor</h1><div class="highlight"><pre>
 <span></span><span class="kn">import</span><span class="w"> </span><span class="nn">pickle</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">ray</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">ray.util.dask</span><span class="w"> </span><span class="kn">import</span> <span class="n">ray_dask_get</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray._async_dict</span><span class="w"> </span><span class="kn">import</span> <span class="n">AsyncDict</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.types</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">GraphKey</span><span class="p">,</span>
@@ -253,10 +253,8 @@
     <span class="n">PartialArray</span><span class="p">,</span>
     <span class="n">RayActorHandle</span><span class="p">,</span>
     <span class="n">ActorID</span><span class="p">,</span>
-    <span class="n">DoubleRef</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_ready_actor_with_retry</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.ray_patch</span><span class="w"> </span><span class="kn">import</span> <span class="n">remote_ray_dask_get</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.errors</span><span class="w"> </span><span class="kn">import</span> <span class="n">ContractError</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Hashable</span><span class="p">,</span> <span class="n">Any</span>
 
@@ -643,22 +641,18 @@
             <span class="n">partial_array</span><span class="o">.</span><span class="n">per_timestep_arrays</span><span class="p">[</span><span class="n">timestep</span><span class="p">]</span> <span class="o">=</span> <span class="n">ArrayPerTimestep</span><span class="p">()</span>
         <span class="n">array_timestep</span> <span class="o">=</span> <span class="n">partial_array</span><span class="o">.</span><span class="n">per_timestep_arrays</span><span class="p">[</span><span class="n">timestep</span><span class="p">]</span>
 
-        <span class="c1"># Note: We need to use double refs everywhere since we don&#39;t want the distributed scheduling to block.</span>
-        <span class="c1"># Therefore we call an rpc on the same actor (returns a ref) to a task which unwraps the ref.</span>
-        <span class="n">double_ref_chunk</span><span class="p">:</span> <span class="n">DoubleRef</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">actor_handle</span><span class="o">.</span><span class="n">_pack_object_ref</span><span class="o">.</span><span class="n">remote</span><span class="p">(</span><span class="n">chunk_ref</span><span class="p">)</span>
-        <span class="n">array_timestep</span><span class="o">.</span><span class="n">local_chunks</span><span class="p">[</span><span class="n">bridge_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">double_ref_chunk</span>
+        <span class="n">chunk_ref</span><span class="p">:</span> <span class="n">ray</span><span class="o">.</span><span class="n">ObjectRef</span> <span class="o">=</span> <span class="n">chunk_ref</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">array_timestep</span><span class="o">.</span><span class="n">local_chunks</span><span class="p">[</span><span class="n">bridge_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">chunk_ref</span>
 
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">array_timestep</span><span class="o">.</span><span class="n">local_chunks</span><span class="p">)</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">nb_chunks_of_node</span><span class="p">:</span>
-            <span class="n">pos_to_ref</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">tuple</span><span class="p">,</span> <span class="n">DoubleRef</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="n">pos_to_ref</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">tuple</span><span class="p">,</span> <span class="n">ray</span><span class="o">.</span><span class="n">ObjectRef</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
 
-            <span class="k">for</span> <span class="n">bridge_id</span><span class="p">,</span> <span class="n">double_ref</span> <span class="ow">in</span> <span class="n">array_timestep</span><span class="o">.</span><span class="n">local_chunks</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-                <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">double_ref</span><span class="p">,</span> <span class="n">ray</span><span class="o">.</span><span class="n">ObjectRef</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">bridge_id</span><span class="p">,</span> <span class="n">ref</span> <span class="ow">in</span> <span class="n">array_timestep</span><span class="o">.</span><span class="n">local_chunks</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ref</span><span class="p">,</span> <span class="n">ray</span><span class="o">.</span><span class="n">ObjectRef</span><span class="p">)</span>
 
-                <span class="n">pos_to_ref</span><span class="p">[</span><span class="n">partial_array</span><span class="o">.</span><span class="n">bid_to_pos</span><span class="p">[</span><span class="n">bridge_id</span><span class="p">]]</span> <span class="o">=</span> <span class="n">double_ref</span>
+                <span class="n">pos_to_ref</span><span class="p">[</span><span class="n">partial_array</span><span class="o">.</span><span class="n">bid_to_pos</span><span class="p">[</span><span class="n">bridge_id</span><span class="p">]]</span> <span class="o">=</span> <span class="n">ref</span>
 
-                <span class="n">array_timestep</span><span class="o">.</span><span class="n">local_chunks</span><span class="p">[</span><span class="n">bridge_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">double_ref</span><span class="p">)</span>
-
-            <span class="c1"># all_chunks_ref = ray.put(pos_to_ref)</span>
+                <span class="n">array_timestep</span><span class="o">.</span><span class="n">local_chunks</span><span class="p">[</span><span class="n">bridge_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">ref</span><span class="p">)</span>
 
             <span class="c1"># TODO rename</span>
             <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">head</span><span class="o">.</span><span class="n">chunks_ready</span><span class="o">.</span><span class="n">options</span><span class="p">(</span><span class="n">enable_task_events</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">remote</span><span class="p">(</span><span class="n">array_name</span><span class="p">,</span> <span class="n">timestep</span><span class="p">,</span> <span class="n">pos_to_ref</span><span class="p">)</span>
@@ -720,7 +714,12 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">scheduling_actors</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">ActorID</span><span class="p">,</span> <span class="n">RayActorHandle</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">graph_infos</span><span class="p">:</span> <span class="n">AsyncDict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">GraphInfo</span><span class="p">]</span> <span class="o">=</span> <span class="n">AsyncDict</span><span class="p">()</span>
 
-    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">schedule_graph</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">graph_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">graph</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">GraphKey</span><span class="p">,</span> <span class="n">GraphValue</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">schedule_graph</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">graph_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">graph</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">GraphKey</span><span class="p">,</span> <span class="n">GraphValue</span><span class="p">],</span>
+        <span class="n">initial_refs</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">GraphKey</span><span class="p">,</span> <span class="n">ray</span><span class="o">.</span><span class="n">ObjectRef</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Schedule a Dask task graph for execution.</span>
 
@@ -740,19 +739,25 @@
 <span class="sd">            - ChunkRef objects (replaced with actual chunk ObjectRefs)</span>
 <span class="sd">            - ScheduledByOtherActor objects (replaced with remote calls to</span>
 <span class="sd">              other actors)</span>
+<span class="sd">        initial_refs : dict[GraphKey, ray.ObjectRef] or None, optional</span>
+<span class="sd">            Optional mapping of keys to pre-seeded *double* ObjectRefs. These</span>
+<span class="sd">            refs are injected into the :class:`GraphInfo` before scheduling</span>
+<span class="sd">            completes, which can be useful for tests or bootstrapping</span>
+<span class="sd">            cross-actor dependencies. Default is ``None``.</span>
 
 <span class="sd">        Notes</span>
 <span class="sd">        -----</span>
 <span class="sd">        This method performs the following operations:</span>
 <span class="sd">        1. Retrieves the list of all scheduling actors (if not already cached)</span>
 <span class="sd">        2. Creates a GraphInfo object to track this graph&#39;s state</span>
-<span class="sd">        3. Processes the task graph:</span>
+<span class="sd">        3. Optionally pre-populates GraphInfo with seeded references</span>
+<span class="sd">        4. Processes the task graph:</span>
 <span class="sd">           - Replaces ScheduledByOtherActor with remote calls to other actors</span>
 <span class="sd">           - Replaces ChunkRef with actual chunk ObjectRefs from local storage</span>
 <span class="sd">           - Converts pickled chunk references back to ObjectRefs</span>
-<span class="sd">        4. Schedules the graph using remote_ray_dask_get</span>
-<span class="sd">        5. Stores the resulting *double* ObjectRefs in GraphInfo</span>
-<span class="sd">        6. Sets the scheduled_event to signal completion for dependents</span>
+<span class="sd">        5. Schedules the graph using remote_ray_dask_get</span>
+<span class="sd">        6. Stores the resulting *double* ObjectRefs in GraphInfo</span>
+<span class="sd">        7. Sets the scheduled_event to signal completion for dependents</span>
 
 <span class="sd">        The method handles cross-actor dependencies by delegating tasks to</span>
 <span class="sd">        the appropriate scheduling actors. Chunk references are retrieved</span>
@@ -766,6 +771,9 @@
         <span class="c1"># Create and store graph info for tracking this graph&#39;s execution</span>
         <span class="n">info</span> <span class="o">=</span> <span class="n">GraphInfo</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">graph_infos</span><span class="p">[</span><span class="n">graph_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">info</span>
+
+        <span class="k">if</span> <span class="n">initial_refs</span><span class="p">:</span>
+            <span class="n">info</span><span class="o">.</span><span class="n">refs</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">initial_refs</span><span class="p">)</span>
 
         <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">substitute_graph_values_with_refs</span><span class="p">(</span><span class="n">graph_id</span><span class="p">,</span> <span class="n">graph</span><span class="p">)</span>
 
@@ -784,10 +792,11 @@
         <span class="c1"># so, the function returns a ref -&gt; result. But, since we set ray_persist, we get a ref to the output of the function.        # function. Therefore, we get a ref -&gt; ref -&gt; result.</span>
         <span class="c1"># Incindentally, this is why, removing ray_persist = True from remote_ray_dask_get makes everything fail (because we then</span>
         <span class="c1"># get a tuple of single refs instead of double). We need double refs to keep the entire graph consistent.</span>
-        <span class="n">doubleRefs_of_results</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">DoubleRef</span><span class="p">]</span> <span class="o">=</span> <span class="k">await</span> <span class="n">remote_ray_dask_get</span><span class="o">.</span><span class="n">remote</span><span class="p">(</span><span class="n">graph</span><span class="p">,</span> <span class="n">keys_needed</span><span class="p">)</span>
+        <span class="c1"># doubleRefs_of_results: tuple[DoubleRef] = await remote_ray_dask_get.remote(graph, keys_needed)</span>
+        <span class="n">refs_to_results</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">ray</span><span class="o">.</span><span class="n">ObjectRef</span><span class="p">]</span> <span class="o">=</span> <span class="n">ray_dask_get</span><span class="p">(</span><span class="n">graph</span><span class="p">,</span> <span class="n">keys_needed</span><span class="p">,</span> <span class="n">ray_persist</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
         <span class="c1"># store the refs in a dictionary so other actors can retrieve them</span>
-        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">ref</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">keys_needed</span><span class="p">,</span> <span class="n">doubleRefs_of_results</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">ref</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">keys_needed</span><span class="p">,</span> <span class="n">refs_to_results</span><span class="p">):</span>
             <span class="n">info</span><span class="o">.</span><span class="n">refs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">ref</span>
 
         <span class="n">info</span><span class="o">.</span><span class="n">scheduled_event</span><span class="o">.</span><span class="n">set</span><span class="p">()</span>
@@ -809,7 +818,7 @@
 <span class="sd">        The provided ``graph`` is mutated in place.</span>
 <span class="sd">        - ``ScheduledByOtherActor`` entries are rewritten to remote calls</span>
 <span class="sd">          to the owning scheduling actor.</span>
-<span class="sd">        - ``ChunkRef`` entries are replaced with the pickled or direct</span>
+<span class="sd">        - (not used for now) ``ChunkRef`` entries are replaced with the pickled or direct</span>
 <span class="sd">          ObjectRefs stored locally for the relevant timestep/position.</span>
 <span class="sd">        - When a stored ref is still in-memory, it is pickled to ensure</span>
 <span class="sd">          ownership transfer and memory release after scheduling.</span>
@@ -821,11 +830,16 @@
                 <span class="n">graph</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">actor</span><span class="o">.</span><span class="n">get_value</span><span class="o">.</span><span class="n">options</span><span class="p">(</span><span class="n">enable_task_events</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">remote</span><span class="p">(</span><span class="n">graph_id</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span>
 
             <span class="c1"># Replace the false chunks by the real ObjectRefs</span>
-            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="n">ChunkRef</span><span class="p">):</span>
-                <span class="k">assert</span> <span class="n">val</span><span class="o">.</span><span class="n">actor_id</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">actor_id</span>
+            <span class="c1"># TODO we never enter this condition due to new dask version</span>
+            <span class="c1"># so for now prepare iteration (in the future) will not work.</span>
+            <span class="c1"># FOR FUTURE WHOEVER: if trying to enable prepare iteration stuff, you need to make sure</span>
+            <span class="c1"># that the function enters the if below somehow, because the awaits are made so that</span>
+            <span class="c1"># the actor will wait until the refs are created and the leaf nodes will therefore exist.</span>
+            <span class="c1"># only then, can the tasks proceed. However, the graph itself is already created.</span>
 
-                <span class="c1"># TODO: maybe awaiting is not necessary. When would the key not be present in the</span>
-                <span class="c1"># AsyncDict?</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="n">ChunkRef</span><span class="p">):</span>
+                <span class="k">assert</span> <span class="n">val</span><span class="o">.</span><span class="n">actorid</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">actor_id</span>
+
                 <span class="n">array</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">partial_arrays</span><span class="o">.</span><span class="n">wait_for_key</span><span class="p">(</span><span class="n">val</span><span class="o">.</span><span class="n">array_name</span><span class="p">)</span>
 
                 <span class="n">array_timestep</span> <span class="o">=</span> <span class="k">await</span> <span class="n">array</span><span class="o">.</span><span class="n">per_timestep_arrays</span><span class="o">.</span><span class="n">wait_for_key</span><span class="p">(</span><span class="n">val</span><span class="o">.</span><span class="n">timestep</span><span class="p">)</span>
@@ -833,12 +847,12 @@
                 <span class="c1"># should be pickled ref of ref</span>
                 <span class="n">ref</span> <span class="o">=</span> <span class="k">await</span> <span class="n">array_timestep</span><span class="o">.</span><span class="n">local_chunks</span><span class="o">.</span><span class="n">wait_for_key</span><span class="p">(</span><span class="n">val</span><span class="o">.</span><span class="n">bridge_id</span><span class="p">)</span>
 
-                <span class="c1"># TODO what does this mean?</span>
-                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ref</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">):</span>  <span class="c1"># This may not be the case depending on the asyncio scheduling order</span>
-                    <span class="c1"># technically, here its an actual ray ref which is a ref of ref.</span>
+                <span class="c1"># This may not be the case depending on the asyncio scheduling order</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ref</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">):</span>
                     <span class="n">ref</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">ref</span><span class="p">)</span>
                 <span class="k">else</span><span class="p">:</span>
-                    <span class="n">ref</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">pickle</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">ref</span><span class="p">))</span>  <span class="c1"># To free the memory automatically</span>
+                    <span class="c1"># To free the memory automatically</span>
+                    <span class="n">ref</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">pickle</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">ref</span><span class="p">))</span>
 
                 <span class="c1"># replace ChunkRef by actual ref (still ref of ref)</span>
                 <span class="n">graph</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">ref</span>
@@ -848,9 +862,9 @@
     <span class="c1"># a ref for a dask task that this actor posseses (is supposed to deal with). It does three things</span>
     <span class="c1"># 1. waits for the graph to be created (look at method above)</span>
     <span class="c1"># 2. waits for the scheduled_event to be set</span>
-    <span class="c1"># 3. retrieves the ref corresponding to the required key from a dictionary. Since this is a ref of ref,</span>
-    <span class="c1"># it awaits it to unpack one level and return a ref to a result of the task.</span>
-    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">get_value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">graph_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ray</span><span class="o">.</span><span class="n">ObjectRef</span><span class="p">:</span>
+    <span class="c1"># 3. retrieves the ref corresponding to the required key from a dictionary. Since this is a ref</span>
+    <span class="c1"># it awaits it to unpack one level and return the value to the task.</span>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">get_value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">graph_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Get the result value for a specific key from a scheduled graph.</span>
 
@@ -891,9 +905,8 @@
         <span class="c1"># However, to make the entire graph &quot;coherent&quot;, I need to make leaf nodes refs of refs as well. Then it all becomes</span>
         <span class="c1"># cohesive.</span>
         <span class="c1"># I am missing why we need the pickling and how memory is released.</span>
-        <span class="n">double_ref</span> <span class="o">=</span> <span class="n">graph_info</span><span class="o">.</span><span class="n">refs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
-        <span class="n">ref_to_result</span> <span class="o">=</span> <span class="k">await</span> <span class="n">double_ref</span>
-        <span class="k">return</span> <span class="n">ref_to_result</span>
+        <span class="n">ref</span> <span class="o">=</span> <span class="n">graph_info</span><span class="o">.</span><span class="n">refs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+        <span class="k">return</span> <span class="k">await</span> <span class="n">ref</span>
 
 
 <span class="nd">@ray</span><span class="o">.</span><span class="n">remote</span>
