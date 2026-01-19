@@ -185,9 +185,11 @@ class Bridge:
 
         self.arrays_metadata = self._validate_arrays_meta(arrays_metadata)
         # we add a special array with a name that will signal the end of the simulation
-        # note we only need the metadata so that it can pass through the entire pipeline correctly and 
+        # note we only need the metadata so that it can pass through the entire pipeline correctly and
         # in sequential order, so we just replicate the first metadata we have.
-        self.arrays_metadata["__deisa_last_iteration_array"] = self.arrays_metadata[list(self.arrays_metadata.keys())[0]]
+        self.arrays_metadata["__deisa_last_iteration_array"] = self.arrays_metadata[
+            list(self.arrays_metadata.keys())[0]
+        ]
         self.system_metadata = self._validate_system_meta(system_metadata)
 
         if not ray.is_initialized():
@@ -296,7 +298,8 @@ class Bridge:
         # sending a single chunk described by ``arrays_metadata``.
         del args, kwargs  # explicitly unused
 
-        chunk = self.preprocessing_callbacks[array_name](chunk)
+        if array_name != "__deisa_last_iteration_array":
+            chunk = self.preprocessing_callbacks[array_name](chunk)
 
         # Setting the owner allows keeping the reference when the simulation script terminates.
         ref = ray.put(chunk, _owner=self.node_actor)

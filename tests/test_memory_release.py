@@ -22,13 +22,12 @@ def head_script(enable_distributed_scheduling) -> None:
 
     d = Deisa()
 
-    def simulation_callback(array: da.Array, timestep: int):
+    def simulation_callback(array: da.Array):
         pass
 
     d.register_callback(
         simulation_callback,
         [WindowArrayDefinition("array")],
-        max_iterations=NB_ITERATIONS,
     )
     d.execute_callbacks()
 

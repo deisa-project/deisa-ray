@@ -18,24 +18,24 @@ def head_script(enable_distributed_scheduling) -> None:
 
     d = Deisa()
 
-    def simulation_callback(array: list[da.Array], timestep: int):
+    def simulation_callback(array: list[da.Array]):
+        timestep = array.t
         if timestep == 0:
             assert len(array) == 1
             return
 
-        assert array[0].sum().compute() == 10 * (timestep - 1)
-        assert array[1].sum().compute() == 10 * timestep
+        assert array[0].dask.sum().compute() == 10 * (timestep - 1)
+        assert array[1].dask.sum().compute() == 10 * timestep
 
         # Test a computation where the two arrays are used at the same time.
         # This checks that they are defined with different names.
-        assert (array[1] - array[0]).sum().compute() == 10
+        assert (array[1].dask - array[0].dask).sum().compute() == 10
 
     d.register_callback(
         simulation_callback,
         [
             WindowArrayDefinition("array", window_size=2),
         ],
-        max_iterations=NB_ITERATIONS,
     )
     d.execute_callbacks()
 

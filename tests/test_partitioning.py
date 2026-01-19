@@ -19,9 +19,9 @@ def head_script(partitioning_strategy: str) -> None:
 
     d = Deisa()
 
-    def simulation_callback(array: da.Array, timestep: int):
-        x = array.sum().compute(deisa_ray_partitioning_strategy=partitioning_strategy)
-        assert x == 10 * timestep
+    def simulation_callback(array: da.Array):
+        x = array.dask.sum().compute(deisa_ray_partitioning_strategy=partitioning_strategy)
+        assert x == 10 * array.t
 
         # Test with a full Dask computation
         assert da.ones((2, 2), chunks=(1, 1)).sum().compute(deisa_ray_partitioning_strategy=partitioning_strategy) == 4
@@ -29,7 +29,6 @@ def head_script(partitioning_strategy: str) -> None:
     d.register_callback(
         simulation_callback,
         [WindowArrayDefinition("array")],
-        max_iterations=NB_ITERATIONS,
     )
     d.execute_callbacks()
 

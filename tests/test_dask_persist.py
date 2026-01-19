@@ -18,11 +18,11 @@ def head_script(enable_distributed_scheduling) -> None:
 
     d = Deisa()
 
-    def simulation_callback(array: da.Array, timestep: int):
+    def simulation_callback(array: da.Array):
         # This is the standard dask task graph
-        assert len(array.sum().dask) == 9
+        assert len(array.dask.sum().dask) == 9
 
-        x = array.sum().persist()
+        x = array.dask.sum().persist()
 
         # We still have a dask array
         assert isinstance(x, da.Array)
@@ -31,12 +31,11 @@ def head_script(enable_distributed_scheduling) -> None:
         assert len(x.dask) == 1
 
         x_final = x.compute()
-        assert x_final == 10 * timestep
+        assert x_final == 10 * array.t
 
     d.register_callback(
         simulation_callback,
         [WindowArrayDefinition("array")],
-        max_iterations=NB_ITERATIONS,
     )
     d.execute_callbacks()
 

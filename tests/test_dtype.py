@@ -18,13 +18,12 @@ def head_script(enable_distributed_scheduling) -> None:
 
     d = Deisa()
 
-    def simulation_callback(array: da.Array, timestep: int):
-        assert array.dtype == np.int8
+    def simulation_callback(array: da.Array):
+        assert array.dask.dtype == np.int8
 
     d.register_callback(
         simulation_callback,
         [WindowArrayDefinition("array")],
-        max_iterations=1,
     )
     d.execute_callbacks()
 

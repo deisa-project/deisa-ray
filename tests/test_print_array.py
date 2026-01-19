@@ -20,11 +20,11 @@ def head_script(enable_distributed_scheduling) -> None:
 
     d = Deisa()
 
-    def simulation_callback(array: da.Array, timestep: int):
-        x = array.compute()
+    def simulation_callback(array: da.Array):
+        x = array.dask.compute()
         print(f"ARRAY PRINTED = {x}", flush=True)
 
-        arr = timestep * np.array([[1, 2], [3, 4]])
+        arr = array.t * np.array([[1, 2], [3, 4]])
         assert (arr == np.array(x)).all()
 
         # TODO: Test for 2d/3d/4d/... arrays
@@ -32,7 +32,6 @@ def head_script(enable_distributed_scheduling) -> None:
     d.register_callback(
         simulation_callback,
         [WindowArrayDefinition("array")],
-        max_iterations=NB_ITERATIONS,
     )
     d.execute_callbacks()
 

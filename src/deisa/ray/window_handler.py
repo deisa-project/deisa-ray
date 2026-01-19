@@ -15,7 +15,7 @@ from deisa.ray.utils import get_head_actor_options
 from deisa.ray.types import ActorID, RayActorHandle, WindowArrayDefinition, _CallbackConfig, DeisaArray
 from deisa.ray.config import config
 import logging
-import deisa.core.interface import SupportsSlidingWindow
+from deisa.core.interface import SupportsSlidingWindow
 from deisa.ray.errors import _default_exception_handler
 
 
@@ -147,8 +147,8 @@ class Deisa:
         simulation_callback: SupportsSlidingWindow.Callback,
         arrays_description: list[WindowArrayDefinition],
         exception_handler: Optional[SupportsSlidingWindow.ExceptionHandler] = None,
-        when: Literal['AND', 'OR'] = 'AND',
-        *,
+        when: Literal["AND", "OR"] = "AND",
+        # *,
         # prepare_iteration: Callable | None = None,
         # preparation_advance: int = 3,
     ) -> None:
@@ -176,7 +176,7 @@ class Deisa:
         cfg = _CallbackConfig(
             simulation_callback=simulation_callback,
             arrays_description=arrays_description,
-            exception_handler = exception_handler or _default_exception_handler,
+            exception_handler=exception_handler or _default_exception_handler,
             # prepare_iteration=prepare_iteration,
             # preparation_advance=preparation_advance,
         )
@@ -184,7 +184,7 @@ class Deisa:
 
         # register array with head actor
         max_pending_arrays = 2 * len(arrays_description)
-        
+
         # TODO make head node take the entire type
         head_arrays_description = [(definition.name, definition.preprocess) for definition in arrays_description]
 
@@ -213,16 +213,17 @@ class Deisa:
         self.queue_per_array = {}
         for cb_cfg in self.registered_callbacks:
             description = cb_cfg.arrays_description
-            name = description.name
-            window_size = description.window_size
+            for arraydef in description:
+                name = arraydef.name
+                window_size = arraydef.window_size
 
-            if self.queue_per_array[name]:
-                if self.queue_per_array[name].maxlen < window_size:
-                    self.queue_per_array[name] = deque(maxlen = window_size)
+                if name in self.queue_per_array:
+                    if self.queue_per_array[name].maxlen < window_size:
+                        self.queue_per_array[name] = deque(maxlen=window_size)
+                    else:
+                        pass
                 else:
-                    pass
-            else:
-                self.queue_per_array[name] = deque(maxlen = window_size)
+                    self.queue_per_array[name] = deque(maxlen=window_size)
 
     # TODO: introduce a method that will generate the final array spec for each registered array
     def execute_callbacks(
@@ -249,7 +250,7 @@ class Deisa:
 
         # TODO sim should signal end
         name, timestep, array = ray.get(self.head.get_next_array.remote())
-        self.queue_per_array[name].append(DeisaArray(dask = array, t = timestep))
+        self.queue_per_array[name].append(DeisaArray(dask=array, t=timestep))
         end_reached = False
         while not end_reached:
             # get next available array
@@ -262,7 +263,7 @@ class Deisa:
                 if time < timestep:
                     break
 
-                self.queue_per_array[name].append(DeisaArray(dask = array, t = timestep))
+                self.queue_per_array[name].append(DeisaArray(dask=array, t=timestep))
 
             # inspect what callbacks can be called
             for cb_cfg in self.registered_callbacks:
@@ -271,23 +272,25 @@ class Deisa:
                 exception_handler = cb_cfg.exception_handler
 
                 # Compute the arrays to pass to the callback
-                callback_args: dict[str, List[DeisaArray]] = self.determine_callback_args(description_arrays_needed)
+                callback_args: dict[str, DeisaArray | List[DeisaArray]] = self.determine_callback_args(
+                    description_arrays_needed
+                )
                 try:
                     simulation_callback(**callback_args)
                 except TimeoutError:
                     pass
                 except BaseException as e:
-                    try: 
+                    try:
                         exception_handler(e)
                     except BaseException as e:
                         _default_exception_handler(e)
-            
+
                 del callback_args
                 gc.collect()
-            
-            self.queue_per_array[name].append(DeisaArray(dask = array, t = timestep))
+            if not end_reached:
+                self.queue_per_array[name].append(DeisaArray(dask=array, t=timestep))
 
-    def determine_callback_args(self, description_of_arrays_needed):
+    def determine_callback_args(self, description_of_arrays_needed) -> dict[str, List[DeisaArray]]:
         callback_args: dict[str, list[DeisaArray]] = {}
         for description in description_of_arrays_needed:
             name = description.name
@@ -297,8 +300,10 @@ class Deisa:
                 callback_args[name] = [queue[-1]]
             else:
                 callback_args[name] = list(queue)[-window_size:]
+        for name, arrays in callback_args.items():
+            if len(callback_args[name]) == 1:
+                callback_args[name] = arrays[0]
         return callback_args
-
 
     # TODO add persist
     def set(self, *args, key: Hashable, value: Any, chunked: bool = False, **kwargs) -> None:

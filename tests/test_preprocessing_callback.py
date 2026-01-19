@@ -19,15 +19,14 @@ def head_script(enable_distributed_scheduling) -> None:
 
     d = Deisa()
 
-    def simulation_callback(array: da.Array, timestep: int):
-        x = array.sum().compute()
+    def simulation_callback(array: da.Array):
+        x = array.dask.sum().compute()
 
-        assert x == 100 * timestep
+        assert x == 100 * array.t
 
     d.register_callback(
         simulation_callback,
         [WindowArrayDefinition("array", preprocess=lambda arr: 10 * arr)],
-        max_iterations=NB_ITERATIONS,
     )
     d.execute_callbacks()
 

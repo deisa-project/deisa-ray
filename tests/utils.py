@@ -60,3 +60,4 @@ def simple_worker(
     for i in range(nb_iterations):
         chunk = i * array
         client.send(array_name=array_name, chunk=chunk, timestep=i, chunked=True)
+    client.send(array_name="__deisa_last_iteration_array", chunk=array, timestep=nb_iterations, chunked=True)
