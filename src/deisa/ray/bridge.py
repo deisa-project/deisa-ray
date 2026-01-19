@@ -184,6 +184,10 @@ class Bridge:
         self._init_retries = _init_retries
 
         self.arrays_metadata = self._validate_arrays_meta(arrays_metadata)
+        # we add a special array with a name that will signal the end of the simulation
+        # note we only need the metadata so that it can pass through the entire pipeline correctly and 
+        # in sequential order, so we just replicate the first metadata we have.
+        self.arrays_metadata["__deisa_last_iteration_array"] = self.arrays_metadata[list(self.arrays_metadata.keys())[0]]
         self.system_metadata = self._validate_system_meta(system_metadata)
 
         if not ray.is_initialized():
@@ -307,6 +311,29 @@ class Bridge:
         )  # type: ignore
 
         # Wait until the data is processed before returning to the simulation
+        ray.get(future)
+
+    def close(
+        self,
+        *args: Any,
+        timestep: int,
+        store_externally: bool = False,
+        **kwargs: Any,
+    ) -> None:
+        """
+        Close the bridge by creating a special array that has a special name which signals to the analytics
+        that the simulation has finished and that it should stop.
+        """
+        del args, kwargs  # explicitly unused
+        ref = ray.put(0, _owner=self.node_actor)
+        future: ray.ObjectRef = self.node_actor.add_chunk.remote(
+            bridge_id=self.id,
+            array_name="__deisa_last_iteration_array",
+            chunk_ref=[ref],
+            timestep=timestep,
+            chunked=True,
+            store_externally=store_externally,
+        )  # type: ignore
         ray.get(future)
 
     def _validate_arrays_meta(

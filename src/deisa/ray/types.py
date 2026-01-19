@@ -204,13 +204,17 @@ class WindowArrayDefinition:
     preprocess: Callable = lambda x: x
 
 
+@dataclass(frozen=True)
+class DeisaArray:
+    dask: da.Array
+    t: int
+
 @dataclass
 class _CallbackConfig:
     simulation_callback: SupportsSlidingWindow.Callback
     arrays_description: list[WindowArrayDefinition]
-    max_iterations: int
-    prepare_iteration: Callable | None
-    preparation_advance: int
+    # prepare_iteration: Callable | None
+    # preparation_advance: int
     exception_handler: SupportsSlidingWindow.ExceptionHandler
 
 

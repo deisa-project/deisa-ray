@@ -74,6 +74,7 @@ class HeadNodeActor:
         # All the newly created arrays
         self.arrays_ready: asyncio.Queue[tuple[str, Timestep, da.Array]] = asyncio.Queue()
         self.registered_arrays: dict[str, DaskArrayData] = {}
+        self.max_pending_arrays = 0
 
     # TODO rename or move creation of global container elsewhere
     def register_arrays(
@@ -101,10 +102,13 @@ class HeadNodeActor:
         the provided definitions.
         """
         # regulate how far ahead sim can go wrt to analytics
-        self.new_pending_array_semaphore = asyncio.Semaphore(max_pending_arrays)
+        self.max_pending_arrays += max_pending_arrays
 
         for name, f_preprocessing in arrays_definitions:
             self.registered_arrays[name] = DaskArrayData(name, f_preprocessing)
+    
+    def set_semaphore(self,):
+        self.new_pending_array_semaphore = asyncio.Semaphore(self.max_pending_arrays)
 
     def list_scheduling_actors(self) -> dict[str, RayActorHandle]:
         """
