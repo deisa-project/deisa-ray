@@ -11,7 +11,6 @@ class ConfigError(RuntimeError):
 
     pass
 
+
 def _default_exception_handler(e: BaseException):
     print(f"There was an error {e} in the callback! Unregistering it!")
-    
-

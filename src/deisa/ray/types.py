@@ -1,16 +1,18 @@
-from dataclasses import dataclass
-from typing import Callable, Any, TypeAlias
-from dask.highlevelgraph import HighLevelGraph
-import math
-import numpy as np
 import asyncio
+from collections import defaultdict
+from dataclasses import dataclass
+import math
+from typing import Any, Callable, TypeAlias
+
+import dask.array as da
+from dask.highlevelgraph import HighLevelGraph
+from deisa.core.interface import SupportsSlidingWindow
+import numpy as np
 import ray
 import ray.actor
+
 from deisa.ray import Timestep
-import dask.array as da
 from deisa.ray._async_dict import AsyncDict
-from collections import defaultdict
-from deisa.core.interface import SupportsSlidingWindow
 
 type DoubleRef = ray.ObjectRef
 type ActorID = str
@@ -166,7 +168,7 @@ class ChunkRef:
     ref: ray.ObjectRef
     actorid: int
     array_name: str
-    timestep: int
+    timestep: Timestep
     bridge_id: int
 
 

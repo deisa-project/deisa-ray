@@ -6,10 +6,11 @@ top of Ray.
 """
 
 import logging
-from typing import Any, Callable, Dict, Mapping, Type
+from typing import Any, Callable, Dict, Mapping
 
 import numpy as np
 import ray
+from ray.actor import ActorClass
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 from deisa.ray.scheduling_actor import SchedulingActor as _RealSchedulingActor
 from deisa.ray.types import RayActorHandle
@@ -131,7 +132,7 @@ class Bridge:
         system_metadata: Mapping[str, Any],
         *args: Any,
         _node_id: str | None = None,
-        scheduling_actor_cls: Type = _RealSchedulingActor,
+        scheduling_actor_cls: ActorClass = _RealSchedulingActor,
         _init_retries: int = 3,
         **kwargs: Any,
     ) -> None:
@@ -491,7 +492,7 @@ class Bridge:
 
     def _create_node_actor(
         self,
-        node_actor_cls: Type = _RealSchedulingActor,
+        node_actor_cls: ActorClass = _RealSchedulingActor,
         node_actor_options: Mapping[str, Any] | None = None,
     ) -> None:
         """

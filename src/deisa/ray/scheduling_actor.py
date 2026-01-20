@@ -1,21 +1,23 @@
 import pickle
+from typing import Any, Dict, Hashable
+
 import ray
 from ray.util.dask import ray_dask_get
+
 from deisa.ray._async_dict import AsyncDict
+from deisa.ray.errors import ContractError
 from deisa.ray.types import (
+    ActorID,
+    ArrayPerTimestep,
+    ChunkRef,
+    GraphInfo,
     GraphKey,
     GraphValue,
-    ChunkRef,
-    ScheduledByOtherActor,
-    GraphInfo,
-    ArrayPerTimestep,
     PartialArray,
     RayActorHandle,
-    ActorID,
+    ScheduledByOtherActor,
 )
 from deisa.ray.utils import get_ready_actor_with_retry
-from deisa.ray.errors import ContractError
-from typing import Dict, Hashable, Any
 
 
 class NodeActorBase:

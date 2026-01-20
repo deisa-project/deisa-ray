@@ -1,8 +1,9 @@
-from typing import Dict
-from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
-import time
-import ray
 import random
+import time
+from typing import Dict
+
+import ray
+from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 
 
 def get_system_metadata() -> Dict:

@@ -4,7 +4,6 @@ from typing import Callable
 import dask.array as da
 import numpy as np
 import ray
-import ray.actor
 
 from deisa.ray import Timestep
 from deisa.ray.types import DaskArrayData, RayActorHandle
@@ -106,8 +105,10 @@ class HeadNodeActor:
 
         for name, f_preprocessing in arrays_definitions:
             self.registered_arrays[name] = DaskArrayData(name, f_preprocessing)
-    
-    def set_semaphore(self,):
+
+    def set_semaphore(
+        self,
+    ):
         self.new_pending_array_semaphore = asyncio.Semaphore(self.max_pending_arrays)
 
     def list_scheduling_actors(self) -> dict[str, RayActorHandle]:

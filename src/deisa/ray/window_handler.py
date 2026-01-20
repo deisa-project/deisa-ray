@@ -1,22 +1,26 @@
+from collections import deque
 import gc
-from pydoc import describe
-from re import A
-from typing import Any, Callable, Hashable, Optional, Literal, List
-from collections import defaultdict, deque
+import logging
+from typing import Any, Callable, Hashable, List, Literal, Optional
 
 import dask
 import dask.array as da
-from ray.util.dask import ray_dask_get
+from deisa.core.interface import SupportsSlidingWindow
 import ray
+from ray.util.dask import ray_dask_get
 
 from deisa.ray._scheduler import deisa_ray_get
-from deisa.ray.head_node import HeadNodeActor
-from deisa.ray.utils import get_head_actor_options
-from deisa.ray.types import ActorID, RayActorHandle, WindowArrayDefinition, _CallbackConfig, DeisaArray
 from deisa.ray.config import config
-import logging
-from deisa.core.interface import SupportsSlidingWindow
 from deisa.ray.errors import _default_exception_handler
+from deisa.ray.head_node import HeadNodeActor
+from deisa.ray.types import (
+    ActorID,
+    DeisaArray,
+    RayActorHandle,
+    WindowArrayDefinition,
+    _CallbackConfig,
+)
+from deisa.ray.utils import get_head_actor_options
 
 
 @ray.remote(num_cpus=0, max_retries=0)
@@ -290,8 +294,8 @@ class Deisa:
             if not end_reached:
                 self.queue_per_array[name].append(DeisaArray(dask=array, t=timestep))
 
-    def determine_callback_args(self, description_of_arrays_needed) -> dict[str, List[DeisaArray]]:
-        callback_args: dict[str, list[DeisaArray]] = {}
+    def determine_callback_args(self, description_of_arrays_needed) -> dict[str, DeisaArray | List[DeisaArray]]:
+        callback_args = {}
         for description in description_of_arrays_needed:
             name = description.name
             window_size = description.window_size
