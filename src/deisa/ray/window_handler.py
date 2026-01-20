@@ -17,7 +17,7 @@ from deisa.ray.types import (
     ActorID,
     DeisaArray,
     RayActorHandle,
-    WindowArrayDefinition,
+    WindowSpec,
     _CallbackConfig,
 )
 from deisa.ray.utils import get_head_actor_options
@@ -61,7 +61,6 @@ class Deisa:
     def __init__(
         self,
         *,
-        max_iterations: int = 1000_000_000,
         ray_start: Optional[Callable[[], None]] = None,
         handshake: Optional[Callable[["Deisa"], None]] = None,
     ) -> None:
@@ -78,7 +77,6 @@ class Deisa:
         self._connected = False
         self.node_actors: dict[ActorID, RayActorHandle] = {}
         self.registered_callbacks: list[_CallbackConfig] = []
-        self.max_iterations = max_iterations
         self.queue_per_array: dict[str, deque]
 
     def _handshake_impl(self, _: "Deisa") -> None:
@@ -140,7 +138,7 @@ class Deisa:
         self._connected = True
 
     def _create_head_actor(self) -> None:
-        self.head = HeadNodeActor.options(**get_head_actor_options()).remote()
+        self.head: Ac = HeadNodeActor.options(**get_head_actor_options()).remote()
 
     def _ray_start_impl(self) -> None:
         if not ray.is_initialized():
@@ -149,9 +147,8 @@ class Deisa:
     def register_callback(
         self,
         simulation_callback: SupportsSlidingWindow.Callback,
-        arrays_description: list[WindowArrayDefinition],
+        arrays_description: list[WindowSpec],
         exception_handler: Optional[SupportsSlidingWindow.ExceptionHandler] = None,
-        when: Literal["AND", "OR"] = "AND",
     ) -> None:
         """
         Register the analytics callback and array descriptions.
@@ -161,10 +158,9 @@ class Deisa:
         simulation_callback : Callable
             Function to run for each iteration; receives arrays as kwargs
             and ``timestep``.
-        arrays_description : list[WindowArrayDefinition]
+        arrays_description : list[WindowSpec]
             Descriptions of arrays to stream to the callback (with optional
             sliding windows).
-        max_iterations : int, optional
             Maximum iterations to execute. Default is a large sentinel.
         """
         self._ensure_connected()  # connect + handshake before accepting callbacks

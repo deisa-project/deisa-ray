@@ -22,7 +22,7 @@
 # def head_script(enable_distributed_scheduling) -> None:
 #     """The head node checks that the values are correct"""
 #     from deisa.ray.window_handler import Deisa
-#     from deisa.ray.types import WindowArrayDefinition
+#     from deisa.ray.types import WindowSpec
 
 #     import deisa.ray as deisa
 
@@ -44,7 +44,7 @@
 
 #     d.register_callback(
 #         simulation_callback,
-#         [WindowArrayDefinition("array")],
+#         [WindowSpec("array")],
 #         max_iterations=NB_ITERATIONS,
 #         prepare_iteration=prepare_iteration,
 #         preparation_advance=10,

@@ -173,7 +173,7 @@ class ChunkRef:
 
 
 @dataclass
-class WindowArrayDefinition:
+class WindowSpec:
     """
     Description of an array with optional windowing support.
 
@@ -215,7 +215,7 @@ class DeisaArray:
 @dataclass
 class _CallbackConfig:
     simulation_callback: SupportsSlidingWindow.Callback
-    arrays_description: list[WindowArrayDefinition]
+    arrays_description: list[WindowSpec]
     exception_handler: SupportsSlidingWindow.ExceptionHandler
 
 

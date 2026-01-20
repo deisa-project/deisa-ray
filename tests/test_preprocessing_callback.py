@@ -11,7 +11,7 @@ NB_ITERATIONS = 10
 def head_script(enable_distributed_scheduling) -> None:
     """The head node checks that the values are correct"""
     from deisa.ray.window_handler import Deisa
-    from deisa.ray.types import WindowArrayDefinition
+    from deisa.ray.types import WindowSpec
 
     import deisa.ray as deisa
 
@@ -26,7 +26,7 @@ def head_script(enable_distributed_scheduling) -> None:
 
     d.register_callback(
         simulation_callback,
-        [WindowArrayDefinition("array", preprocess=lambda arr: 10 * arr)],
+        [WindowSpec("array", preprocess=lambda arr: 10 * arr)],
     )
     d.execute_callbacks()
 

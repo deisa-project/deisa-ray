@@ -1,3 +1,7 @@
+import traceback
+import sys
+
+
 class ContractError(Exception):
     """Exception raised when a contract or invariant is violated."""
 
@@ -13,4 +17,4 @@ class ConfigError(RuntimeError):
 
 
 def _default_exception_handler(e: BaseException):
-    print(f"There was an error {e} in the callback! Unregistering it!")
+    traceback.print_exc(file=sys.stderr)
