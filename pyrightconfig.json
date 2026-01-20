@@ -1,3 +1,7 @@
 {
-    "reportPrivateImportUsage": "none"
+    "reportPrivateImportUsage": "none",
+    "venvPath": "/home/hstrappa/deisa",
+    "venv": ".venv",
+    "pythonVersion": "3.13",
+    "typeCheckingMode": "basic",
 }

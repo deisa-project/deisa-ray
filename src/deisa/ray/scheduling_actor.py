@@ -84,8 +84,9 @@ class NodeActorBase:
 
         # For non-chunked feedback between analytics and simulation
         self.feedback_non_chunked: Dict[Hashable, Any] = {}
+        self.should_persist: Dict[Hashable, bool] = {}
 
-    def set(self, *args, key: Hashable, value: Any, chunked: bool = False, **kwargs) -> None:
+    def set(self, *args, key: Hashable, value: Any, chunked: bool = False, persist: bool, **kwargs) -> None:
         """
         Store a feedback value shared between analytics and simulation.
 
@@ -106,6 +107,7 @@ class NodeActorBase:
         """
         if not chunked:
             self.feedback_non_chunked[key] = value
+            self.should_persist[key] = persist
         else:
             # TODO: implement chunked version
             raise NotImplementedError()
@@ -134,8 +136,12 @@ class NodeActorBase:
         Any
             Stored value or ``default`` if missing.
         """
+        val = self.feedback_non_chunked.get(key, default)
+        persist = self.should_persist.get(key, False)
         if not chunked:
-            return self.feedback_non_chunked.get(key, default)
+            if not persist:
+                self.delete(key=key)
+            return val
         else:
             raise NotImplementedError()
 
@@ -158,6 +164,7 @@ class NodeActorBase:
         Missing keys are ignored to keep the call idempotent.
         """
         self.feedback_non_chunked.pop(key, None)
+        self.should_persist.pop(key, None)
 
     def _create_or_retrieve_partial_array(self, array_name: str, nb_chunks_of_node: int) -> PartialArray:
         """

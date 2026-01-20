@@ -1,4 +1,5 @@
 import asyncio
+from collections import defaultdict
 from typing import Callable
 
 import dask.array as da
@@ -52,7 +53,7 @@ class HeadNodeActor:
     # TODO: Discuss if max_pending_arrays should be here or in register callback. In that case, what
     # should happen when the freqs are diff and max_pending_arrays are diff too? When does the sim
     # stop?''
-    def __init__(self) -> None:
+    def __init__(self, max_simulation_ahead: int = 1) -> None:
         """
         Initialize synchronization primitives and bookkeeping containers.
 
@@ -69,16 +70,15 @@ class HeadNodeActor:
 
         # TODO: document what this event signals and update documentation
         self.new_array_created = asyncio.Event()
+        self.max_simulation_ahead = max_simulation_ahead
+        self.semaphore_per_array = {}
 
         # All the newly created arrays
         self.arrays_ready: asyncio.Queue[tuple[str, Timestep, da.Array]] = asyncio.Queue()
         self.registered_arrays: dict[str, DaskArrayData] = {}
-        self.max_pending_arrays = 0
 
     # TODO rename or move creation of global container elsewhere
-    def register_arrays(
-        self, arrays_definitions: list[tuple[str, Callable]], max_pending_arrays: int = 1_000_000_000
-    ) -> None:
+    def register_arrays(self, arrays_definitions: list[tuple[str, Callable]]) -> None:
         """
         Register array definitions and set back-pressure on pending timesteps.
 
@@ -101,15 +101,9 @@ class HeadNodeActor:
         the provided definitions.
         """
         # regulate how far ahead sim can go wrt to analytics
-        self.max_pending_arrays += max_pending_arrays
-
         for name, f_preprocessing in arrays_definitions:
             self.registered_arrays[name] = DaskArrayData(name, f_preprocessing)
-
-    def set_semaphore(
-        self,
-    ):
-        self.new_pending_array_semaphore = asyncio.Semaphore(self.max_pending_arrays)
+            self.semaphore_per_array[name] = asyncio.Semaphore(self.max_simulation_ahead)
 
     def list_scheduling_actors(self) -> dict[str, RayActorHandle]:
         """
@@ -254,7 +248,7 @@ class HeadNodeActor:
             # TODO what happens if new_array_created for an array of a prev iter is set?
             # could it influence this iter?
             # need to reason more about this condition
-            t1 = asyncio.create_task(self.new_pending_array_semaphore.acquire())
+            t1 = asyncio.create_task(self.semaphore_per_array[array_name].acquire())
             t2 = asyncio.create_task(self.new_array_created.wait())
 
             done, pending = await asyncio.wait([t1, t2], return_when=asyncio.FIRST_COMPLETED)
@@ -265,7 +259,7 @@ class HeadNodeActor:
             if t1 in done:
                 if timestep in array.chunk_refs:
                     # The array was already created by another scheduling actor
-                    self.new_pending_array_semaphore.release()
+                    self.semaphore_per_array[array_name].release()
                 else:
                     array.chunk_refs[timestep] = []
 
@@ -331,5 +325,5 @@ class HeadNodeActor:
         components to pull work in order.
         """
         array = await self.arrays_ready.get()
-        self.new_pending_array_semaphore.release()
+        self.semaphore_per_array[array[0]].release()
         return array

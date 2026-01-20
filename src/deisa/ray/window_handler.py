@@ -63,6 +63,7 @@ class Deisa:
         *,
         ray_start: Optional[Callable[[], None]] = None,
         handshake: Optional[Callable[["Deisa"], None]] = None,
+        max_simulation_ahead: int = 1,
     ) -> None:
         # cheap constructor: no Ray side effects
         config.lock()
@@ -78,6 +79,7 @@ class Deisa:
         self.node_actors: dict[ActorID, RayActorHandle] = {}
         self.registered_callbacks: list[_CallbackConfig] = []
         self.queue_per_array: dict[str, deque]
+        self.max_simulation_ahead: int = max_simulation_ahead
 
     def _handshake_impl(self, _: "Deisa") -> None:
         """
@@ -89,7 +91,7 @@ class Deisa:
         :param _: Description
         :type _: "Deisa"
         """
-        # TODO finish and add this config option to Deisa
+        # TODO :finish and add this config option to Deisa use get_connection_info
         self.total_nodes = 0
         from ray.util.state import list_actors
 
@@ -138,7 +140,7 @@ class Deisa:
         self._connected = True
 
     def _create_head_actor(self) -> None:
-        self.head: Ac = HeadNodeActor.options(**get_head_actor_options()).remote()
+        self.head = HeadNodeActor.options(**get_head_actor_options()).remote(self.max_simulation_ahead)
 
     def _ray_start_impl(self) -> None:
         if not ray.is_initialized():
@@ -171,13 +173,10 @@ class Deisa:
         )
         self.registered_callbacks.append(cfg)
 
-        # register array with head actor
-        max_pending_arrays = 2 * len(arrays_description)
-
         # TODO make head node take the entire type
         head_arrays_description = [(definition.name, definition.preprocess) for definition in arrays_description]
 
-        ray.get(self.head.register_arrays.remote(head_arrays_description, max_pending_arrays))
+        ray.get(self.head.register_arrays.remote(head_arrays_description))
 
     def unregister_callback(
         self,
@@ -229,8 +228,7 @@ class Deisa:
         """
         self._ensure_connected()
         head_arrays_description = [("__deisa_last_iteration_array", None)]
-        ray.get(self.head.register_arrays.remote(head_arrays_description, 0))
-        ray.get(self.head.set_semaphore.remote())
+        ray.get(self.head.register_arrays.remote(head_arrays_description))
 
         if not self.registered_callbacks:
             raise RuntimeError("Please register at least one callback before calling execute_callbacks()")
@@ -295,7 +293,7 @@ class Deisa:
         return callback_args
 
     # TODO add persist
-    def set(self, *args, key: Hashable, value: Any, chunked: bool = False, **kwargs) -> None:
+    def set(self, *args, key: Hashable, value: Any, chunked: bool = False, persist: bool = False, **kwargs) -> None:
         """
         Broadcast a feedback value to all node actors.
 
@@ -323,7 +321,7 @@ class Deisa:
             for _, handle in self.node_actors.items():
                 # set the value inside each node actor
                 # TODO: does it need to be blocking?
-                handle.set.remote(key, value, chunked)
+                handle.set.remote(key, value, chunked, persist)
         else:
             # TODO: implement chunked version
             raise NotImplementedError()

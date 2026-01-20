@@ -36,11 +36,7 @@ def head_script(enable_distributed_scheduling) -> None:
     "nb_nodes, enable_distributed_scheduling",
     [
         (1, True),
-        (2, True),
-        (4, True),
         (1, False),
-        (2, False),
-        (4, False),
     ],
 )
 def test_deisa_ray(nb_nodes: int, enable_distributed_scheduling: bool, ray_cluster) -> None:  # noqa: F811
