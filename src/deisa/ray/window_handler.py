@@ -219,7 +219,7 @@ class Deisa:
             description = cb_cfg.arrays_description
             for arraydef in description:
                 name = arraydef.name
-                window_size = arraydef.window_size
+                window_size: int = arraydef.window_size if arraydef.window_size is not None else 2
 
                 if name in self.queue_per_array:
                     if self.queue_per_array[name].maxlen < window_size:
