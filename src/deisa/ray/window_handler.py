@@ -152,9 +152,6 @@ class Deisa:
         arrays_description: list[WindowArrayDefinition],
         exception_handler: Optional[SupportsSlidingWindow.ExceptionHandler] = None,
         when: Literal["AND", "OR"] = "AND",
-        # *,
-        # prepare_iteration: Callable | None = None,
-        # preparation_advance: int = 3,
     ) -> None:
         """
         Register the analytics callback and array descriptions.
@@ -169,20 +166,12 @@ class Deisa:
             sliding windows).
         max_iterations : int, optional
             Maximum iterations to execute. Default is a large sentinel.
-        prepare_iteration : DEPRECATED Callable or None, optional
-            Optional preparatory callback run ``preparation_advance`` steps
-            ahead. Receives the array and ``timestep``.
-        preparation_advance : DEPRECATED int, optional
-            How many iterations ahead to prepare when ``prepare_iteration``
-            is provided. Default is 3.
         """
         self._ensure_connected()  # connect + handshake before accepting callbacks
         cfg = _CallbackConfig(
             simulation_callback=simulation_callback,
             arrays_description=arrays_description,
             exception_handler=exception_handler or _default_exception_handler,
-            # prepare_iteration=prepare_iteration,
-            # preparation_advance=preparation_advance,
         )
         self.registered_callbacks.append(cfg)
 
@@ -239,7 +228,7 @@ class Deisa:
         Notes
         -----
         Supports a single registered callback at present. Manages array
-        retrieval from the head actor, optional preparation tasks, windowed
+        retrieval from the head actor, windowed
         array delivery, and garbage collection between iterations.
         """
         self._ensure_connected()

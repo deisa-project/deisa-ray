@@ -216,8 +216,6 @@ class DeisaArray:
 class _CallbackConfig:
     simulation_callback: SupportsSlidingWindow.Callback
     arrays_description: list[WindowArrayDefinition]
-    # prepare_iteration: Callable | None
-    # preparation_advance: int
     exception_handler: SupportsSlidingWindow.ExceptionHandler
 
 
@@ -421,9 +419,7 @@ class DaskArrayData:
         # I mark the array as ready to be formed.
         return len(self.chunk_refs[timestep]) == self.nb_scheduling_actors
 
-    def get_full_array(
-        self, timestep: Timestep, *, distributing_scheduling_enabled: bool, is_preparation: bool = False
-    ) -> da.Array:
+    def get_full_array(self, timestep: Timestep, *, distributing_scheduling_enabled: bool) -> da.Array:
         """
         Return the full Dask array for a given timestep.
 
@@ -431,10 +427,6 @@ class DaskArrayData:
         ----------
         timestep : Timestep
             The timestep for which the full array should be returned.
-        is_preparation : bool, optional
-            If True, the array will not contain ObjectRefs to the actual data.
-            This is used for preparation arrays where only the structure is
-            needed. Default is False.
 
         Returns
         -------
@@ -455,9 +447,6 @@ class DaskArrayData:
         placeholders that keep data owner information. Otherwise the concrete
         chunk payloads are inlined. Chunk reference lists are deleted after
         embedding in the graph to avoid leaking memory.
-        (is_preparation not used for now) ``is_preparation`` skips
-        storing payload refs entirely so analytics can inspect shapes/chunks
-        without materialising data.
         """
         assert len(self.position_to_node_actorID) == self.nb_chunks
         assert self.nb_chunks is not None and self.nb_chunks_per_dim is not None

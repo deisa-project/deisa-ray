@@ -288,7 +288,6 @@ class HeadNodeActor:
                     ),
                 )
             )
-            # TODO Just used for preparation stuff
             # TODO for now, only used when doing distributed scheduling, but in theory could be
             # used with centralized scheduling too
             if self._experimental_distributed_scheduling_enabled:
@@ -334,39 +333,3 @@ class HeadNodeActor:
         array = await self.arrays_ready.get()
         self.new_pending_array_semaphore.release()
         return array
-
-    async def get_preparation_array(self, array_name: str, timestep: Timestep) -> da.Array:
-        """
-        Return the full Dask array for a given timestep, used for preparation.
-
-        This method returns a Dask array structure without actual data
-        references, which is useful for preparation tasks that need to know
-        the array structure but don't need the actual data.
-
-        Parameters
-        ----------
-        array_name : str
-            The name of the array.
-        timestep : Timestep
-            The timestep for which the full array should be returned.
-
-        Returns
-        -------
-        da.Array
-            A Dask array representing the structure of the array for the
-            given timestep. This array does not contain ObjectRefs to actual
-            data (is_preparation=True).
-
-        Notes
-        -----
-        Waits for ``fully_defined`` on the corresponding
-        :class:`~deisa.ray.types.DaskArrayData` before returning. The
-        ``distributing_scheduling_enabled`` flag mirrors the runtime config
-        provided via :meth:`exchange_config`.
-        """
-        await self.registered_arrays[array_name].fully_defined.wait()
-        return self.registered_arrays[array_name].get_full_array(
-            timestep,
-            is_preparation=True,
-            distributing_scheduling_enabled=self._experimental_distributed_scheduling_enabled,
-        )
