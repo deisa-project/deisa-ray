@@ -250,28 +250,6 @@ class NodeActorBase:
         else:
             await partial_array.ready_event.wait()
 
-    def preprocessing_callbacks(self) -> ray.ObjectRef:
-        """
-        Get the preprocessing callbacks for all arrays.
-
-        Returns
-        -------
-        ray.ObjectRef
-            ObjectRef to a dictionary mapping array names to their
-            preprocessing callback functions.
-
-        Notes
-        -----
-        This method returns an ObjectRef rather than the actual dictionary
-        to avoid blocking. The callbacks are retrieved from the head node
-        and used by Bridge instances to preprocess chunks before sending
-        them to this node actor.
-        """
-        # return obect ref
-        p_clbs = self.head.preprocessing_callbacks.remote()
-        assert isinstance(p_clbs, ray.ObjectRef)
-        return p_clbs
-
     def ready(self) -> None:
         """
         Check if the node actor is ready.

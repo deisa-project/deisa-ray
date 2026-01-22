@@ -1,5 +1,6 @@
 import dask.array as da
 import ray
+from deisa.ray.types import DeisaArray
 from tests.utils import ray_cluster, simple_worker, wait_for_head_node  # noqa: F401
 import pytest
 
@@ -18,11 +19,11 @@ def head_script(enable_distributed_scheduling) -> None:
 
     d = Deisa()
 
-    def simulation_callback(array: da.Array):
+    def simulation_callback(array: list[DeisaArray]):
         # This is the standard dask task graph
-        assert len(array.dask.sum().dask) == 9
+        assert len(array[0].dask.sum().dask) == 9
 
-        x = array.dask.sum().persist()
+        x = array[0].dask.sum().persist()
 
         # We still have a dask array
         assert isinstance(x, da.Array)
@@ -31,7 +32,7 @@ def head_script(enable_distributed_scheduling) -> None:
         assert len(x.dask) == 1
 
         x_final = x.compute()
-        assert x_final == 10 * array.t
+        assert x_final == 10 * array[0].t
 
     d.register_callback(
         simulation_callback,

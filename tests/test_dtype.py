@@ -3,6 +3,7 @@ import numpy as np
 import ray
 import pytest
 
+from deisa.ray.types import DeisaArray
 from tests.utils import ray_cluster, simple_worker, wait_for_head_node  # noqa: F401
 
 
@@ -18,8 +19,8 @@ def head_script(enable_distributed_scheduling) -> None:
 
     d = Deisa()
 
-    def simulation_callback(array: da.Array):
-        assert array.dask.dtype == np.int8
+    def simulation_callback(array: list[DeisaArray]):
+        assert array[0].dask.dtype == np.int8
 
     d.register_callback(
         simulation_callback,

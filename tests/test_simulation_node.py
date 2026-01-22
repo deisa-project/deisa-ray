@@ -24,26 +24,6 @@ def _actor_names_by_prefix(prefix="sched-"):
     return set(names)
 
 
-@pytest.mark.parametrize(
-    "inpt, inpt_doubled",
-    [
-        (2, 4),
-        (4, 8),
-        (6, 12),
-    ],
-)
-def test_stub_actor_basic(ray_cluster, inpt, inpt_doubled):
-    a = StubSchedulingActor.options(
-        name="stub-alone", namespace="deisa_ray", lifetime="detached", get_if_exists=True
-    ).remote("node-X")
-    ref = ray.get(a.preprocessing_callbacks.remote())
-    assert isinstance(ref, ray.ObjectRef)
-    cbs = ray.get(ref)
-    assert isinstance(cbs, dict)
-    assert callable(cbs["default"]) and callable(cbs["double"])
-    assert cbs["default"](inpt) == inpt and cbs["double"](inpt) == inpt_doubled
-
-
 arrays_md = {
     "array": {
         "chunk_shape": (1, 1),
@@ -67,8 +47,6 @@ def test_init(ray_cluster):
     )
     assert c.node_id == fake_node_id
     assert isinstance(c.node_actor, RayActorHandle)
-    assert isinstance(c.preprocessing_callbacks, dict)
-    assert callable(c.preprocessing_callbacks["default"]) and callable(c.preprocessing_callbacks["double"])
     assert isinstance(c, Bridge)
 
 
@@ -128,7 +106,6 @@ def test_actor_dies_and_client_recovers(ray_cluster):
         scheduling_actor_cls=StubSchedulingActor,
         _init_retries=5,
     )
-    assert isinstance(c2.preprocessing_callbacks, dict)
 
     # Also check that a fresh actor exists with the same name
     a2 = ray.get_actor(f"sched-{fake_node_id}", namespace="deisa_ray")

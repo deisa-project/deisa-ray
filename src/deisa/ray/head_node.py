@@ -78,14 +78,14 @@ class HeadNodeActor:
         self.registered_arrays: dict[str, DaskArrayData] = {}
 
     # TODO rename or move creation of global container elsewhere
-    def register_arrays(self, arrays_definitions: list[tuple[str, Callable]]) -> None:
+    def register_arrays(self, arrays_definitions: list[str]) -> None:
         """
         Register array definitions and set back-pressure on pending timesteps.
 
         Parameters
         ----------
         arrays_definitions : list[tuple[str, Callable]]
-            Sequence of ``(name, preprocessing_callback)`` pairs for each array
+            Sequence of ``(name)`` pairs for each array
             produced by the simulation. Each entry becomes a
             :class:`~deisa.ray.types.DaskArrayData` instance.
         max_pending_arrays : int, optional
@@ -101,8 +101,8 @@ class HeadNodeActor:
         the provided definitions.
         """
         # regulate how far ahead sim can go wrt to analytics
-        for name, f_preprocessing in arrays_definitions:
-            self.registered_arrays[name] = DaskArrayData(name, f_preprocessing)
+        for name in arrays_definitions:
+            self.registered_arrays[name] = DaskArrayData(name)
             self.semaphore_per_array[name] = asyncio.Semaphore(self.max_simulation_ahead)
 
     def list_scheduling_actors(self) -> dict[str, RayActorHandle]:
@@ -135,25 +135,6 @@ class HeadNodeActor:
         """
         if actor_id not in self.scheduling_actors:
             self.scheduling_actors[actor_id] = actor_handle
-
-    def preprocessing_callbacks(self) -> dict[str, Callable]:
-        """
-        Return the preprocessing callbacks for each array.
-
-        Returns
-        -------
-        dict[str, Callable]
-            Dictionary mapping array names to their preprocessing callback
-            functions. These callbacks are used by Bridge instances to
-            preprocess chunks before sending them to the scheduling actors.
-
-        Notes
-        -----
-        The preprocessing callbacks are extracted from the array definitions
-        provided during initialization. These callbacks are static and cannot
-        be changed after initialization.
-        """
-        return {name: array.f_preprocessing for name, array in self.registered_arrays.items()}
 
     def register_partial_array(
         self,

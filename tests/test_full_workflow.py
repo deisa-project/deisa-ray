@@ -18,9 +18,9 @@ def head_script(enable_distributed_scheduling) -> None:
 
     d = Deisa()
 
-    def simulation_callback(array: DeisaArray):
-        x = array.dask.sum().compute()
-        assert x == 10 * array.t
+    def simulation_callback(array: list[DeisaArray]):
+        x = array[0].dask.sum().compute()
+        assert x == 10 * array[0].t
 
     d.register_callback(
         simulation_callback,

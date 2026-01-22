@@ -23,40 +23,6 @@ from deisa.ray.types import (
 from deisa.ray.utils import get_head_actor_options
 
 
-@ray.remote(num_cpus=0, max_retries=0)
-def _call_prepare_iteration(prepare_iteration: Callable, array: da.Array, timestep: int):
-    """
-    Call the prepare_iteration function with the given array and timestep.
-
-    This is a Ray remote function that executes the prepare_iteration
-    callback with a Dask array. It configures Dask to use the Deisa-Ray
-    scheduler before calling the function.
-
-    Parameters
-    ----------
-    prepare_iteration : Callable
-        The function to call. Should accept a Dask array and a timestep
-        keyword argument.
-    array : da.Array
-        The Dask array to pass to the prepare_iteration function.
-    timestep : int
-        The current timestep to pass to the prepare_iteration function.
-
-    Returns
-    -------
-    Any
-        The result of calling `prepare_iteration(array, timestep=timestep)`.
-
-    Notes
-    -----
-    This function is executed as a Ray remote task with no CPU requirements
-    and no retries. It configures Dask to use the Deisa-Ray scheduler before
-    executing the prepare_iteration callback.
-    """
-    dask.config.set(scheduler=deisa_ray_get, shuffle="tasks")
-    return prepare_iteration(array, timestep=timestep)
-
-
 class Deisa:
     def __init__(
         self,
@@ -174,7 +140,7 @@ class Deisa:
         self.registered_callbacks.append(cfg)
 
         # TODO make head node take the entire type
-        head_arrays_description = [(definition.name, definition.preprocess) for definition in arrays_description]
+        head_arrays_description = [definition.name for definition in arrays_description]
 
         ray.get(self.head.register_arrays.remote(head_arrays_description))
 
@@ -227,7 +193,7 @@ class Deisa:
         array delivery, and garbage collection between iterations.
         """
         self._ensure_connected()
-        head_arrays_description = [("__deisa_last_iteration_array", None)]
+        head_arrays_description = ["__deisa_last_iteration_array"]
         ray.get(self.head.register_arrays.remote(head_arrays_description))
 
         if not self.registered_callbacks:
@@ -259,13 +225,13 @@ class Deisa:
                 exception_handler = cb_cfg.exception_handler
 
                 # Compute the arrays to pass to the callback
-                callback_args: dict[str, DeisaArray | List[DeisaArray]] = self.determine_callback_args(
-                    description_arrays_needed
-                )
+                callback_args: dict[str, List[DeisaArray]] = self.determine_callback_args(description_arrays_needed)
                 try:
                     simulation_callback(**callback_args)
                 except TimeoutError:
                     pass
+                except AssertionError as e:
+                    raise e
                 except BaseException as e:
                     try:
                         exception_handler(e)
@@ -277,7 +243,7 @@ class Deisa:
             if not end_reached:
                 self.queue_per_array[name].append(DeisaArray(dask=array, t=timestep))
 
-    def determine_callback_args(self, description_of_arrays_needed) -> dict[str, DeisaArray | List[DeisaArray]]:
+    def determine_callback_args(self, description_of_arrays_needed) -> dict[str, List[DeisaArray]]:
         callback_args = {}
         for description in description_of_arrays_needed:
             name = description.name
@@ -287,9 +253,6 @@ class Deisa:
                 callback_args[name] = [queue[-1]]
             else:
                 callback_args[name] = list(queue)[-window_size:]
-        for name, arrays in callback_args.items():
-            if len(callback_args[name]) == 1:
-                callback_args[name] = arrays[0]
         return callback_args
 
     # TODO add persist

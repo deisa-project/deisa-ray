@@ -2,6 +2,7 @@ import dask.array as da
 import ray
 import pytest
 
+from deisa.ray.types import DeisaArray
 from tests.utils import ray_cluster, simple_worker, wait_for_head_node  # noqa: F401
 
 NB_ITERATIONS = 10
@@ -18,14 +19,13 @@ def head_script(enable_distributed_scheduling) -> None:
 
     d = Deisa()
 
-    def simulation_callback(array: list[da.Array]):
-        timestep = array.t
-        if timestep == 0:
+    def simulation_callback(array: list[DeisaArray]):
+        if array[-1].t == 0:
             assert len(array) == 1
             return
 
-        assert array[0].dask.sum().compute() == 10 * (timestep - 1)
-        assert array[1].dask.sum().compute() == 10 * timestep
+        assert array[0].dask.sum().compute() == 10 * array[0].t
+        assert array[1].dask.sum().compute() == 10 * array[1].t
 
         # Test a computation where the two arrays are used at the same time.
         # This checks that they are defined with different names.

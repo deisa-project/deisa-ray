@@ -2,6 +2,7 @@ import dask.array as da
 import ray
 import pytest
 
+from deisa.ray.types import DeisaArray
 from tests.utils import ray_cluster, simple_worker, wait_for_head_node  # noqa: F401
 
 NB_ITERATIONS = 10
@@ -19,18 +20,17 @@ def head_script(enable_distributed_scheduling) -> None:
 
     d = Deisa()
 
-    def simulation_callback(a: list[da.Array], b: list[da.Array]):
-        timestep = a.t
-        assert b[0].dask.sum().compute() == 20 * timestep
+    def simulation_callback(a: list[DeisaArray], b: list[DeisaArray]):
+        assert b[0].dask.sum().compute() == 10 * b[0].t
 
         assert len(b) == 1
-        if timestep == 0:
+        if a[-1].t == 0:
             assert len(a) == 1
             return
         assert len(a) == 2
 
-        assert a[0].dask.sum().compute() == 10 * (timestep - 1)
-        assert a[1].dask.sum().compute() == 10 * timestep
+        assert a[0].dask.sum().compute() == 10 * a[0].t
+        assert a[1].dask.sum().compute() == 10 * a[1].t
 
         # Test a computation where the two arrays are used at the same time.
         # This checks that they are defined with different names.
@@ -40,7 +40,7 @@ def head_script(enable_distributed_scheduling) -> None:
         simulation_callback,
         [
             WindowSpec("a", window_size=2),
-            WindowSpec("b", window_size=1, preprocess=lambda x: 2 * x),
+            WindowSpec("b", window_size=1),
         ],
     )
     d.execute_callbacks()

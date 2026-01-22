@@ -3,6 +3,7 @@ import pytest
 import ray
 import numpy as np
 
+from deisa.ray.types import DeisaArray
 from tests.utils import ray_cluster, simple_worker, wait_for_head_node  # noqa: F401
 
 NB_ITERATIONS = 10
@@ -20,11 +21,11 @@ def head_script(enable_distributed_scheduling) -> None:
 
     d = Deisa()
 
-    def simulation_callback(array: da.Array):
-        x = array.dask.compute()
+    def simulation_callback(array: list[DeisaArray]):
+        x = array[0].dask.compute()
         print(f"ARRAY PRINTED = {x}", flush=True)
 
-        arr = array.t * np.array([[1, 2], [3, 4]])
+        arr = array[0].t * np.array([[1, 2], [3, 4]])
         assert (arr == np.array(x)).all()
 
         # TODO: Test for 2d/3d/4d/... arrays

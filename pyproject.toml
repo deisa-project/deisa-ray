@@ -10,6 +10,7 @@ dependencies = [
     "ray[default] (==2.48.0)",
     "numpy",
     "deisa-core>=0.2.0",
+    "distributed (==2025.5.0)"
 ]
 
 [build-system]

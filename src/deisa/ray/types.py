@@ -185,25 +185,19 @@ class WindowSpec:
         If specified, creates a sliding window of arrays for this array name.
         The window will contain the last `window_size` timesteps. If None,
         only the current timestep array is provided. Default is None.
-    preprocess : Callable, optional
-        A preprocessing function to apply to chunks of this array before
-        they are sent to the analytics. The function should take a numpy
-        array and return a processed numpy array. Default is the identity
-        function (no preprocessing).
 
     Examples
     --------
     >>> def normalize(arr):
     ...     return arr / arr.max()
     >>> # Array with windowing: last 5 timesteps
-    >>> array_def = ArrayDefinition(name="temperature", window_size=5, preprocess=normalize)
+    >>> array_def = ArrayDefinition(name="temperature", window_size=5)
     >>> # Array without windowing: current timestep only
     >>> array_def = ArrayDefinition(name="pressure", window_size=None)
     """
 
     name: str
     window_size: int | None = None
-    preprocess: Callable = lambda x: x
 
 
 @dataclass(frozen=True)
@@ -230,15 +224,11 @@ class DaskArrayData:
     ----------
     name : str
         Array name registered with the head actor.
-    f_preprocessing : Callable
-        Preprocessing callback applied to each chunk.
 
     Attributes
     ----------
     name : str
         Array name without timestep suffix.
-    f_preprocessing : Callable
-        Preprocessing callback supplied at registration.
     fully_defined : asyncio.Event
         Set when every chunk owner has been registered.
     nb_chunks_per_dim : tuple[int, ...] or None
@@ -269,7 +259,7 @@ class DaskArrayData:
         actors. Used when distributed scheduling is disabled.
     """
 
-    def __init__(self, name, f_preprocessing) -> None:
+    def __init__(self, name) -> None:
         """
         Initialise per-array metadata containers.
 
@@ -277,12 +267,9 @@ class DaskArrayData:
         ----------
         name : str
             Array name as registered with the head actor.
-        f_preprocessing : Callable
-            Preprocessing callback applied to each chunk before analytics
-            consume the array.
+
         """
         self.name = name
-        self.f_preprocessing = f_preprocessing
 
         # This will be set when we know, for each chunk, the scheduling actor in charge of it.
         self.fully_defined: asyncio.Event = asyncio.Event()
