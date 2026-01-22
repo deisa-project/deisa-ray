@@ -228,8 +228,8 @@ class Deisa:
                 callback_args: dict[str, List[DeisaArray]] = self.determine_callback_args(description_arrays_needed)
                 try:
                     simulation_callback(**callback_args)
-                except TimeoutError:
-                    pass
+                except TimeoutError as e:
+                    raise e
                 except AssertionError as e:
                     raise e
                 except BaseException as e:

@@ -69,7 +69,7 @@ class HeadNodeActor:
         self.scheduling_actors: dict[str, RayActorHandle] = {}
 
         # TODO: document what this event signals and update documentation
-        self.new_array_created = asyncio.Event()
+        self.new_array_created: dict[str, asyncio.Event] = {}
         self.max_simulation_ahead = max_simulation_ahead
         self.semaphore_per_array = {}
 
@@ -104,6 +104,7 @@ class HeadNodeActor:
         for name in arrays_definitions:
             self.registered_arrays[name] = DaskArrayData(name)
             self.semaphore_per_array[name] = asyncio.Semaphore(self.max_simulation_ahead)
+            self.new_array_created[name] = asyncio.Event()
 
     def list_scheduling_actors(self) -> dict[str, RayActorHandle]:
         """
@@ -230,7 +231,7 @@ class HeadNodeActor:
             # could it influence this iter?
             # need to reason more about this condition
             t1 = asyncio.create_task(self.semaphore_per_array[array_name].acquire())
-            t2 = asyncio.create_task(self.new_array_created.wait())
+            t2 = asyncio.create_task(self.new_array_created[array_name].wait())
 
             done, pending = await asyncio.wait([t1, t2], return_when=asyncio.FIRST_COMPLETED)
 
@@ -244,8 +245,8 @@ class HeadNodeActor:
                 else:
                     array.chunk_refs[timestep] = []
 
-                    self.new_array_created.set()
-                    self.new_array_created.clear()
+                    self.new_array_created[array_name].set()
+                    self.new_array_created[array_name].clear()
         chunks = [val for val in pos_to_ref.values()]
         ref_to_list_of_chunks = ray.put(chunks)
 

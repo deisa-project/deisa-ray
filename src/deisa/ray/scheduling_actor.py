@@ -4,6 +4,8 @@ from typing import Any, Dict, Hashable
 import ray
 from ray.util.dask import ray_dask_get
 
+import asyncio
+import time
 from deisa.ray._async_dict import AsyncDict
 from deisa.ray.errors import ContractError
 from deisa.ray.types import (
@@ -616,19 +618,20 @@ class SchedulingActor(NodeActorBase):
         non-blocking in distributed Dask computations.
         """
         graph_info = await self.graph_infos.wait_for_key(graph_id)
-
         await graph_info.scheduled_event.wait()
-        # For tomorrow: I understood this - the await is similar to a ray.get() so it unpacks the ref once.
-        # therefore, at the end all the refs are refs of refs (same leve). Then the patches dask task wrapper
-        # is called and works the same way for all tasks (calls itself).
-        # Because of this, I also think I understand why we need a ref of ref: if you work directly with a ref of
-        # data, then Actor1 could need a key from Actor2, and Actor2 a key from Actor1. Both call ray.get(refOwnedByOtherActor)
-        # and the cluster deadlocks. To fix this, I need to make it non-blocking. How can I do this? By making it a remote call.
-        # However, to make the entire graph "coherent", I need to make leaf nodes refs of refs as well. Then it all becomes
-        # cohesive.
-        # I am missing why we need the pickling and how memory is released.
         ref = graph_info.refs[key]
-        return await ref
+
+        async with asyncio.timeout(10.0):
+            # For tomorrow: I understood this - the await is similar to a ray.get() so it unpacks the ref once.
+            # therefore, at the end all the refs are refs of refs (same leve). Then the patches dask task wrapper
+            # is called and works the same way for all tasks (calls itself).
+            # Because of this, I also think I understand why we need a ref of ref: if you work directly with a ref of
+            # data, then Actor1 could need a key from Actor2, and Actor2 a key from Actor1. Both call ray.get(refOwnedByOtherActor)
+            # and the cluster deadlocks. To fix this, I need to make it non-blocking. How can I do this? By making it a remote call.
+            # However, to make the entire graph "coherent", I need to make leaf nodes refs of refs as well. Then it all becomes
+            # cohesive.
+            # I am missing why we need the pickling and how memory is released.
+            return await ref
 
 
 @ray.remote

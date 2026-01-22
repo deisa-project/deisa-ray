@@ -20,6 +20,7 @@ def head_script(enable_distributed_scheduling) -> None:
 
     # TODO : modify assert to test the actual error handler
     def simulation_callback(array: list[DeisaArray]):
+        array[0].dask.compute()
         assert False
 
     d.register_callback(
@@ -60,3 +61,31 @@ def test_exception_handler_not_bypass_computation(
             )
 
         ray.get([head_ref] + worker_refs)
+
+
+# @pytest.mark.parametrize(
+#    "nb_nodes, enable_distributed_scheduling",
+#    [
+#        (1, True),
+#    ],
+# )
+# def test_timeout_error(nb_nodes: int, enable_distributed_scheduling: bool, ray_cluster) -> None:  # noqa: F811
+#    with pytest.raises(TimeoutError):
+#        head_ref = head_script.remote(enable_distributed_scheduling)
+#        wait_for_head_node()
+#
+#        worker_refs = []
+#        for rank in range(4):
+#            worker_refs.append(
+#                simple_worker_error_test.remote(
+#                    rank=rank,
+#                    position=(rank // 2, rank % 2),
+#                    chunks_per_dim=(2, 2),
+#                    nb_chunks_of_node=4 // nb_nodes,
+#                    chunk_size=(1, 1),
+#                    nb_iterations=NB_ITERATIONS,
+#                    node_id=f"node_{rank % nb_nodes}",
+#                )
+#            )
+#
+#        ray.get([head_ref] + worker_refs)
