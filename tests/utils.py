@@ -53,7 +53,7 @@ def simple_worker(
         }
     }
 
-    client = Bridge(id=rank, arrays_metadata=arrays_md, system_metadata=sys_md, _node_id=node_id)
+    client = Bridge(bridge_id=rank, arrays_metadata=arrays_md, system_metadata=sys_md, _node_id=node_id)
 
     array = (rank + 1) * np.ones(chunk_size, dtype=dtype)
 
@@ -91,7 +91,7 @@ def simple_worker_error_test(
         }
     }
 
-    client = Bridge(id=rank, arrays_metadata=arrays_md, system_metadata=sys_md, _node_id=node_id)
+    client = Bridge(bridge_id=rank, arrays_metadata=arrays_md, system_metadata=sys_md, _node_id=node_id)
 
     array = (rank + 1) * np.ones(chunk_size, dtype=dtype)
 

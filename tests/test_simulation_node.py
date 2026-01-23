@@ -39,7 +39,7 @@ def test_init(ray_cluster):
     fake_node_id = "FAKE-NODE-1"
     sys_md = get_system_metadata()
     c = Bridge(
-        id=0,
+        bridge_id=0,
         arrays_metadata=arrays_md,
         system_metadata=sys_md,
         _node_id=fake_node_id,
@@ -58,7 +58,7 @@ def test_init_race_free(nb_nodes, ray_cluster):
     def _mk(id):
         sys_md = get_system_metadata()
         Bridge(
-            id=0,
+            bridge_id=0,
             arrays_metadata=arrays_md,
             system_metadata=sys_md,
             _node_id=id,
@@ -87,7 +87,7 @@ def test_actor_dies_and_client_recovers(ray_cluster):
     # First client brings up the actor
     sys_md = get_system_metadata()
     Bridge(
-        id=0,
+        bridge_id=0,
         arrays_metadata=arrays_md,
         system_metadata=sys_md,
         _node_id=fake_node_id,
@@ -99,7 +99,7 @@ def test_actor_dies_and_client_recovers(ray_cluster):
 
     # Now, creating another client should recover (thanks to retry in Bridge.__init__)
     c2 = Bridge(
-        id=0,
+        bridge_id=0,
         arrays_metadata=arrays_md,
         system_metadata=sys_md,
         _node_id=fake_node_id,

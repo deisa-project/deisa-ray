@@ -126,7 +126,7 @@ class Bridge:
 
     def __init__(
         self,
-        id: int,
+        bridge_id: int,
         arrays_metadata: Mapping[str, Mapping[str, Any]],
         system_metadata: Mapping[str, Any],
         *args: Any,
@@ -140,7 +140,7 @@ class Bridge:
 
         Parameters
         ----------
-        id : int
+        bridge_id : int
             Unique identifier of this Bridge.
         arrays_metadata : Mapping[str, Mapping[str, Any]]
             Dictionary that describes the arrays being shared by the simulation.
@@ -180,7 +180,7 @@ class Bridge:
             versions of the API.
         """
 
-        self.id = id
+        self.id = bridge_id
         self._init_retries = _init_retries
 
         self.arrays_metadata = self._validate_arrays_meta(arrays_metadata)
@@ -225,8 +225,9 @@ class Bridge:
         """
         # send metadata of each array chunk (both global and local chunk info) to node actor
 
+        refs = []
         for array_name, meta in self.arrays_metadata.items():
-            self.node_actor.register_chunk_meta.remote(
+            refs.append(self.node_actor.register_chunk_meta.remote(
                 # global info of array (same across bridges)
                 array_name=array_name,
                 chunk_shape=meta["chunk_shape"],
@@ -236,7 +237,8 @@ class Bridge:
                 # local info of array specific to bridge
                 bridge_id=self.id,
                 chunk_position=meta["chunk_position"],
-            )
+            ))
+        ray.get(refs)
 
     def send(
         self,

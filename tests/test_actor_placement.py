@@ -130,7 +130,7 @@ def test_actor_placement(enable_distributed_scheduling, ray_multinode_cluster):
         }
         sys_md = get_system_metadata()
         c = Bridge(
-            id=0,
+            bridge_id=0,
             arrays_metadata=arrays_md,
             system_metadata=sys_md,
             _node_id=None,

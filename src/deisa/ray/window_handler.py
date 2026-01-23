@@ -46,6 +46,7 @@ class Deisa:
         self.registered_callbacks: list[_CallbackConfig] = []
         self.queue_per_array: dict[str, deque]
         self.max_simulation_ahead: int = max_simulation_ahead
+        self.has_new_timestep: dict[str, bool] = {}
 
     def _handshake_impl(self, _: "Deisa") -> None:
         """
@@ -201,9 +202,11 @@ class Deisa:
 
         self.generate_queue_per_array()
 
-        # TODO sim should signal end
+        # get first array just to kickstart the process and add to queue
         name, timestep, array = ray.get(self.head.get_next_array.remote())
         self.queue_per_array[name].append(DeisaArray(dask=array, t=timestep))
+        self.has_new_timestep[name] = True
+
         end_reached = False
         while not end_reached:
             # get next available array
@@ -217,6 +220,7 @@ class Deisa:
                     break
 
                 self.queue_per_array[name].append(DeisaArray(dask=array, t=timestep))
+                self.has_new_timestep[name] = True
 
             # inspect what callbacks can be called
             for cb_cfg in self.registered_callbacks:
@@ -224,36 +228,51 @@ class Deisa:
                 description_arrays_needed = cb_cfg.arrays_description
                 exception_handler = cb_cfg.exception_handler
 
-                # Compute the arrays to pass to the callback
-                callback_args: dict[str, List[DeisaArray]] = self.determine_callback_args(description_arrays_needed)
-                try:
-                    simulation_callback(**callback_args)
-                except TimeoutError as e:
-                    raise e
-                except AssertionError as e:
-                    raise e
-                except BaseException as e:
+                should_call = self.should_call(description_arrays_needed)
+                if should_call:
+                    # Compute the arrays to pass to the callback
+                    callback_args: dict[str, List[DeisaArray]] = self.determine_callback_args(description_arrays_needed)
                     try:
-                        exception_handler(e)
+                        simulation_callback(**callback_args)
+                    except TimeoutError as e:
+                        raise e
+                    except AssertionError as e:
+                        raise e
                     except BaseException as e:
-                        _default_exception_handler(e)
+                        try:
+                            exception_handler(e)
+                        except BaseException as e:
+                            _default_exception_handler(e)
 
-                del callback_args
-                gc.collect()
+                    del callback_args
+                    gc.collect()
+
+            # set all new timesteps to be false
+            for name in self.has_new_timestep:
+                self.has_new_timestep[name] = False
+
+            # add the first "bigger" timestep back into queue and set new_timestep flag
             if not end_reached:
                 self.queue_per_array[name].append(DeisaArray(dask=array, t=timestep))
+                self.has_new_timestep[name] = True
 
     def determine_callback_args(self, description_of_arrays_needed) -> dict[str, List[DeisaArray]]:
         callback_args = {}
         for description in description_of_arrays_needed:
-            name = description.name
-            window_size = description.window_size
-            queue = self.queue_per_array[name]
-            if window_size is None:
-                callback_args[name] = [queue[-1]]
-            else:
-                callback_args[name] = list(queue)[-window_size:]
+             name = description.name
+             window_size = description.window_size
+             queue = self.queue_per_array[name]
+             if window_size is None:
+                 callback_args[name] = [queue[-1]]
+             else:
+                 callback_args[name] = list(queue)[-window_size:]
         return callback_args
+
+    def should_call(self, description_of_arrays_needed) -> bool:
+        should_call = True
+        for description in description_of_arrays_needed:
+            should_call = should_call and self.has_new_timestep[description.name]
+        return should_call
 
     # TODO add persist
     def set(self, *args, key: Hashable, value: Any, chunked: bool = False, persist: bool = False, **kwargs) -> None:

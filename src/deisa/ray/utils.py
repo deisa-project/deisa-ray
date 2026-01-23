@@ -18,7 +18,7 @@ def get_system_metadata() -> Dict:
     return {}
 
 
-def get_ready_actor_with_retry(name, namespace, deadline_s=180):
+async def get_ready_actor_with_retry(name, namespace, deadline_s=180):
     """
     Get a Ray actor by name with retry logic and readiness check.
 
@@ -61,7 +61,7 @@ def get_ready_actor_with_retry(name, namespace, deadline_s=180):
             # TODO for even more reliability, in the future we should handle
             # actor exists, but unavailable
             # actor exists, crashed, need to recreate
-            ray.get(actor.ready.remote())
+            await actor.ready.remote()
             return actor
         except ValueError:
             if time.time() - start > deadline_s:

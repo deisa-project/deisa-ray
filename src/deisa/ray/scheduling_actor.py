@@ -74,10 +74,11 @@ class NodeActorBase:
         Registers the actor with the head node immediately so it can start
         receiving metadata and chunk notifications.
         """
+        self.nb_chunks_of_node: dict[str, int] = {}
         self.actor_id = actor_id
         self.actor_handle = ray.get_runtime_context().current_actor
 
-        self.head = get_ready_actor_with_retry(name="simulation_head", namespace="deisa_ray")
+        self.head = await get_ready_actor_with_retry(name="simulation_head", namespace="deisa_ray")
         await self.head.register_scheduling_actor.remote(actor_id, self.actor_handle)
 
         # Keeps track of array metadata AND ref per timestep.
@@ -187,7 +188,7 @@ class NodeActorBase:
         """
         if array_name not in self.partial_arrays:
             self.partial_arrays[array_name] = PartialArray()
-            self.nb_chunks_of_node = nb_chunks_of_node
+            self.nb_chunks_of_node[array_name] = nb_chunks_of_node
         return self.partial_arrays[array_name]
 
     async def register_chunk_meta(
@@ -271,33 +272,6 @@ class NodeActorBase:
         """
         pass
 
-    def _pack_object_ref(self, refs: list[ray.ObjectRef]):
-        """
-        Return the first ObjectRef from a list, intended to be called remotely.
-
-        The remote invocation of this method produces a *double* Ray
-        ObjectRef, which keeps distributed scheduling non-blocking while
-        preserving the original single-ref payload inside the list.
-
-        Parameters
-        ----------
-        refs : list[ray.ObjectRef]
-            List of Ray object references to pack. Only the first one is
-            returned.
-
-        Returns
-        -------
-        ray.ObjectRef
-            The first ObjectRef from the input list.
-
-        Notes
-        -----
-        Implemented as an actor method (rather than a separate remote
-        function) to avoid spinning up extra workers when generating the
-        double reference structure expected by the task graph.
-        """
-        return refs[0]
-
     # TODO: refactor from here
     async def add_chunk(
         self,
@@ -344,9 +318,8 @@ class NodeActorBase:
         Notes
         -----
         This method manages chunk collection and coordination:
-        1. Wraps the single chunk ref in a double ref by calling
-           :meth:`_pack_object_ref` remotely.
-        2. Stores the double ref in the per-timestep structure.
+        1. Check array is expected
+        2. Stores the ref in the per-timestep structure.
         3. When all local chunks have arrived, builds a
            ``{chunk_position: double_ref}`` mapping and sends it to the head
            actor via :meth:`HeadNodeActor.chunks_ready`.
@@ -357,7 +330,7 @@ class NodeActorBase:
         if array_name not in self.partial_arrays:
             # respect contract at the beginning
             raise ContractError(
-                f"User requested to add chunk for {array_name} but this array has"
+                f"User requested to add chunk for {array_name} but this array has "
                 f"not been described. Please call register_array({array_name}) before calling"
                 "add_chunk()."
             )
@@ -370,7 +343,7 @@ class NodeActorBase:
         chunk_ref: ray.ObjectRef = chunk_ref[0]
         array_timestep.local_chunks[bridge_id] = chunk_ref
 
-        if len(array_timestep.local_chunks) == self.nb_chunks_of_node:
+        if len(array_timestep.local_chunks) == self.nb_chunks_of_node[array_name]:
             pos_to_ref: dict[tuple, ray.ObjectRef] = {}
 
             for bridge_id, ref in array_timestep.local_chunks._data.items():
