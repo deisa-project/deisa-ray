@@ -26,7 +26,6 @@ from deisa.ray.utils import get_head_actor_options
 class Deisa:
     def __init__(
         self,
-        n_sim_nodes: int,
         *,
         ray_start: Optional[Callable[[], None]] = None,
         handshake: Optional[Callable[["Deisa"], None]] = None,
@@ -34,7 +33,6 @@ class Deisa:
     ) -> None:
         # cheap constructor: no Ray side effects
         config.lock()
-        self.n_sim_nodes = n_sim_nodes
 
         self._experimental_distributed_scheduling_enabled = config.experimental_distributed_scheduling_enabled
 
@@ -50,15 +48,21 @@ class Deisa:
         self.max_simulation_ahead: int = max_simulation_ahead
         self.has_new_timestep: dict[str, bool] = {}
 
-    def _handshake_impl(self) -> None:
+    def _handshake_impl(self, _: "Deisa") -> None:
         """
         Implementation for handshake between window handler (Deisa) and the Simulation side Bridges.
 
         The handshake occurs when all the expected Ray Node Actors are connected.
+
+        :param self: Description
+        :param _: Description
+        :type _: "Deisa"
         """
+        # TODO :finish and add this config option to Deisa use get_connection_info
+        self.total_nodes = 0
         from ray.util.state import list_actors
 
-        expected_ray_actors = self.n_sim_nodes
+        expected_ray_actors = self.total_nodes
         connected_actors = 0
         while connected_actors < expected_ray_actors:
             connected_actors = 0
@@ -98,7 +102,7 @@ class Deisa:
             )
         )
 
-        self._handshake()
+        self._handshake(self)
 
         self._connected = True
 

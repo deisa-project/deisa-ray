@@ -142,3 +142,63 @@ def test_actor_placement(enable_distributed_scheduling, ray_multinode_cluster):
     client_node_id, sched_name = ray.get(make_client_and_return_ids.remote())
     assert client_node_id == worker_node_id
     assert actor_node_id_by_name(sched_name) == worker_node_id
+
+
+# @pytest.mark.parametrize("sleep_t", [0, 60, 120])
+# def test_analytics_late_start(ray_multinode_cluster, sleep_t):
+#     ids = ray_multinode_cluster["ids"]
+#     head_node_id, worker_node_id = ids["head"], ids["node1"]
+#
+#     @ray.remote(
+#         max_retries=0,
+#         scheduling_strategy=NodeAffinitySchedulingStrategy(node_id=head_node_id, soft=False),
+#     )
+#     def head_script(enable_distributed_scheduling) -> None:
+#         """The head node checks that the values are correct"""
+#         from deisa.ray.window_api import ArrayDefinition, run_simulation
+#
+#         time.sleep(sleep_t)
+#
+#         def simulation_callback(array: da.Array, timestep: int):
+#             return True
+#
+#         run_simulation(
+#             simulation_callback,
+#             [ArrayDefinition("array")],
+#             max_iterations=0,
+#         )
+#
+#     head_script.remote()
+#
+#     # test that client creation resilient to head actor taking a long time to start
+#     @ray.remote(
+#         scheduling_strategy=NodeAffinitySchedulingStrategy(node_id=worker_node_id, soft=False),
+#     )
+#     def make_client_and_return_ids():
+#         c = Bridge(_node_id=None)  # type:ignore
+#         return (c.node_id, f"sched-{c.node_id}")
+#
+#     # this should be blocking because we want the sim code to wait
+#     client_node_id, sched_name = ray.get(make_client_and_return_ids.remote())
+#
+#     # check placement
+#     assert client_node_id == worker_node_id
+#     assert actor_node_id_by_name(sched_name) == worker_node_id
+#     assert actor_node_id_by_name("simulation_head") == head_node_id
+#
+#
+# # TODO use more specific timeoutError
+# def test_sim_exits_if_analytics_dont_start(ray_multinode_cluster):
+#     ids = ray_multinode_cluster["ids"]
+#     worker_node_id = ids["node1"]
+#
+#     # test that client creation resilient to head actor taking a long time to start
+#     @ray.remote(
+#         scheduling_strategy=NodeAffinitySchedulingStrategy(node_id=worker_node_id, soft=False),
+#     )
+#     def make_client_and_return_ids():
+#         c = Bridge(_node_id=None, _init_retries=1)  # type:ignore
+#         return (c.node_id, f"sched-{c.node_id}")
+#
+#     with pytest.raises(Exception):
+#         ray.get(make_client_and_return_ids.remote())
