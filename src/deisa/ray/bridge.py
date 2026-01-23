@@ -184,6 +184,9 @@ class Bridge:
         self._init_retries = _init_retries
 
         self.arrays_metadata = self._validate_arrays_meta(arrays_metadata)
+        # NOTE : Possible error : if two bridges have different first array it will have different
+        # shape and will be declared twice.
+        # Possible fix : do it somewhere else (Head or SchedulingActor)
         # we add a special array with a name that will signal the end of the simulation
         # note we only need the metadata so that it can pass through the entire pipeline correctly and
         # in sequential order, so we just replicate the first metadata we have.
@@ -227,17 +230,19 @@ class Bridge:
 
         refs = []
         for array_name, meta in self.arrays_metadata.items():
-            refs.append(self.node_actor.register_chunk_meta.remote(
-                # global info of array (same across bridges)
-                array_name=array_name,
-                chunk_shape=meta["chunk_shape"],
-                nb_chunks_per_dim=meta["nb_chunks_per_dim"],
-                nb_chunks_of_node=meta["nb_chunks_of_node"],
-                dtype=meta["dtype"],
-                # local info of array specific to bridge
-                bridge_id=self.id,
-                chunk_position=meta["chunk_position"],
-            ))
+            refs.append(
+                self.node_actor.register_chunk_meta.remote(
+                    # global info of array (same across bridges)
+                    array_name=array_name,
+                    chunk_shape=meta["chunk_shape"],
+                    nb_chunks_per_dim=meta["nb_chunks_per_dim"],
+                    nb_chunks_of_node=meta["nb_chunks_of_node"],
+                    dtype=meta["dtype"],
+                    # local info of array specific to bridge
+                    bridge_id=self.id,
+                    chunk_position=meta["chunk_position"],
+                )
+            )
         ray.get(refs)
 
     def send(

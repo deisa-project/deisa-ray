@@ -18,7 +18,7 @@ def head_script(enable_distributed_scheduling) -> None:
 
     deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
 
-    d = Deisa()
+    d = Deisa(n_sim_nodes=4)
 
     def simulation_callback(a: list[DeisaArray], b: list[DeisaArray]):
         assert b[0].dask.sum().compute() == 10 * b[0].t

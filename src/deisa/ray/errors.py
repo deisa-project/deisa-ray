@@ -17,7 +17,5 @@ class ConfigError(RuntimeError):
 
 
 def _default_exception_handler(e: Exception):
-    print("\n################ERROR################", flush=True, file=sys.stderr)
     traceback.print_exc(file=sys.stderr)
     print(e, file=sys.stderr)
-    print("#################END#################\n", flush=True, file=sys.stderr)

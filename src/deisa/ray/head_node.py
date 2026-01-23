@@ -76,6 +76,14 @@ class HeadNodeActor:
         # All the newly created arrays
         self.arrays_ready: asyncio.Queue[tuple[str, Timestep, da.Array]] = asyncio.Queue()
         self.registered_arrays: dict[str, DaskArrayData] = {}
+        self.analytics_ready_for_execution: asyncio.Event = asyncio.Event()
+
+    def set_analytics_ready_for_execution(self):
+        self.analytics_ready_for_execution.set()
+        # self.analytics_ready_for_execution.clear()
+
+    async def wait_until_analytics_ready(self):
+        await self.analytics_ready_for_execution.wait()
 
     # TODO rename or move creation of global container elsewhere
     def register_arrays(self, arrays_definitions: list[str]) -> None:

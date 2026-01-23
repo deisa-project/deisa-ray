@@ -93,7 +93,7 @@ def test_actor_placement(enable_distributed_scheduling, ray_multinode_cluster):
 
         deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
 
-        d = Deisa()
+        d = Deisa(n_sim_nodes=1)
 
         def simulation_callback(array: list[DeisaArray]):
             return True

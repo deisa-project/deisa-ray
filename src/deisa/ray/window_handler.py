@@ -26,6 +26,7 @@ from deisa.ray.utils import get_head_actor_options
 class Deisa:
     def __init__(
         self,
+        n_sim_nodes: int,
         *,
         ray_start: Optional[Callable[[], None]] = None,
         handshake: Optional[Callable[["Deisa"], None]] = None,
@@ -33,6 +34,7 @@ class Deisa:
     ) -> None:
         # cheap constructor: no Ray side effects
         config.lock()
+        self.n_sim_nodes = n_sim_nodes
 
         self._experimental_distributed_scheduling_enabled = config.experimental_distributed_scheduling_enabled
 
@@ -48,7 +50,7 @@ class Deisa:
         self.max_simulation_ahead: int = max_simulation_ahead
         self.has_new_timestep: dict[str, bool] = {}
 
-    def _handshake_impl(self, _: "Deisa") -> None:
+    def _handshake_impl(self) -> None:
         """
         Implementation for handshake between window handler (Deisa) and the Simulation side Bridges.
 
@@ -59,10 +61,9 @@ class Deisa:
         :type _: "Deisa"
         """
         # TODO :finish and add this config option to Deisa use get_connection_info
-        self.total_nodes = 0
         from ray.util.state import list_actors
 
-        expected_ray_actors = self.total_nodes
+        expected_ray_actors = self.n_sim_nodes
         connected_actors = 0
         while connected_actors < expected_ray_actors:
             connected_actors = 0
@@ -101,8 +102,6 @@ class Deisa:
                 {"experimental_distributed_scheduling_enabled": self._experimental_distributed_scheduling_enabled}
             )
         )
-
-        self._handshake(self)
 
         self._connected = True
 
@@ -194,8 +193,12 @@ class Deisa:
         array delivery, and garbage collection between iterations.
         """
         self._ensure_connected()
+
         head_arrays_description = ["__deisa_last_iteration_array"]
         ray.get(self.head.register_arrays.remote(head_arrays_description))
+        ray.get(self.head.set_analytics_ready_for_execution.remote())
+
+        self._handshake()
 
         if not self.registered_callbacks:
             raise RuntimeError("Please register at least one callback before calling execute_callbacks()")
@@ -259,13 +262,13 @@ class Deisa:
     def determine_callback_args(self, description_of_arrays_needed) -> dict[str, List[DeisaArray]]:
         callback_args = {}
         for description in description_of_arrays_needed:
-             name = description.name
-             window_size = description.window_size
-             queue = self.queue_per_array[name]
-             if window_size is None:
-                 callback_args[name] = [queue[-1]]
-             else:
-                 callback_args[name] = list(queue)[-window_size:]
+            name = description.name
+            window_size = description.window_size
+            queue = self.queue_per_array[name]
+            if window_size is None:
+                callback_args[name] = [queue[-1]]
+            else:
+                callback_args[name] = list(queue)[-window_size:]
         return callback_args
 
     def should_call(self, description_of_arrays_needed) -> bool:
