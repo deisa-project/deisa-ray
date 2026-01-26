@@ -2,7 +2,7 @@ import pytest
 import ray
 
 from deisa.ray.types import DeisaArray
-from tests.utils import ray_cluster, simple_worker, simple_worker_error_test, wait_for_head_node  # noqa: F401
+from tests.utils import simple_worker_error_test, wait_for_head_node  # noqa: F401
 
 NB_ITERATIONS = 10
 
