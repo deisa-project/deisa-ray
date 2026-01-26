@@ -42,7 +42,7 @@ def head_script(enable_distributed_scheduling) -> None:
 def test_exception_handler_not_bypass_computation(
     nb_nodes: int, enable_distributed_scheduling: bool, ray_cluster
 ) -> None:  # noqa: F811
-    with pytest.raises(AssertionError) as error:
+    with pytest.raises(AssertionError):
         head_ref = head_script.remote(enable_distributed_scheduling)
         wait_for_head_node()
 

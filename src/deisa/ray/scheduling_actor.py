@@ -5,7 +5,6 @@ import ray
 from ray.util.dask import ray_dask_get
 
 import asyncio
-import time
 from deisa.ray._async_dict import AsyncDict
 from deisa.ray.errors import ContractError
 from deisa.ray.types import (

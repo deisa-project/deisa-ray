@@ -1,4 +1,3 @@
-import dask.array as da
 import pytest
 import ray
 import numpy as np

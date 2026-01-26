@@ -98,7 +98,7 @@ def test_actor_dies_and_client_recovers(ray_cluster):
     ray.kill(a, no_restart=True)
 
     # Now, creating another client should recover (thanks to retry in Bridge.__init__)
-    c2 = Bridge(
+    Bridge(
         bridge_id=0,
         arrays_metadata=arrays_md,
         system_metadata=sys_md,

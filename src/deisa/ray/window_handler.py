@@ -1,10 +1,9 @@
 from collections import deque
 import gc
 import logging
-from typing import Any, Callable, Hashable, List, Literal, Optional
+from typing import Any, Callable, Hashable, List, Optional
 
 import dask
-import dask.array as da
 from deisa.core.interface import SupportsSlidingWindow
 import ray
 from ray.util.dask import ray_dask_get

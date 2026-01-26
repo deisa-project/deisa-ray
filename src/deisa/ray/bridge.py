@@ -6,7 +6,7 @@ top of Ray.
 """
 
 import logging
-from typing import Any, Callable, Dict, Mapping
+from typing import Any, Dict, Mapping
 
 import numpy as np
 import ray

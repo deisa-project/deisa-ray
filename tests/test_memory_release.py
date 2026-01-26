@@ -1,10 +1,10 @@
 import os
 import random
 
-import dask.array as da
 import pytest
 import ray
 
+from deisa.ray.types import DeisaArray
 from tests.utils import ray_cluster, simple_worker, wait_for_head_node  # noqa: F401
 
 NB_ITERATIONS = 100  # Should be enough to saturate the memory in case the chunks are not released
@@ -22,7 +22,7 @@ def head_script(enable_distributed_scheduling) -> None:
 
     d = Deisa(n_sim_nodes=1)
 
-    def simulation_callback(array: da.Array):
+    def simulation_callback(array: list[DeisaArray]):
         pass
 
     d.register_callback(

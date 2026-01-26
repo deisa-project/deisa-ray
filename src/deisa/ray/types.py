@@ -2,7 +2,7 @@ import asyncio
 from collections import defaultdict
 from dataclasses import dataclass
 import math
-from typing import Any, Callable, TypeAlias
+from typing import Any, TypeAlias
 
 import dask.array as da
 from dask.highlevelgraph import HighLevelGraph
