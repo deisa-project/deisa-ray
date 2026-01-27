@@ -135,3 +135,19 @@ def get_head_actor_options() -> dict:
         # Disabled for performance reasons
         enable_task_events=False,
     )
+
+
+def log(message: str, debug_logs_path: str | None) -> None:
+    """
+    Append a timestamped debug message to ``debug_logs_path`` if provided.
+
+    Parameters
+    ----------
+    message : str
+        Text to append.
+    debug_logs_path : str or None
+        Destination file path. If ``None`` logging is skipped.
+    """
+    if debug_logs_path is not None:
+        with open(debug_logs_path, "a") as f:
+            f.write(f"{message}\n")
