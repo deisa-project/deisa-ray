@@ -102,3 +102,44 @@ def simple_worker_error_test(
         else:
             client.send(array_name=array_name, chunk=chunk, timestep=i, chunked=True)
     client.close(timestep=nb_iterations)
+
+
+@ray.remote(num_cpus=0, max_retries=0)
+def simple_worker_start_any(
+    *,
+    rank: int,
+    position: tuple[int, ...],
+    chunks_per_dim: tuple[int, ...],
+    nb_chunks_of_node: int,
+    chunk_size: tuple[int, ...],
+    nb_iterations: int,
+    start_iteration: int,
+    node_id: str | None = None,
+    array_name: str = "array",
+    dtype: np.dtype = np.int32,  # type: ignore
+) -> None:
+    """Worker node sending chunks of data"""
+    from deisa.ray.bridge import Bridge
+    from deisa.ray.utils import get_system_metadata
+
+    assert start_iteration < nb_iterations
+
+    sys_md = get_system_metadata()
+    arrays_md = {
+        array_name: {
+            "chunk_shape": chunk_size,
+            "nb_chunks_per_dim": chunks_per_dim,
+            "nb_chunks_of_node": nb_chunks_of_node,
+            "dtype": dtype,
+            "chunk_position": position,
+        }
+    }
+
+    client = Bridge(bridge_id=rank, arrays_metadata=arrays_md, system_metadata=sys_md, _node_id=node_id)
+
+    array = (rank + 1) * np.ones(chunk_size, dtype=dtype)
+
+    for i in range(start_iteration, nb_iterations):
+        chunk = i * array
+        client.send(array_name=array_name, chunk=chunk, timestep=i, chunked=True)
+    client.close(timestep=nb_iterations)
