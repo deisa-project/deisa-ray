@@ -6,6 +6,7 @@ import ray
 
 from deisa.ray import Timestep
 from deisa.ray.types import DaskArrayData, RayActorHandle
+from deisa.ray.utils import log
 
 
 @ray.remote
@@ -236,10 +237,12 @@ class HeadNodeActor:
             # TODO what happens if new_array_created for an array of a prev iter is set?
             # could it influence this iter?
             # need to reason more about this condition
+            log(f"taking semaphore for {array_name}", "./logs")
             t1 = asyncio.create_task(self.semaphore_per_array[array_name].acquire())
             t2 = asyncio.create_task(self.new_array_created[array_name].wait())
 
             done, pending = await asyncio.wait([t1, t2], return_when=asyncio.FIRST_COMPLETED)
+            log(f"done = {done}, pending = {pending}", "./logs")
 
             for task in pending:
                 task.cancel()
@@ -247,6 +250,7 @@ class HeadNodeActor:
             if t1 in done:
                 if timestep in array.chunk_refs:
                     # The array was already created by another scheduling actor
+                    log(f"releasing semaphore for {array_name}", "./logs")
                     self.semaphore_per_array[array_name].release()
                 else:
                     array.chunk_refs[timestep] = []
@@ -258,9 +262,12 @@ class HeadNodeActor:
 
         # ray.get(ref_to_list_of_chunks) -> [ref_of_ref_chunk_i, ref_ref_chunk_i+1, ...] (belonging to actor that owns it)
         # so I unpack it and give this ray ref.
+        log(f"Checking is ready step : {timestep} ?", "./logs")
         is_ready = array.add_chunk_ref(ref_to_list_of_chunks, timestep, pos_to_ref)
+        log(f"is_ready = {is_ready}", "./logs")
 
         if is_ready:
+            log(f"getting full array : {array_name}, step : {timestep}", "./logs")
             self.arrays_ready.put_nowait(
                 (
                     array_name,

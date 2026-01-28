@@ -18,7 +18,7 @@ from deisa.ray.types import (
     RayActorHandle,
     ScheduledByOtherActor,
 )
-from deisa.ray.utils import get_ready_actor_with_retry
+from deisa.ray.utils import get_ready_actor_with_retry, log
 
 
 class NodeActorBase:
@@ -355,6 +355,7 @@ class NodeActorBase:
                 array_timestep.local_chunks[bridge_id] = pickle.dumps(ref)
 
             # TODO rename
+            log(f"gathered chunk in ScheActor {self.actor_id}", "./logs")
             await self.head.chunks_ready.options(enable_task_events=False).remote(array_name, timestep, pos_to_ref)
 
             array_timestep.chunks_ready_event.set()
