@@ -230,30 +230,33 @@ class HeadNodeActor:
         semaphore is released when analytics later consume the array.
         """
         array = self.registered_arrays[array_name]
+        semaphore = self.semaphore_per_array[array_name]
+        created_event = self.new_array_created[array_name]
 
-        # long story short, this creates an empty array.chunk_refs[timestep] = []
+        # Ensure the timestep entry exists
         while timestep not in array.chunk_refs:
-            # TODO what happens if new_array_created for an array of a prev iter is set?
-            # could it influence this iter?
-            # need to reason more about this condition
-            t1 = asyncio.create_task(self.semaphore_per_array[array_name].acquire())
-            t2 = asyncio.create_task(self.new_array_created[array_name].wait())
+            acquire_task = asyncio.create_task(semaphore.acquire())
+            created_task = asyncio.create_task(created_event.wait())
 
-            done, pending = await asyncio.wait([t1, t2], return_when=asyncio.FIRST_COMPLETED)
+            done, pending = await asyncio.wait(
+                {acquire_task, created_task},
+                return_when=asyncio.FIRST_COMPLETED,
+            )
 
             for task in pending:
                 task.cancel()
 
-            if t1 in done:
+            if acquire_task in done:
                 if timestep in array.chunk_refs:
-                    # The array was already created by another scheduling actor
-                    self.semaphore_per_array[array_name].release()
+                    # Another actor created the entry while we were waiting
+                    semaphore.release()
                 else:
                     array.chunk_refs[timestep] = []
+                    created_event.set()
+                    created_event.clear()
 
-                    self.new_array_created[array_name].set()
-                    self.new_array_created[array_name].clear()
-        chunks = [val for val in pos_to_ref.values()]
+        # Collect chunk refs and store them in Ray
+        chunks = list(pos_to_ref.values())
         ref_to_list_of_chunks = ray.put(chunks)
 
         # ray.get(ref_to_list_of_chunks) -> [ref_of_ref_chunk_i, ref_ref_chunk_i+1, ...] (belonging to actor that owns it)
