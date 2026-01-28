@@ -36,17 +36,17 @@ def test_non_bool_rejected():
 
 def test_config_locks_on_instantiation():
     assert deisa.config.is_locked() is False
-    _ = Deisa()
+    _ = Deisa(n_sim_nodes=0)
     assert deisa.config.is_locked() is True
 
 
 def test_cannot_mutate_after_instantiation():
-    _ = Deisa()
+    _ = Deisa(n_sim_nodes=0)
     with pytest.raises(ConfigError):
         deisa.config.enable_experimental_distributed_scheduling(True)
 
 
 def test_instance_copies_value_at_construction_time():
     deisa.config.enable_experimental_distributed_scheduling(True)
-    d = Deisa()
+    d = Deisa(n_sim_nodes=0)
     assert d._experimental_distributed_scheduling_enabled is True

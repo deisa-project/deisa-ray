@@ -1,10 +1,10 @@
 import os
 import random
 
-import dask.array as da
 import pytest
 import ray
 
+from deisa.ray.types import DeisaArray
 from tests.utils import ray_cluster, simple_worker, wait_for_head_node  # noqa: F401
 
 NB_ITERATIONS = 100  # Should be enough to saturate the memory in case the chunks are not released
@@ -14,21 +14,20 @@ NB_ITERATIONS = 100  # Should be enough to saturate the memory in case the chunk
 def head_script(enable_distributed_scheduling) -> None:
     """The head node checks that the values are correct"""
     from deisa.ray.window_handler import Deisa
-    from deisa.ray.types import WindowArrayDefinition
+    from deisa.ray.types import WindowSpec
 
     import deisa.ray as deisa
 
     deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
 
-    d = Deisa()
+    d = Deisa(n_sim_nodes=1)
 
-    def simulation_callback(array: da.Array, timestep: int):
+    def simulation_callback(array: list[DeisaArray]):
         pass
 
     d.register_callback(
         simulation_callback,
-        [WindowArrayDefinition("array")],
-        max_iterations=NB_ITERATIONS,
+        [WindowSpec("array")],
     )
     d.execute_callbacks()
 

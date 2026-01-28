@@ -1,5 +1,5 @@
-import ray
 import pytest
+import ray
 
 from deisa.ray.types import DeisaArray
 from tests.utils import ray_cluster, simple_worker, wait_for_head_node  # noqa: F401
@@ -12,41 +12,45 @@ def head_script(enable_distributed_scheduling) -> None:
     """The head node checks that the values are correct"""
     from deisa.ray.window_handler import Deisa
     from deisa.ray.types import WindowSpec
-
     import deisa.ray as deisa
 
     deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
 
     d = Deisa(n_sim_nodes=4)
 
-    def simulation_callback(a: list[DeisaArray], b: list[DeisaArray]):
-        assert b[0].dask.sum().compute() == 10 * b[0].t
+    def simulation_callback1(array: list[DeisaArray]):
+        x = array[0].dask.sum().compute()
+        assert x == 10 * array[0].t
 
-        assert len(b) == 1
-        if a[-1].t == 0:
-            assert len(a) == 1
-            return
-        assert len(a) == 2
+    def simulation_callback2(array1: list[DeisaArray]):
+        x = array1[0].dask.sum().compute()
+        assert x == 10 * array1[0].t
 
-        assert a[0].dask.sum().compute() == 10 * a[0].t
-        assert a[1].dask.sum().compute() == 10 * a[1].t
-
-        # Test a computation where the two arrays are used at the same time.
-        # This checks that they are defined with different names.
-        assert (a[1].dask - a[0].dask).sum().compute() == 10
+    def simulation_callback3(array: list[DeisaArray], array1: list[DeisaArray]):
+        x = array[0].dask.sum().compute()
+        y = array1[0].dask.sum().compute()
+        assert x == 10 * array[0].t and y == 10 * array1[0].t
 
     d.register_callback(
-        simulation_callback,
-        [
-            WindowSpec("a", window_size=2),
-            WindowSpec("b", window_size=1),
-        ],
+        simulation_callback1,
+        [WindowSpec("array")],
+    )
+    d.register_callback(
+        simulation_callback2,
+        [WindowSpec("array1")],
+    )
+    d.register_callback(
+        simulation_callback3,
+        [WindowSpec("array"), WindowSpec("array1")],
     )
     d.execute_callbacks()
 
 
-@pytest.mark.parametrize("enable_distributed_scheduling", [False, True])
-def test_several_arrays(enable_distributed_scheduling, ray_cluster) -> None:  # noqa: F811
+@pytest.mark.parametrize(
+    "enable_distributed_scheduling",
+    [True, False],
+)
+def test_multiple_callbacks(enable_distributed_scheduling: bool, ray_cluster) -> None:  # noqa: F811
     head_ref = head_script.remote(enable_distributed_scheduling)
     wait_for_head_node()
 
@@ -61,7 +65,7 @@ def test_several_arrays(enable_distributed_scheduling, ray_cluster) -> None:  # 
                 chunk_size=(1, 1),
                 nb_iterations=NB_ITERATIONS,
                 node_id=f"node_{rank}",
-                array_name=["a", "b"],
+                array_name=["array", "array1"],
             )
         )
 

@@ -1,14 +1,16 @@
+from collections import Counter
 import random
 import time
-from collections import Counter
 from typing import Callable
-import ray
+
+from dask._task_spec import DataNode, Task
 from dask.core import get_dependencies
+from dask.core import flatten
+import ray
+from ray.util.dask.scheduler_utils import nested_get
+
 from deisa.ray.scheduling_actor import ChunkRef, ScheduledByOtherActor
 from deisa.ray.types import ActorID, GraphKey, GraphValue, RayActorHandle
-from ray.util.dask.scheduler_utils import nested_get
-from dask.core import flatten
-from dask._task_spec import DataNode, Task
 
 
 def random_partitioning(dsk, scheduling_actors: dict) -> dict[str, int]:

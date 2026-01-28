@@ -2,6 +2,7 @@ import dask.array as da
 import pytest
 import ray
 
+from deisa.ray.types import DeisaArray
 from tests.utils import ray_cluster, simple_worker, wait_for_head_node  # noqa: F401
 
 NB_ITERATIONS = 10
@@ -11,25 +12,24 @@ NB_ITERATIONS = 10
 def head_script(partitioning_strategy: str) -> None:
     """The head node checks that the values are correct"""
     from deisa.ray.window_handler import Deisa
-    from deisa.ray.types import WindowArrayDefinition
+    from deisa.ray.types import WindowSpec
 
     import deisa.ray as deisa
 
     deisa.config.enable_experimental_distributed_scheduling(True)
 
-    d = Deisa()
+    d = Deisa(n_sim_nodes=4)
 
-    def simulation_callback(array: da.Array, timestep: int):
-        x = array.sum().compute(deisa_ray_partitioning_strategy=partitioning_strategy)
-        assert x == 10 * timestep
+    def simulation_callback(array: list[DeisaArray]):
+        x = array[0].dask.sum().compute(deisa_ray_partitioning_strategy=partitioning_strategy)
+        assert x == 10 * array[0].t
 
         # Test with a full Dask computation
         assert da.ones((2, 2), chunks=(1, 1)).sum().compute(deisa_ray_partitioning_strategy=partitioning_strategy) == 4
 
     d.register_callback(
         simulation_callback,
-        [WindowArrayDefinition("array")],
-        max_iterations=NB_ITERATIONS,
+        [WindowSpec("array")],
     )
     d.execute_callbacks()
 

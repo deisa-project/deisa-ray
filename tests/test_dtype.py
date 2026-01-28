@@ -1,8 +1,8 @@
-import dask.array as da
 import numpy as np
 import ray
 import pytest
 
+from deisa.ray.types import DeisaArray
 from tests.utils import ray_cluster, simple_worker, wait_for_head_node  # noqa: F401
 
 
@@ -10,21 +10,20 @@ from tests.utils import ray_cluster, simple_worker, wait_for_head_node  # noqa: 
 def head_script(enable_distributed_scheduling) -> None:
     """The head node checks that the values are correct"""
     from deisa.ray.window_handler import Deisa
-    from deisa.ray.types import WindowArrayDefinition
+    from deisa.ray.types import WindowSpec
 
     import deisa.ray as deisa
 
     deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
 
-    d = Deisa()
+    d = Deisa(n_sim_nodes=1)
 
-    def simulation_callback(array: da.Array, timestep: int):
-        assert array.dtype == np.int8
+    def simulation_callback(array: list[DeisaArray]):
+        assert array[0].dask.dtype == np.int8
 
     d.register_callback(
         simulation_callback,
-        [WindowArrayDefinition("array")],
-        max_iterations=1,
+        [WindowSpec("array")],
     )
     d.execute_callbacks()
 

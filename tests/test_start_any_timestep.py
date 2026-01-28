@@ -1,39 +1,42 @@
-import dask.array as da
-import ray
 import pytest
+import ray
 
+from deisa.ray.types import DeisaArray
 from tests.utils import ray_cluster, simple_worker, wait_for_head_node  # noqa: F401
 
 NB_ITERATIONS = 10
+START_ITERATION = 3
 
 
 @ray.remote(max_retries=0)
 def head_script(enable_distributed_scheduling) -> None:
     """The head node checks that the values are correct"""
     from deisa.ray.window_handler import Deisa
-    from deisa.ray.types import WindowArrayDefinition
-
+    from deisa.ray.types import WindowSpec
     import deisa.ray as deisa
 
     deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
 
-    d = Deisa()
+    d = Deisa(n_sim_nodes=4)
 
-    def simulation_callback(array: da.Array, timestep: int):
-        x = array.sum().compute()
+    def simulation_callback(array: list[DeisaArray]):
+        if len(array) == 1:
+            assert array[0].t == START_ITERATION
 
-        assert x == 100 * timestep
+        array[0].dask.compute()
 
     d.register_callback(
         simulation_callback,
-        [WindowArrayDefinition("array", preprocess=lambda arr: 10 * arr)],
-        max_iterations=NB_ITERATIONS,
+        [WindowSpec("array", window_size=2)],
     )
     d.execute_callbacks()
 
 
-@pytest.mark.parametrize("enable_distributed_scheduling", [False, True])
-def test_preprocessing_callback(enable_distributed_scheduling, ray_cluster) -> None:  # noqa: F811
+@pytest.mark.parametrize(
+    "enable_distributed_scheduling",
+    [False, True],
+)
+def test_start_any_timestep(enable_distributed_scheduling: bool, ray_cluster) -> None:  # noqa: F811
     head_ref = head_script.remote(enable_distributed_scheduling)
     wait_for_head_node()
 
@@ -48,6 +51,7 @@ def test_preprocessing_callback(enable_distributed_scheduling, ray_cluster) -> N
                 chunk_size=(1, 1),
                 nb_iterations=NB_ITERATIONS,
                 node_id=f"node_{rank}",
+                start_iteration=START_ITERATION,
             )
         )
 

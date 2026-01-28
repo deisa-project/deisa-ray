@@ -1,10 +1,8 @@
 import asyncio
-from typing import Callable
 
 import dask.array as da
 import numpy as np
 import ray
-import ray.actor
 
 from deisa.ray import Timestep
 from deisa.ray.types import DaskArrayData, RayActorHandle
@@ -53,7 +51,7 @@ class HeadNodeActor:
     # TODO: Discuss if max_pending_arrays should be here or in register callback. In that case, what
     # should happen when the freqs are diff and max_pending_arrays are diff too? When does the sim
     # stop?''
-    def __init__(self) -> None:
+    def __init__(self, max_simulation_ahead: int = 1) -> None:
         """
         Initialize synchronization primitives and bookkeeping containers.
 
@@ -69,23 +67,31 @@ class HeadNodeActor:
         self.scheduling_actors: dict[str, RayActorHandle] = {}
 
         # TODO: document what this event signals and update documentation
-        self.new_array_created = asyncio.Event()
+        self.new_array_created: dict[str, asyncio.Event] = {}
+        self.max_simulation_ahead = max_simulation_ahead
+        self.semaphore_per_array = {}
 
         # All the newly created arrays
         self.arrays_ready: asyncio.Queue[tuple[str, Timestep, da.Array]] = asyncio.Queue()
         self.registered_arrays: dict[str, DaskArrayData] = {}
+        self.analytics_ready_for_execution: asyncio.Event = asyncio.Event()
+
+    def set_analytics_ready_for_execution(self):
+        self.analytics_ready_for_execution.set()
+        # self.analytics_ready_for_execution.clear()
+
+    async def wait_until_analytics_ready(self):
+        await self.analytics_ready_for_execution.wait()
 
     # TODO rename or move creation of global container elsewhere
-    def register_arrays(
-        self, arrays_definitions: list[tuple[str, Callable]], max_pending_arrays: int = 1_000_000_000
-    ) -> None:
+    def register_arrays(self, arrays_definitions: list[str]) -> None:
         """
         Register array definitions and set back-pressure on pending timesteps.
 
         Parameters
         ----------
         arrays_definitions : list[tuple[str, Callable]]
-            Sequence of ``(name, preprocessing_callback)`` pairs for each array
+            Sequence of ``(name)`` pairs for each array
             produced by the simulation. Each entry becomes a
             :class:`~deisa.ray.types.DaskArrayData` instance.
         max_pending_arrays : int, optional
@@ -101,10 +107,10 @@ class HeadNodeActor:
         the provided definitions.
         """
         # regulate how far ahead sim can go wrt to analytics
-        self.new_pending_array_semaphore = asyncio.Semaphore(max_pending_arrays)
-
-        for name, f_preprocessing in arrays_definitions:
-            self.registered_arrays[name] = DaskArrayData(name, f_preprocessing)
+        for name in arrays_definitions:
+            self.registered_arrays[name] = DaskArrayData(name)
+            self.semaphore_per_array[name] = asyncio.Semaphore(self.max_simulation_ahead)
+            self.new_array_created[name] = asyncio.Event()
 
     def list_scheduling_actors(self) -> dict[str, RayActorHandle]:
         """
@@ -136,25 +142,6 @@ class HeadNodeActor:
         """
         if actor_id not in self.scheduling_actors:
             self.scheduling_actors[actor_id] = actor_handle
-
-    def preprocessing_callbacks(self) -> dict[str, Callable]:
-        """
-        Return the preprocessing callbacks for each array.
-
-        Returns
-        -------
-        dict[str, Callable]
-            Dictionary mapping array names to their preprocessing callback
-            functions. These callbacks are used by Bridge instances to
-            preprocess chunks before sending them to the scheduling actors.
-
-        Notes
-        -----
-        The preprocessing callbacks are extracted from the array definitions
-        provided during initialization. These callbacks are static and cannot
-        be changed after initialization.
-        """
-        return {name: array.f_preprocessing for name, array in self.registered_arrays.items()}
 
     def register_partial_array(
         self,
@@ -249,8 +236,8 @@ class HeadNodeActor:
             # TODO what happens if new_array_created for an array of a prev iter is set?
             # could it influence this iter?
             # need to reason more about this condition
-            t1 = asyncio.create_task(self.new_pending_array_semaphore.acquire())
-            t2 = asyncio.create_task(self.new_array_created.wait())
+            t1 = asyncio.create_task(self.semaphore_per_array[array_name].acquire())
+            t2 = asyncio.create_task(self.new_array_created[array_name].wait())
 
             done, pending = await asyncio.wait([t1, t2], return_when=asyncio.FIRST_COMPLETED)
 
@@ -260,12 +247,12 @@ class HeadNodeActor:
             if t1 in done:
                 if timestep in array.chunk_refs:
                     # The array was already created by another scheduling actor
-                    self.new_pending_array_semaphore.release()
+                    self.semaphore_per_array[array_name].release()
                 else:
                     array.chunk_refs[timestep] = []
 
-                    self.new_array_created.set()
-                    self.new_array_created.clear()
+                    self.new_array_created[array_name].set()
+                    self.new_array_created[array_name].clear()
         chunks = [val for val in pos_to_ref.values()]
         ref_to_list_of_chunks = ray.put(chunks)
 
@@ -283,7 +270,6 @@ class HeadNodeActor:
                     ),
                 )
             )
-            # TODO Just used for preparation stuff
             # TODO for now, only used when doing distributed scheduling, but in theory could be
             # used with centralized scheduling too
             if self._experimental_distributed_scheduling_enabled:
@@ -327,41 +313,5 @@ class HeadNodeActor:
         components to pull work in order.
         """
         array = await self.arrays_ready.get()
-        self.new_pending_array_semaphore.release()
+        self.semaphore_per_array[array[0]].release()
         return array
-
-    async def get_preparation_array(self, array_name: str, timestep: Timestep) -> da.Array:
-        """
-        Return the full Dask array for a given timestep, used for preparation.
-
-        This method returns a Dask array structure without actual data
-        references, which is useful for preparation tasks that need to know
-        the array structure but don't need the actual data.
-
-        Parameters
-        ----------
-        array_name : str
-            The name of the array.
-        timestep : Timestep
-            The timestep for which the full array should be returned.
-
-        Returns
-        -------
-        da.Array
-            A Dask array representing the structure of the array for the
-            given timestep. This array does not contain ObjectRefs to actual
-            data (is_preparation=True).
-
-        Notes
-        -----
-        Waits for ``fully_defined`` on the corresponding
-        :class:`~deisa.ray.types.DaskArrayData` before returning. The
-        ``distributing_scheduling_enabled`` flag mirrors the runtime config
-        provided via :meth:`exchange_config`.
-        """
-        await self.registered_arrays[array_name].fully_defined.wait()
-        return self.registered_arrays[array_name].get_full_array(
-            timestep,
-            is_preparation=True,
-            distributing_scheduling_enabled=self._experimental_distributed_scheduling_enabled,
-        )

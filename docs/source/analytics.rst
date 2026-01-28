@@ -7,7 +7,7 @@ Simple example
 .. code-block:: python
 
     from deisa.ray.window_handler import Deisa
-    from deisa.ray.types import WindowArrayDefinition
+    from deisa.ray.types import WindowSpec
 
     deisa = Deisa()
 
@@ -17,7 +17,7 @@ Simple example
 
     deisa.register_callback(
         simulation_callback,
-        [WindowArrayDefinition("array")],
+        [WindowSpec("array")],
     )
     deisa.execute_callbacks()
 
@@ -27,7 +27,7 @@ Several arrays
 .. code-block:: python
 
     from deisa.ray.window_handler import Deisa
-    from deisa.ray.types import WindowArrayDefinition
+    from deisa.ray.types import WindowSpec
 
     deisa = Deisa()
 
@@ -36,7 +36,7 @@ Several arrays
 
     deisa.register_callback(
         simulation_callback,
-        [WindowArrayDefinition("a"), WindowArrayDefinition("b")]
+        [WindowSpec("a"), WindowSpec("b")]
     )
     deisa.execute_callbacks()
 
@@ -49,7 +49,7 @@ a time derivative), it is possible to use the ``window_size`` parameter.
 .. code-block:: python
 
     from deisa.ray.window_handler import Deisa
-    from deisa.ray.types import WindowArrayDefinition
+    from deisa.ray.types import WindowSpec
 
     deisa = Deisa()
 
@@ -65,7 +65,7 @@ a time derivative), it is possible to use the ``window_size`` parameter.
     deisa.register_callback(
         simulation_callback,
         [
-            WindowArrayDefinition("array", window_size=2),  # Enable sliding window
+            WindowSpec("array", window_size=2),  # Enable sliding window
         ],
     )
     deisa.execute_callbacks()
@@ -78,7 +78,7 @@ Dask's ``persist`` is supported:
 .. code-block:: python
 
     from deisa.ray.window_handler import Deisa
-    from deisa.ray.types import WindowArrayDefinition
+    from deisa.ray.types import WindowSpec
 
     deisa = Deisa()
 
@@ -93,7 +93,7 @@ Dask's ``persist`` is supported:
 
     deisa.register_callback(
         simulation_callback,
-        [WindowArrayDefinition("array")],
+        [WindowSpec("array")],
         max_iterations=NB_ITERATIONS,
     )
     deisa.execute_callbacks()

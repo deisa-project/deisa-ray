@@ -1,15 +1,18 @@
-from dataclasses import dataclass
-from typing import Callable, Any, TypeAlias
-from dask.highlevelgraph import HighLevelGraph
-import math
-import numpy as np
 import asyncio
+from collections import defaultdict
+from dataclasses import dataclass
+import math
+from typing import Any, TypeAlias
+
+import dask.array as da
+from dask.highlevelgraph import HighLevelGraph
+from deisa.core.interface import SupportsSlidingWindow
+import numpy as np
 import ray
 import ray.actor
+
 from deisa.ray import Timestep
-import dask.array as da
 from deisa.ray._async_dict import AsyncDict
-from collections import defaultdict
 
 type DoubleRef = ray.ObjectRef
 type ActorID = str
@@ -165,12 +168,12 @@ class ChunkRef:
     ref: ray.ObjectRef
     actorid: int
     array_name: str
-    timestep: int
+    timestep: Timestep
     bridge_id: int
 
 
 @dataclass
-class WindowArrayDefinition:
+class WindowSpec:
     """
     Description of an array with optional windowing support.
 
@@ -182,34 +185,32 @@ class WindowArrayDefinition:
         If specified, creates a sliding window of arrays for this array name.
         The window will contain the last `window_size` timesteps. If None,
         only the current timestep array is provided. Default is None.
-    preprocess : Callable, optional
-        A preprocessing function to apply to chunks of this array before
-        they are sent to the analytics. The function should take a numpy
-        array and return a processed numpy array. Default is the identity
-        function (no preprocessing).
 
     Examples
     --------
     >>> def normalize(arr):
     ...     return arr / arr.max()
     >>> # Array with windowing: last 5 timesteps
-    >>> array_def = ArrayDefinition(name="temperature", window_size=5, preprocess=normalize)
+    >>> array_def = ArrayDefinition(name="temperature", window_size=5)
     >>> # Array without windowing: current timestep only
     >>> array_def = ArrayDefinition(name="pressure", window_size=None)
     """
 
     name: str
     window_size: int | None = None
-    preprocess: Callable = lambda x: x
+
+
+@dataclass(frozen=True)
+class DeisaArray:
+    dask: da.Array
+    t: int
 
 
 @dataclass
 class _CallbackConfig:
-    simulation_callback: Callable
-    arrays_description: list[WindowArrayDefinition]
-    max_iterations: int
-    prepare_iteration: Callable | None
-    preparation_advance: int
+    simulation_callback: SupportsSlidingWindow.Callback
+    arrays_description: list[WindowSpec]
+    exception_handler: SupportsSlidingWindow.ExceptionHandler
 
 
 class DaskArrayData:
@@ -223,15 +224,11 @@ class DaskArrayData:
     ----------
     name : str
         Array name registered with the head actor.
-    f_preprocessing : Callable
-        Preprocessing callback applied to each chunk.
 
     Attributes
     ----------
     name : str
         Array name without timestep suffix.
-    f_preprocessing : Callable
-        Preprocessing callback supplied at registration.
     fully_defined : asyncio.Event
         Set when every chunk owner has been registered.
     nb_chunks_per_dim : tuple[int, ...] or None
@@ -262,7 +259,7 @@ class DaskArrayData:
         actors. Used when distributed scheduling is disabled.
     """
 
-    def __init__(self, name, f_preprocessing) -> None:
+    def __init__(self, name) -> None:
         """
         Initialise per-array metadata containers.
 
@@ -270,12 +267,9 @@ class DaskArrayData:
         ----------
         name : str
             Array name as registered with the head actor.
-        f_preprocessing : Callable
-            Preprocessing callback applied to each chunk before analytics
-            consume the array.
+
         """
         self.name = name
-        self.f_preprocessing = f_preprocessing
 
         # This will be set when we know, for each chunk, the scheduling actor in charge of it.
         self.fully_defined: asyncio.Event = asyncio.Event()
@@ -412,9 +406,7 @@ class DaskArrayData:
         # I mark the array as ready to be formed.
         return len(self.chunk_refs[timestep]) == self.nb_scheduling_actors
 
-    def get_full_array(
-        self, timestep: Timestep, *, distributing_scheduling_enabled: bool, is_preparation: bool = False
-    ) -> da.Array:
+    def get_full_array(self, timestep: Timestep, *, distributing_scheduling_enabled: bool) -> da.Array:
         """
         Return the full Dask array for a given timestep.
 
@@ -422,10 +414,6 @@ class DaskArrayData:
         ----------
         timestep : Timestep
             The timestep for which the full array should be returned.
-        is_preparation : bool, optional
-            If True, the array will not contain ObjectRefs to the actual data.
-            This is used for preparation arrays where only the structure is
-            needed. Default is False.
 
         Returns
         -------
@@ -446,9 +434,6 @@ class DaskArrayData:
         placeholders that keep data owner information. Otherwise the concrete
         chunk payloads are inlined. Chunk reference lists are deleted after
         embedding in the graph to avoid leaking memory.
-        (is_preparation not used for now) ``is_preparation`` skips
-        storing payload refs entirely so analytics can inspect shapes/chunks
-        without materialising data.
         """
         assert len(self.position_to_node_actorID) == self.nb_chunks
         assert self.nb_chunks is not None and self.nb_chunks_per_dim is not None

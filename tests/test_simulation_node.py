@@ -3,6 +3,7 @@
 import concurrent.futures
 import ray
 import pytest
+import numpy as np
 
 from ray.util.state import list_actors
 from deisa.ray.types import RayActorHandle
@@ -23,40 +24,29 @@ def _actor_names_by_prefix(prefix="sched-"):
     return set(names)
 
 
-@pytest.mark.parametrize(
-    "inpt, inpt_doubled",
-    [
-        (2, 4),
-        (4, 8),
-        (6, 12),
-    ],
-)
-def test_stub_actor_basic(ray_cluster, inpt, inpt_doubled):
-    a = StubSchedulingActor.options(
-        name="stub-alone", namespace="deisa_ray", lifetime="detached", get_if_exists=True
-    ).remote("node-X")
-    ref = ray.get(a.preprocessing_callbacks.remote())
-    assert isinstance(ref, ray.ObjectRef)
-    cbs = ray.get(ref)
-    assert isinstance(cbs, dict)
-    assert callable(cbs["default"]) and callable(cbs["double"])
-    assert cbs["default"](inpt) == inpt and cbs["double"](inpt) == inpt_doubled
+arrays_md = {
+    "array": {
+        "chunk_shape": (1, 1),
+        "nb_chunks_per_dim": (1, 1),
+        "nb_chunks_of_node": 1,
+        "dtype": np.int32,
+        "chunk_position": (0, 0),
+    }
+}
 
 
 def test_init(ray_cluster):
     fake_node_id = "FAKE-NODE-1"
     sys_md = get_system_metadata()
     c = Bridge(
-        id=0,
-        arrays_metadata={},
+        bridge_id=0,
+        arrays_metadata=arrays_md,
         system_metadata=sys_md,
         _node_id=fake_node_id,
         scheduling_actor_cls=StubSchedulingActor,
     )
     assert c.node_id == fake_node_id
     assert isinstance(c.node_actor, RayActorHandle)
-    assert isinstance(c.preprocessing_callbacks, dict)
-    assert callable(c.preprocessing_callbacks["default"]) and callable(c.preprocessing_callbacks["double"])
     assert isinstance(c, Bridge)
 
 
@@ -67,7 +57,13 @@ def test_init_race_free(nb_nodes, ray_cluster):
 
     def _mk(id):
         sys_md = get_system_metadata()
-        Bridge(id=0, arrays_metadata={}, system_metadata=sys_md, _node_id=id, scheduling_actor_cls=StubSchedulingActor)
+        Bridge(
+            bridge_id=0,
+            arrays_metadata=arrays_md,
+            system_metadata=sys_md,
+            _node_id=id,
+            scheduling_actor_cls=StubSchedulingActor,
+        )
         return True
 
         # Start many in parallel (threads are fine; Bridge uses Ray for concurrency)
@@ -91,8 +87,8 @@ def test_actor_dies_and_client_recovers(ray_cluster):
     # First client brings up the actor
     sys_md = get_system_metadata()
     Bridge(
-        id=0,
-        arrays_metadata={},
+        bridge_id=0,
+        arrays_metadata=arrays_md,
         system_metadata=sys_md,
         _node_id=fake_node_id,
         scheduling_actor_cls=StubSchedulingActor,
@@ -102,15 +98,14 @@ def test_actor_dies_and_client_recovers(ray_cluster):
     ray.kill(a, no_restart=True)
 
     # Now, creating another client should recover (thanks to retry in Bridge.__init__)
-    c2 = Bridge(
-        id=0,
-        arrays_metadata={},
+    Bridge(
+        bridge_id=0,
+        arrays_metadata=arrays_md,
         system_metadata=sys_md,
         _node_id=fake_node_id,
         scheduling_actor_cls=StubSchedulingActor,
         _init_retries=5,
     )
-    assert isinstance(c2.preprocessing_callbacks, dict)
 
     # Also check that a fresh actor exists with the same name
     a2 = ray.get_actor(f"sched-{fake_node_id}", namespace="deisa_ray")

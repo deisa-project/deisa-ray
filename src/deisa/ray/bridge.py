@@ -6,13 +6,15 @@ top of Ray.
 """
 
 import logging
-from typing import Any, Callable, Dict, Mapping, Type
+from typing import Any, Dict, Mapping
 
 import numpy as np
 import ray
+from ray.actor import ActorClass
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 from deisa.ray.scheduling_actor import SchedulingActor as _RealSchedulingActor
 from deisa.ray.types import RayActorHandle
+from deisa.ray.errors import _default_exception_handler
 
 logger = logging.getLogger(__name__)
 
@@ -83,8 +85,6 @@ class Bridge:
         The ID of the node this Bridge is associated with.
     scheduling_actor : RayActorHandle
         The Ray actor handle for the scheduling actor.
-    preprocessing_callbacks : dict[str, Callable]
-        Dictionary mapping array names to their preprocessing callback functions.
 
     Notes
     -----
@@ -126,12 +126,12 @@ class Bridge:
 
     def __init__(
         self,
-        id: int,
+        bridge_id: int,
         arrays_metadata: Mapping[str, Mapping[str, Any]],
         system_metadata: Mapping[str, Any],
         *args: Any,
         _node_id: str | None = None,
-        scheduling_actor_cls: Type = _RealSchedulingActor,
+        scheduling_actor_cls: ActorClass = _RealSchedulingActor,
         _init_retries: int = 3,
         **kwargs: Any,
     ) -> None:
@@ -140,7 +140,7 @@ class Bridge:
 
         Parameters
         ----------
-        id : int
+        bridge_id : int
             Unique identifier of this Bridge.
         arrays_metadata : Mapping[str, Mapping[str, Any]]
             Dictionary that describes the arrays being shared by the simulation.
@@ -180,10 +180,19 @@ class Bridge:
             versions of the API.
         """
 
-        self.id = id
+        self.id = bridge_id
         self._init_retries = _init_retries
 
         self.arrays_metadata = self._validate_arrays_meta(arrays_metadata)
+        # NOTE : Possible error : if two bridges have different first array it will have different
+        # shape and will be declared twice.
+        # Possible fix : do it somewhere else (Head or SchedulingActor)
+        # we add a special array with a name that will signal the end of the simulation
+        # note we only need the metadata so that it can pass through the entire pipeline correctly and
+        # in sequential order, so we just replicate the first metadata we have.
+        self.arrays_metadata["__deisa_last_iteration_array"] = self.arrays_metadata[
+            list(self.arrays_metadata.keys())[0]
+        ]
         self.system_metadata = self._validate_system_meta(system_metadata)
 
         if not ray.is_initialized():
@@ -206,39 +215,35 @@ class Bridge:
         self._create_node_actor(scheduling_actor_cls, node_actor_options)
         self._exchange_chunks_meta_with_node_actor()
 
+        ray.get(self.node_actor.ready.remote())
+
     def _exchange_chunks_meta_with_node_actor(self):
         """
-        Push per-array metadata to the node actor and cache preprocessing callbacks.
+        Push per-array metadata to the node actor.
 
         Notes
         -----
         This method registers both global chunk layout and the bridge-specific
-        chunk position for every array described in ``arrays_metadata``. It
-        then fetches preprocessing callbacks from the node actor and stores
-        them locally for use during :meth:`send`.
+        chunk position for every array described in ``arrays_metadata``.
         """
         # send metadata of each array chunk (both global and local chunk info) to node actor
 
+        refs = []
         for array_name, meta in self.arrays_metadata.items():
-            self.node_actor.register_chunk_meta.remote(
-                # global info of array (same across bridges)
-                array_name=array_name,
-                chunk_shape=meta["chunk_shape"],
-                nb_chunks_per_dim=meta["nb_chunks_per_dim"],
-                nb_chunks_of_node=meta["nb_chunks_of_node"],
-                dtype=meta["dtype"],
-                # local info of array specific to bridge
-                bridge_id=self.id,
-                chunk_position=meta["chunk_position"],
+            refs.append(
+                self.node_actor.register_chunk_meta.remote(
+                    # global info of array (same across bridges)
+                    array_name=array_name,
+                    chunk_shape=meta["chunk_shape"],
+                    nb_chunks_per_dim=meta["nb_chunks_per_dim"],
+                    nb_chunks_of_node=meta["nb_chunks_of_node"],
+                    dtype=meta["dtype"],
+                    # local info of array specific to bridge
+                    bridge_id=self.id,
+                    chunk_position=meta["chunk_position"],
+                )
             )
-
-        # double ray.get because method returns a ref itself
-        self.preprocessing_callbacks: dict[str, Callable] = ray.get(
-            ray.get(
-                self.node_actor.preprocessing_callbacks.remote()  # type: ignore
-            )
-        )
-        assert isinstance(self.preprocessing_callbacks, dict)
+        ray.get(refs)
 
     def send(
         self,
@@ -253,8 +258,7 @@ class Bridge:
         """
         Make a chunk of data available to the analytics.
 
-        This method applies the preprocessing callback associated with
-        ``array_name`` to the chunk, stores it in Ray's object store, and
+        This method stores the ``chunk`` in Ray's object store, and
         sends a reference to the node actor. The method blocks until the
         data is processed by the node actor.
 
@@ -275,38 +279,58 @@ class Bridge:
 
         Notes
         -----
-        The chunk is first processed through the preprocessing callback
-        associated with ``array_name``. The processed chunk is then stored in
-        Ray's object store with the node actor as the owner, ensuring the
-        reference persists even after the simulation script terminates.
-        This method blocks until the node actor has processed the chunk.
+        The chunk is stored in Ray's object store with the node actor as the owner,
+        ensuring the reference persists even after the simulation script terminates.
+        This method blocks until the node actor has the chunk.
 
         Raises
         ------
-        KeyError
-            If ``array_name`` is not found in the preprocessing callbacks
-            dictionary.
         """
         # ``chunked`` and additional args/kwargs are currently reserved for
         # future extensions (e.g. multi-chunk sends). For now we only support
         # sending a single chunk described by ``arrays_metadata``.
         del args, kwargs  # explicitly unused
 
-        chunk = self.preprocessing_callbacks[array_name](chunk)
+        try:
+            # Setting the owner allows keeping the reference when the simulation script terminates.
+            ref = ray.put(chunk, _owner=self.node_actor)
 
-        # Setting the owner allows keeping the reference when the simulation script terminates.
-        ref = ray.put(chunk, _owner=self.node_actor)
+            future: ray.ObjectRef = self.node_actor.add_chunk.remote(
+                bridge_id=self.id,
+                array_name=array_name,
+                chunk_ref=[ref],
+                timestep=timestep,
+                chunked=True,
+                store_externally=store_externally,
+            )  # type: ignore
 
+            # Wait until the data is processed before returning to the simulation
+            ray.get(future)
+
+        except Exception as e:
+            _default_exception_handler(e)
+
+    def close(
+        self,
+        *args: Any,
+        timestep: int,
+        store_externally: bool = False,
+        **kwargs: Any,
+    ) -> None:
+        """
+        Close the bridge by creating a special array that has a special name which signals to the analytics
+        that the simulation has finished and that it should stop.
+        """
+        del args, kwargs  # explicitly unused
+        ref = ray.put(0, _owner=self.node_actor)
         future: ray.ObjectRef = self.node_actor.add_chunk.remote(
             bridge_id=self.id,
-            array_name=array_name,
+            array_name="__deisa_last_iteration_array",
             chunk_ref=[ref],
             timestep=timestep,
             chunked=True,
             store_externally=store_externally,
         )  # type: ignore
-
-        # Wait until the data is processed before returning to the simulation
         ray.get(future)
 
     def _validate_arrays_meta(
@@ -461,7 +485,7 @@ class Bridge:
 
     def _create_node_actor(
         self,
-        node_actor_cls: Type = _RealSchedulingActor,
+        node_actor_cls: ActorClass = _RealSchedulingActor,
         node_actor_options: Mapping[str, Any] | None = None,
     ) -> None:
         """

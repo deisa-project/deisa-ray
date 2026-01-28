@@ -1,8 +1,9 @@
-from typing import Dict
-from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
-import time
-import ray
 import random
+import time
+from typing import Dict
+
+import ray
+from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 
 
 def get_system_metadata() -> Dict:
@@ -17,7 +18,7 @@ def get_system_metadata() -> Dict:
     return {}
 
 
-def get_ready_actor_with_retry(name, namespace, deadline_s=180):
+async def get_ready_actor_with_retry(name, namespace, deadline_s=180):
     """
     Get a Ray actor by name with retry logic and readiness check.
 
@@ -60,7 +61,7 @@ def get_ready_actor_with_retry(name, namespace, deadline_s=180):
             # TODO for even more reliability, in the future we should handle
             # actor exists, but unavailable
             # actor exists, crashed, need to recreate
-            ray.get(actor.ready.remote())
+            await actor.ready.remote()
             return actor
         except ValueError:
             if time.time() - start > deadline_s:
@@ -134,3 +135,19 @@ def get_head_actor_options() -> dict:
         # Disabled for performance reasons
         enable_task_events=False,
     )
+
+
+def log(message: str, debug_logs_path: str | None) -> None:
+    """
+    Append a timestamped debug message to ``debug_logs_path`` if provided.
+
+    Parameters
+    ----------
+    message : str
+        Text to append.
+    debug_logs_path : str or None
+        Destination file path. If ``None`` logging is skipped.
+    """
+    if debug_logs_path is not None:
+        with open(debug_logs_path, "a") as f:
+            f.write(f"{message}\n")

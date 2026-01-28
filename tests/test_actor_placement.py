@@ -1,10 +1,11 @@
 import pytest
 import ray
+import numpy as np
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 from tests.stubs import StubSchedulingActor
 from deisa.ray.bridge import Bridge
 from ray.util.state import list_actors
-import dask.array as da
+from deisa.ray.types import DeisaArray
 from ray.cluster_utils import Cluster
 from tests.utils import wait_for_head_node
 
@@ -86,29 +87,26 @@ def test_actor_placement(enable_distributed_scheduling, ray_multinode_cluster):
     def head_script(enable_distributed_scheduling) -> None:
         """The head node checks that the values are correct"""
         from deisa.ray.window_handler import Deisa
-        from deisa.ray.types import WindowArrayDefinition
+        from deisa.ray.types import WindowSpec
 
         import deisa.ray as deisa
 
         deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
 
-        d = Deisa()
+        d = Deisa(n_sim_nodes=1)
 
-        def simulation_callback(array: da.Array, timestep: int):
+        def simulation_callback(array: list[DeisaArray]):
             return True
 
         d.register_callback(
             simulation_callback,
-            [WindowArrayDefinition("array")],
-            max_iterations=0,
+            [WindowSpec("array")],
         )
-        d.execute_callbacks()
 
     # submit head script (analogous to submitting analytics to head node)
     ray.get(head_script.remote(enable_distributed_scheduling))
     # just a ray.get_actor() wrapped in while loop
     wait_for_head_node()
-
     # check that head actor is running in mock head node
     assert actor_node_id_by_name("simulation_head") == head_node_id
 
@@ -121,9 +119,22 @@ def test_actor_placement(enable_distributed_scheduling, ray_multinode_cluster):
     def make_client_and_return_ids():
         from deisa.ray.utils import get_system_metadata
 
+        arrays_md = {
+            "array": {
+                "chunk_shape": (1, 1),
+                "nb_chunks_per_dim": (1, 1),
+                "nb_chunks_of_node": 1,
+                "dtype": np.int32,
+                "chunk_position": (0, 0),
+            }
+        }
         sys_md = get_system_metadata()
         c = Bridge(
-            id=0, arrays_metadata={}, system_metadata=sys_md, _node_id=None, scheduling_actor_cls=StubSchedulingActor
+            bridge_id=0,
+            arrays_metadata=arrays_md,
+            system_metadata=sys_md,
+            _node_id=None,
+            scheduling_actor_cls=StubSchedulingActor,
         )  # type:ignore
 
         return (c.node_id, f"sched-{c.node_id}")

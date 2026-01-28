@@ -1,21 +1,24 @@
 import pickle
+from typing import Any, Dict, Hashable
+
 import ray
 from ray.util.dask import ray_dask_get
+
+import asyncio
 from deisa.ray._async_dict import AsyncDict
+from deisa.ray.errors import ContractError
 from deisa.ray.types import (
+    ActorID,
+    ArrayPerTimestep,
+    ChunkRef,
+    GraphInfo,
     GraphKey,
     GraphValue,
-    ChunkRef,
-    ScheduledByOtherActor,
-    GraphInfo,
-    ArrayPerTimestep,
     PartialArray,
     RayActorHandle,
-    ActorID,
+    ScheduledByOtherActor,
 )
 from deisa.ray.utils import get_ready_actor_with_retry
-from deisa.ray.errors import ContractError
-from typing import Dict, Hashable, Any
 
 
 class NodeActorBase:
@@ -70,10 +73,11 @@ class NodeActorBase:
         Registers the actor with the head node immediately so it can start
         receiving metadata and chunk notifications.
         """
+        self.nb_chunks_of_node: dict[str, int] = {}
         self.actor_id = actor_id
         self.actor_handle = ray.get_runtime_context().current_actor
 
-        self.head = get_ready_actor_with_retry(name="simulation_head", namespace="deisa_ray")
+        self.head = await get_ready_actor_with_retry(name="simulation_head", namespace="deisa_ray")
         await self.head.register_scheduling_actor.remote(actor_id, self.actor_handle)
 
         # Keeps track of array metadata AND ref per timestep.
@@ -82,8 +86,9 @@ class NodeActorBase:
 
         # For non-chunked feedback between analytics and simulation
         self.feedback_non_chunked: Dict[Hashable, Any] = {}
+        self.should_persist: Dict[Hashable, bool] = {}
 
-    def set(self, *args, key: Hashable, value: Any, chunked: bool = False, **kwargs) -> None:
+    def set(self, *args, key: Hashable, value: Any, chunked: bool = False, persist: bool, **kwargs) -> None:
         """
         Store a feedback value shared between analytics and simulation.
 
@@ -104,6 +109,7 @@ class NodeActorBase:
         """
         if not chunked:
             self.feedback_non_chunked[key] = value
+            self.should_persist[key] = persist
         else:
             # TODO: implement chunked version
             raise NotImplementedError()
@@ -132,8 +138,12 @@ class NodeActorBase:
         Any
             Stored value or ``default`` if missing.
         """
+        val = self.feedback_non_chunked.get(key, default)
+        persist = self.should_persist.get(key, False)
         if not chunked:
-            return self.feedback_non_chunked.get(key, default)
+            if not persist:
+                self.delete(key=key)
+            return val
         else:
             raise NotImplementedError()
 
@@ -156,6 +166,7 @@ class NodeActorBase:
         Missing keys are ignored to keep the call idempotent.
         """
         self.feedback_non_chunked.pop(key, None)
+        self.should_persist.pop(key, None)
 
     def _create_or_retrieve_partial_array(self, array_name: str, nb_chunks_of_node: int) -> PartialArray:
         """
@@ -176,7 +187,7 @@ class NodeActorBase:
         """
         if array_name not in self.partial_arrays:
             self.partial_arrays[array_name] = PartialArray()
-            self.nb_chunks_of_node = nb_chunks_of_node
+            self.nb_chunks_of_node[array_name] = nb_chunks_of_node
         return self.partial_arrays[array_name]
 
     async def register_chunk_meta(
@@ -216,6 +227,8 @@ class NodeActorBase:
         event so concurrent callers can proceed. Until that point additional
         callers block on ``ready_event``.
         """
+        await self.head.wait_until_analytics_ready.remote()
+
         partial_array = self._create_or_retrieve_partial_array(array_name, nb_chunks_of_node)
 
         # add metadata for this array
@@ -241,28 +254,6 @@ class NodeActorBase:
         else:
             await partial_array.ready_event.wait()
 
-    def preprocessing_callbacks(self) -> ray.ObjectRef:
-        """
-        Get the preprocessing callbacks for all arrays.
-
-        Returns
-        -------
-        ray.ObjectRef
-            ObjectRef to a dictionary mapping array names to their
-            preprocessing callback functions.
-
-        Notes
-        -----
-        This method returns an ObjectRef rather than the actual dictionary
-        to avoid blocking. The callbacks are retrieved from the head node
-        and used by Bridge instances to preprocess chunks before sending
-        them to this node actor.
-        """
-        # return obect ref
-        p_clbs = self.head.preprocessing_callbacks.remote()
-        assert isinstance(p_clbs, ray.ObjectRef)
-        return p_clbs
-
     def ready(self) -> None:
         """
         Check if the node actor is ready.
@@ -281,33 +272,6 @@ class NodeActorBase:
         operational before returning its handle.
         """
         pass
-
-    def _pack_object_ref(self, refs: list[ray.ObjectRef]):
-        """
-        Return the first ObjectRef from a list, intended to be called remotely.
-
-        The remote invocation of this method produces a *double* Ray
-        ObjectRef, which keeps distributed scheduling non-blocking while
-        preserving the original single-ref payload inside the list.
-
-        Parameters
-        ----------
-        refs : list[ray.ObjectRef]
-            List of Ray object references to pack. Only the first one is
-            returned.
-
-        Returns
-        -------
-        ray.ObjectRef
-            The first ObjectRef from the input list.
-
-        Notes
-        -----
-        Implemented as an actor method (rather than a separate remote
-        function) to avoid spinning up extra workers when generating the
-        double reference structure expected by the task graph.
-        """
-        return refs[0]
 
     # TODO: refactor from here
     async def add_chunk(
@@ -355,9 +319,8 @@ class NodeActorBase:
         Notes
         -----
         This method manages chunk collection and coordination:
-        1. Wraps the single chunk ref in a double ref by calling
-           :meth:`_pack_object_ref` remotely.
-        2. Stores the double ref in the per-timestep structure.
+        1. Check array is expected
+        2. Stores the ref in the per-timestep structure.
         3. When all local chunks have arrived, builds a
            ``{chunk_position: double_ref}`` mapping and sends it to the head
            actor via :meth:`HeadNodeActor.chunks_ready`.
@@ -368,7 +331,7 @@ class NodeActorBase:
         if array_name not in self.partial_arrays:
             # respect contract at the beginning
             raise ContractError(
-                f"User requested to add chunk for {array_name} but this array has"
+                f"User requested to add chunk for {array_name} but this array has "
                 f"not been described. Please call register_array({array_name}) before calling"
                 "add_chunk()."
             )
@@ -381,7 +344,7 @@ class NodeActorBase:
         chunk_ref: ray.ObjectRef = chunk_ref[0]
         array_timestep.local_chunks[bridge_id] = chunk_ref
 
-        if len(array_timestep.local_chunks) == self.nb_chunks_of_node:
+        if len(array_timestep.local_chunks) == self.nb_chunks_of_node[array_name]:
             pos_to_ref: dict[tuple, ray.ObjectRef] = {}
 
             for bridge_id, ref in array_timestep.local_chunks._data.items():
@@ -629,19 +592,20 @@ class SchedulingActor(NodeActorBase):
         non-blocking in distributed Dask computations.
         """
         graph_info = await self.graph_infos.wait_for_key(graph_id)
-
         await graph_info.scheduled_event.wait()
-        # For tomorrow: I understood this - the await is similar to a ray.get() so it unpacks the ref once.
-        # therefore, at the end all the refs are refs of refs (same leve). Then the patches dask task wrapper
-        # is called and works the same way for all tasks (calls itself).
-        # Because of this, I also think I understand why we need a ref of ref: if you work directly with a ref of
-        # data, then Actor1 could need a key from Actor2, and Actor2 a key from Actor1. Both call ray.get(refOwnedByOtherActor)
-        # and the cluster deadlocks. To fix this, I need to make it non-blocking. How can I do this? By making it a remote call.
-        # However, to make the entire graph "coherent", I need to make leaf nodes refs of refs as well. Then it all becomes
-        # cohesive.
-        # I am missing why we need the pickling and how memory is released.
         ref = graph_info.refs[key]
-        return await ref
+
+        async with asyncio.timeout(10.0):
+            # For tomorrow: I understood this - the await is similar to a ray.get() so it unpacks the ref once.
+            # therefore, at the end all the refs are refs of refs (same leve). Then the patches dask task wrapper
+            # is called and works the same way for all tasks (calls itself).
+            # Because of this, I also think I understand why we need a ref of ref: if you work directly with a ref of
+            # data, then Actor1 could need a key from Actor2, and Actor2 a key from Actor1. Both call ray.get(refOwnedByOtherActor)
+            # and the cluster deadlocks. To fix this, I need to make it non-blocking. How can I do this? By making it a remote call.
+            # However, to make the entire graph "coherent", I need to make leaf nodes refs of refs as well. Then it all becomes
+            # cohesive.
+            # I am missing why we need the pickling and how memory is released.
+            return await ref
 
 
 @ray.remote
