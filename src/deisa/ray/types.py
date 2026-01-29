@@ -7,7 +7,6 @@ from typing import Any, TypeAlias
 import dask.array as da
 from dask.highlevelgraph import HighLevelGraph
 from deisa.core.interface import SupportsSlidingWindow
-from deisa.ray.utils import log
 import numpy as np
 import ray
 import ray.actor
@@ -475,5 +474,4 @@ class DaskArrayData:
             dtype=self.dtype,
         )
 
-        log(f"returning {dask_name} array", "./logs")
         return full_array

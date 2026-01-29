@@ -4,8 +4,6 @@ import numpy as np
 import pytest
 import ray
 
-from deisa.ray.utils import log
-
 
 # @pytest.fixture(scope = "session")
 @pytest.fixture()
@@ -68,11 +66,9 @@ def simple_worker(
 
     for i in range(start_iteration, nb_iterations):
         for array_described in list(arrays_md.keys()):
-            log(f"send chunks from {rank} for array : {array_described} for iteration {i}", "./logs")
             chunk = i * array
             client.send(array_name=array_described, chunk=chunk, timestep=i, chunked=True)
 
-    log(f"Worker {rank} closing...", "./logs")
     client.close(timestep=nb_iterations)
 
 

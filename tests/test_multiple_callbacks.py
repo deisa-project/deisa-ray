@@ -20,16 +20,16 @@ def head_script(enable_distributed_scheduling) -> None:
 
     def simulation_callback1(array: list[DeisaArray]):
         x = array[0].dask.sum().compute()
-        assert x == 10 * array[0].t
+        assert x == 136 * array[0].t
 
     def simulation_callback2(array1: list[DeisaArray]):
         x = array1[0].dask.sum().compute()
-        assert x == 10 * array1[0].t
+        assert x == 136 * array1[0].t
 
     def simulation_callback3(array: list[DeisaArray], array1: list[DeisaArray]):
         x = array[0].dask.sum().compute()
         y = array1[0].dask.sum().compute()
-        assert x == 10 * array[0].t and y == 10 * array1[0].t
+        assert x == 136 * array[0].t and y == 136 * array1[0].t
 
     d.register_callback(
         simulation_callback1,
@@ -54,13 +54,14 @@ def test_multiple_callbacks(enable_distributed_scheduling: bool, ray_cluster) ->
     head_ref = head_script.remote(enable_distributed_scheduling)
     wait_for_head_node()
 
+    dim = 4
     worker_refs = []
-    for rank in range(4):
+    for rank in range(dim * dim):
         worker_refs.append(
             simple_worker.remote(
                 rank=rank,
-                position=(rank // 2, rank % 2),
-                chunks_per_dim=(2, 2),
+                position=(rank // dim, rank % dim),
+                chunks_per_dim=(dim, dim),
                 nb_chunks_of_node=1,
                 chunk_size=(1, 1),
                 nb_iterations=NB_ITERATIONS,

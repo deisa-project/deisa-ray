@@ -6,7 +6,6 @@ import ray
 
 from deisa.ray import Timestep
 from deisa.ray.types import DaskArrayData, RayActorHandle
-from deisa.ray.utils import log
 
 
 @ray.remote
@@ -110,7 +109,7 @@ class HeadNodeActor:
         # regulate how far ahead sim can go wrt to analytics
         for name in arrays_definitions:
             self.registered_arrays[name] = DaskArrayData(name)
-            self.semaphore_per_array[name] = asyncio.Semaphore(self.max_simulation_ahead)
+            self.semaphore_per_array[name] = asyncio.Semaphore(self.max_simulation_ahead + 1)
             self.new_array_created[name] = asyncio.Event()
 
     def list_scheduling_actors(self) -> dict[str, RayActorHandle]:
@@ -232,30 +231,24 @@ class HeadNodeActor:
         distributed-scheduling graph) is put into ``arrays_ready``. The
         semaphore is released when analytics later consume the array.
         """
-        log(f"chunks_ready 00 from actor : {actor_id}", "./logs")
         array = self.registered_arrays[array_name]
         semaphore = self.semaphore_per_array[array_name]
         created_event = self.new_array_created[array_name]
 
-        log(f"chunks_ready 01 from actor : {actor_id}", "./logs")
         # Ensure the timestep entry exists
         while timestep not in array.chunk_refs:
             try_to_create_timestep_task = asyncio.create_task(semaphore.acquire())
             wait_for_another_to_create_task = asyncio.create_task(created_event.wait())
 
-            log(f"chunks_ready 02 from actor : {actor_id}", "./logs")
             done, pending = await asyncio.wait(
                 {try_to_create_timestep_task, wait_for_another_to_create_task},
                 return_when=asyncio.FIRST_COMPLETED,
             )
-            log(f"chunks_ready 03 from actor : {actor_id}", "./logs")
 
             for task in pending:
                 task.cancel()
 
-            log(f"chunks_ready 04 from actor : {actor_id}", "./logs")
             if try_to_create_timestep_task in done:
-                log(f"chunks_ready 05 from actor : {actor_id}", "./logs")
                 if timestep in array.chunk_refs:
                     # NOTE : cannot happen since that in the stalling case,
                     # one of the scheduling actor dont add his chunks
@@ -278,21 +271,16 @@ class HeadNodeActor:
                 # NOTE : possible solution :
                 # - release semaphore at different place
                 # - clear the event later ?
-            log(f"chunks_ready 06 from actor : {actor_id}", "./logs")
 
         # Collect chunk refs and store them in Ray
         chunks = list(pos_to_ref.values())
         ref_to_list_of_chunks = ray.put(chunks)
-        log(f"chunks_ready 07 from actor : {actor_id}", "./logs")
 
         # ray.get(ref_to_list_of_chunks) -> [ref_of_ref_chunk_i, ref_ref_chunk_i+1, ...] (belonging to actor that owns it)
         # so I unpack it and give this ray ref.
-        log(f"Checking is ready step : {timestep} ?", "./logs")
         is_ready = array.add_chunk_ref(ref_to_list_of_chunks, timestep, pos_to_ref)
-        log(f"is_ready = {is_ready}", "./logs")
 
         if is_ready:
-            log(f"getting full array : {array_name}, step : {timestep}", "./logs")
             self.arrays_ready.put_nowait(
                 (
                     array_name,
