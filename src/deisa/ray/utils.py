@@ -150,4 +150,4 @@ def log(message: str, debug_logs_path: str | None) -> None:
     """
     if debug_logs_path is not None:
         with open(debug_logs_path, "a") as f:
-            f.write(f"{message}\n")
+            f.write(f"{time.time()} {message}\n")

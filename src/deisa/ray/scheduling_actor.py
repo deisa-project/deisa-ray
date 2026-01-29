@@ -356,10 +356,15 @@ class NodeActorBase:
 
             # TODO rename
             log(f"gathered chunk in ScheActor {self.actor_id}", "./logs")
-            await self.head.chunks_ready.options(enable_task_events=False).remote(array_name, timestep, pos_to_ref)
+            await self.head.chunks_ready.options(enable_task_events=False).remote(
+                array_name, timestep, pos_to_ref, self.actor_id
+            )
+            log(f"chunks ready called from ScheActor {self.actor_id}", "./logs")
 
             array_timestep.chunks_ready_event.set()
+            log(f"array_timestep.chunks_ready_event.set() {self.actor_id}", "./logs")
             array_timestep.chunks_ready_event.clear()
+            log(f"array_timestep.chunks_ready_event.clear() {self.actor_id}", "./logs")
         else:
             await array_timestep.chunks_ready_event.wait()
 

@@ -202,7 +202,9 @@ class HeadNodeActor:
         self.config = config
         self._experimental_distributed_scheduling_enabled = config["experimental_distributed_scheduling_enabled"]
 
-    async def chunks_ready(self, array_name: str, timestep: Timestep, pos_to_ref: dict[tuple, ray.ObjectRef]) -> None:
+    async def chunks_ready(
+        self, array_name: str, timestep: Timestep, pos_to_ref: dict[tuple, ray.ObjectRef], actor_id: str
+    ) -> None:
         """
         Receive chunk references for a timestep and enqueue the full array when complete.
 
@@ -230,35 +232,58 @@ class HeadNodeActor:
         distributed-scheduling graph) is put into ``arrays_ready``. The
         semaphore is released when analytics later consume the array.
         """
+        log(f"chunks_ready 00 from actor : {actor_id}", "./logs")
         array = self.registered_arrays[array_name]
+        semaphore = self.semaphore_per_array[array_name]
+        created_event = self.new_array_created[array_name]
 
-        # long story short, this creates an empty array.chunk_refs[timestep] = []
+        log(f"chunks_ready 01 from actor : {actor_id}", "./logs")
+        # Ensure the timestep entry exists
         while timestep not in array.chunk_refs:
-            # TODO what happens if new_array_created for an array of a prev iter is set?
-            # could it influence this iter?
-            # need to reason more about this condition
-            log(f"taking semaphore for {array_name}", "./logs")
-            t1 = asyncio.create_task(self.semaphore_per_array[array_name].acquire())
-            t2 = asyncio.create_task(self.new_array_created[array_name].wait())
+            try_to_create_timestep_task = asyncio.create_task(semaphore.acquire())
+            wait_for_another_to_create_task = asyncio.create_task(created_event.wait())
 
-            done, pending = await asyncio.wait([t1, t2], return_when=asyncio.FIRST_COMPLETED)
-            log(f"done = {done}, pending = {pending}", "./logs")
+            log(f"chunks_ready 02 from actor : {actor_id}", "./logs")
+            done, pending = await asyncio.wait(
+                {try_to_create_timestep_task, wait_for_another_to_create_task},
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            log(f"chunks_ready 03 from actor : {actor_id}", "./logs")
 
             for task in pending:
                 task.cancel()
 
-            if t1 in done:
+            log(f"chunks_ready 04 from actor : {actor_id}", "./logs")
+            if try_to_create_timestep_task in done:
+                log(f"chunks_ready 05 from actor : {actor_id}", "./logs")
                 if timestep in array.chunk_refs:
-                    # The array was already created by another scheduling actor
-                    log(f"releasing semaphore for {array_name}", "./logs")
-                    self.semaphore_per_array[array_name].release()
+                    # NOTE : cannot happen since that in the stalling case,
+                    # one of the scheduling actor dont add his chunks
+                    # -> is_ready is always false
+                    # -> nothing is put in the queue, get_next_array() never executed
+                    # -> semaphore never released
+                    # -> so try_to_create_timestep_task cant finish and wait_for_another_to_create_task keep waiting -> stall forever
+                    #
+                    # Another actor created the entry while we were waiting
+                    semaphore.release()
                 else:
                     array.chunk_refs[timestep] = []
+                    created_event.set()
+                    # NOTE : If the first scheduling actor that create the timestep
+                    # clear the event before one of the others scheduling actors create
+                    # the asyncio task that wait on it it will wait forever
+                    #
+                    created_event.clear()
+                    #
+                # NOTE : possible solution :
+                # - release semaphore at different place
+                # - clear the event later ?
+            log(f"chunks_ready 06 from actor : {actor_id}", "./logs")
 
-                    self.new_array_created[array_name].set()
-                    self.new_array_created[array_name].clear()
-        chunks = [val for val in pos_to_ref.values()]
+        # Collect chunk refs and store them in Ray
+        chunks = list(pos_to_ref.values())
         ref_to_list_of_chunks = ray.put(chunks)
+        log(f"chunks_ready 07 from actor : {actor_id}", "./logs")
 
         # ray.get(ref_to_list_of_chunks) -> [ref_of_ref_chunk_i, ref_ref_chunk_i+1, ...] (belonging to actor that owns it)
         # so I unpack it and give this ray ref.
