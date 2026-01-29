@@ -355,7 +355,9 @@ class NodeActorBase:
                 array_timestep.local_chunks[bridge_id] = pickle.dumps(ref)
 
             # TODO rename
-            await self.head.chunks_ready.options(enable_task_events=False).remote(array_name, timestep, pos_to_ref)
+            await self.head.chunks_ready.options(enable_task_events=False).remote(
+                array_name, timestep, pos_to_ref, self.actor_id
+            )
 
             array_timestep.chunks_ready_event.set()
             array_timestep.chunks_ready_event.clear()

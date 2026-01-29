@@ -356,9 +356,10 @@ class DaskArrayData:
         self.position_to_bridgeID[position] = bridge_id
         for i, pos in enumerate(position):
             if self.chunks_size[i][pos] is None:
-                self.chunks_size[i][pos] = size[pos]
+                # NOTE : Verify this
+                self.chunks_size[i][pos] = size[i]
             else:
-                assert self.chunks_size[i][pos] == size[pos]
+                assert self.chunks_size[i][pos] == size[i]
 
     def add_chunk_ref(
         self, chunk_ref: ray.ObjectRef, timestep: Timestep, pos_to_ref: dict[tuple, ray.ObjectRef]

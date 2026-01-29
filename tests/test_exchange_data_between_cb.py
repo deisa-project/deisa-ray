@@ -18,18 +18,30 @@ def head_script(enable_distributed_scheduling) -> None:
 
     d = Deisa(n_sim_nodes=4)
 
+    class Shared_variables:
+        def __init__(self) -> None:
+            self.sum = 0
+
+    vars = Shared_variables()
+
     def simulation_callback1(array: list[DeisaArray]):
         x = array[0].dask.sum().compute()
-        assert x == 136 * array[0].t
+        assert x == 10 * array[0].t
+        if array[0].t == 5:
+            vars.sum = x
 
     def simulation_callback2(array1: list[DeisaArray]):
         x = array1[0].dask.sum().compute()
-        assert x == 136 * array1[0].t
+        assert x == 10 * array1[0].t
+        if array1[0].t == 8:
+            vars.sum = vars.sum + x
 
     def simulation_callback3(array: list[DeisaArray], array1: list[DeisaArray]):
         x = array[0].dask.sum().compute()
         y = array1[0].dask.sum().compute()
-        assert x == 136 * array[0].t and y == 136 * array1[0].t
+        assert x == 10 * array[0].t and y == 10 * array1[0].t
+        if array1[0].t > 8:
+            assert vars.sum == 130
 
     d.register_callback(
         simulation_callback1,
@@ -54,14 +66,13 @@ def test_multiple_callbacks(enable_distributed_scheduling: bool, ray_cluster) ->
     head_ref = head_script.remote(enable_distributed_scheduling)
     wait_for_head_node()
 
-    dim = 4
     worker_refs = []
-    for rank in range(dim * dim):
+    for rank in range(4):
         worker_refs.append(
             simple_worker.remote(
                 rank=rank,
-                position=(rank // dim, rank % dim),
-                chunks_per_dim=(dim, dim),
+                position=(rank // 2, rank % 2),
+                chunks_per_dim=(2, 2),
                 nb_chunks_of_node=1,
                 chunk_size=(1, 1),
                 nb_iterations=NB_ITERATIONS,

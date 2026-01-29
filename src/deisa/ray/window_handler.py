@@ -250,8 +250,8 @@ class Deisa:
                     gc.collect()
 
             # set all new timesteps to be false
-            for name in self.has_new_timestep:
-                self.has_new_timestep[name] = False
+            for queue in self.has_new_timestep:
+                self.has_new_timestep[queue] = False
 
             # add the first "bigger" timestep back into queue and set new_timestep flag
             if not end_reached:
