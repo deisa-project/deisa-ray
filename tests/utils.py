@@ -4,6 +4,8 @@ import numpy as np
 import pytest
 import ray
 
+from deisa.ray.bridge import Bridge
+
 
 # @pytest.fixture(scope = "session")
 @pytest.fixture()
@@ -38,7 +40,7 @@ def simple_worker(
     array_name: str | list[str] = "array",
     dtype: np.dtype = np.int32,  # type: ignore
     **kwargs,
-) -> None:
+) -> Bridge | None:
     """Worker node sending chunks of data"""
     from deisa.ray.bridge import Bridge
     from deisa.ray.utils import get_system_metadata
@@ -47,6 +49,7 @@ def simple_worker(
         array_name = [array_name]
 
     start_iteration = kwargs.get("start_iteration", 0)
+    close_client = kwargs.get("close_client", True)
 
     sys_md = get_system_metadata()
     arrays_md = {
@@ -65,11 +68,15 @@ def simple_worker(
     array = (rank + 1) * np.ones(chunk_size, dtype=dtype)
 
     for i in range(start_iteration, nb_iterations):
+        print(f"send {list(arrays_md.keys())} for step {i}", flush=True)
         for array_described in list(arrays_md.keys()):
             chunk = i * array
             client.send(array_name=array_described, chunk=chunk, timestep=i, chunked=True)
 
-    client.close(timestep=nb_iterations)
+    if close_client:
+        client.close(timestep=nb_iterations)
+    else:
+        return client
 
 
 @ray.remote(num_cpus=0, max_retries=0)
@@ -106,7 +113,7 @@ def simple_worker_error_test(
 
     for i in range(nb_iterations):
         chunk = i * array
-        if i == nb_iterations / 2:
+        if i == 4:
             client.send(array_name="error", chunk=chunk, timestep=i, chunked=True)
         else:
             client.send(array_name=array_name, chunk=chunk, timestep=i, chunked=True)
