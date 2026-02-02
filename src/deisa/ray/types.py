@@ -245,18 +245,23 @@ class DeisaArray:
                 Chunk position and filename of saved chunk.
             """
 
-            path = f".{fname}-{"-".join(map(str,block_id))}.h5"
-            with h5py.File(path, 'w') as f:
+            dirs = fname.split("/")[:-1]
+            path = '' if len(dirs) == 0 else '/'.join(dirs) + '/'
+
+            name = fname.split("/")[-1]
+
+            filename = f"{path}.{name}-{'-'.join(map(str,block_id))}.h5"
+
+            with h5py.File(filename, 'w') as f:
                 f.create_dataset("data", data=chunk)
 
-            return (block_id, path)
+            return (block_id, filename)
 
-        @dask.delayed
         def create_vds(fname : str,
-                       files : tuple[tuple[int, ...], str],
                        chunk_shape : tuple[int,...],
                        data_shape : tuple[int,...],
-                       data_dtype : np.dtype) -> None:
+                       data_dtype : np.dtype,
+                       *files) -> None:
             """
             Creates a VDS aggregating all chunk files.
 
@@ -264,20 +269,20 @@ class DeisaArray:
             ----------
             fname : str
                 The name of the final file where the data will be stored.
-            files : tuple[tuple[int, ...], str]
-                List of all chunk files and position
             chunk_shape : tuple[int,...]
                 Shape of the chunks, used to map the chunks into the VDS.
             data_shape : tuple[int,...]
                 Shape of the data.
             data_dtype : np.dtype
                 The numpy dtype of the data.
+            files : tuple[tuple[int, ...], str]
+                List of all chunk files and position
             """
 
-            layout = h5py.VirtualLayout(shape=data_shape, dtype=data.dtype)
+            layout = h5py.VirtualLayout(shape=data_shape, dtype=data_dtype)
 
-            for indices, fname in files:
-                vsource = h5py.VirtualSource(fname, 'data', shape=chunk_shape)
+            for indices, name in files:
+                vsource = h5py.VirtualSource(name, 'data', shape=chunk_shape)
 
                 selection = tuple(
                     slice(idx * size, (idx + 1) * size)
@@ -293,22 +298,28 @@ class DeisaArray:
         suffix = fname.split(".")[-1]
         fname = fname.split(".")[0]
 
-        files = self.dask.map_blocks(save_chunk,
-                                     fname=fname,
-                                     dtype=object,
-                                     meta=np.array([],
-                                                   dtype=object))
+        chunks = self.dask.to_delayed()
 
-        files = files.to_delayed().flatten().tolist()
+        writing_tasks = []
+        for block_id in np.ndindex(chunks.shape):
+
+            task = dask.delayed(save_chunk)(chunks[block_id], fname, block_id=block_id)
+
+            writing_tasks.append(task)
+
 
         if fname != suffix:
-            fname = fname + suffix
+            fname = fname + "." + suffix
 
-        create_vds(fname, files,
-                   self.dask.chunksize,
-                   self.dask.shape,
-                   self.dask.dtype).compute()
+        vds_task = dask.delayed(create_vds)(
+            fname,
+            self.dask.chunksize,
+            self.dask.shape,
+            self.dask.dtype,
+            *writing_tasks
+        )
 
+        vds_task.compute()
 
 
 @dataclass
