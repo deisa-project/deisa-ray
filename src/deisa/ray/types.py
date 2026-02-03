@@ -331,9 +331,6 @@ class DeisaArray:
             with h5py.File(fname, "w", libver="latest") as f:
                 f.create_virtual_dataset("data", layout, fillvalue=-1)
 
-        suffix = fname.split(".")[-1]
-        fname = fname.split(".")[0]
-
         chunks = self.dask.to_delayed()
 
         writing_tasks = []
@@ -341,9 +338,6 @@ class DeisaArray:
             task = dask.delayed(save_chunk)(chunks[block_id], fname, block_id=block_id)
 
             writing_tasks.append(task)
-
-        if fname != suffix:
-            fname = fname + "." + suffix
 
         vds_task = dask.delayed(create_vds)(
             fname, self.dask.chunksize, self.dask.shape, self.dask.dtype, *writing_tasks
