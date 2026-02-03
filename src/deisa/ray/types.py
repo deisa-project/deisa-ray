@@ -223,10 +223,9 @@ class DeisaArray:
 
         import h5py
 
-        def save_chunk(chunk: np.ndarray,
-                       fname: str,
-                       block_id: tuple[int, ...] | None = None
-                       ) -> tuple[tuple[int, ...], str]:
+        def save_chunk(
+            chunk: np.ndarray, fname: str, block_id: tuple[int, ...] | None = None
+        ) -> tuple[tuple[int, ...], str]:
             """
             Save one chunk to a individual hdf5 file.
 
@@ -246,22 +245,20 @@ class DeisaArray:
             """
 
             dirs = fname.split("/")[:-1]
-            path = '' if len(dirs) == 0 else '/'.join(dirs) + '/'
+            path = "" if len(dirs) == 0 else "/".join(dirs) + "/"
 
             name = fname.split("/")[-1]
 
-            filename = f"{path}.{name}-{'-'.join(map(str,block_id))}.h5"
+            filename = f"{path}.{name}-{'-'.join(map(str, block_id))}.h5"
 
-            with h5py.File(filename, 'w') as f:
+            with h5py.File(filename, "w") as f:
                 f.create_dataset("data", data=chunk)
 
             return (block_id, filename)
 
-        def create_vds(fname : str,
-                       chunk_shape : tuple[int,...],
-                       data_shape : tuple[int,...],
-                       data_dtype : np.dtype,
-                       *files) -> None:
+        def create_vds(
+            fname: str, chunk_shape: tuple[int, ...], data_shape: tuple[int, ...], data_dtype: np.dtype, *files
+        ) -> None:
             """
             Creates a VDS aggregating all chunk files.
 
@@ -282,18 +279,14 @@ class DeisaArray:
             layout = h5py.VirtualLayout(shape=data_shape, dtype=data_dtype)
 
             for indices, name in files:
-                vsource = h5py.VirtualSource(name, 'data', shape=chunk_shape)
+                vsource = h5py.VirtualSource(name, "data", shape=chunk_shape)
 
-                selection = tuple(
-                    slice(idx * size, (idx + 1) * size)
-                    for idx, size in zip(indices, chunk_shape)
-                )
+                selection = tuple(slice(idx * size, (idx + 1) * size) for idx, size in zip(indices, chunk_shape))
 
                 layout[selection] = vsource
 
-            with h5py.File(fname, "w", libver='latest') as f:
+            with h5py.File(fname, "w", libver="latest") as f:
                 f.create_virtual_dataset("data", layout, fillvalue=-1)
-
 
         suffix = fname.split(".")[-1]
         fname = fname.split(".")[0]
@@ -302,21 +295,15 @@ class DeisaArray:
 
         writing_tasks = []
         for block_id in np.ndindex(chunks.shape):
-
             task = dask.delayed(save_chunk)(chunks[block_id], fname, block_id=block_id)
 
             writing_tasks.append(task)
-
 
         if fname != suffix:
             fname = fname + "." + suffix
 
         vds_task = dask.delayed(create_vds)(
-            fname,
-            self.dask.chunksize,
-            self.dask.shape,
-            self.dask.dtype,
-            *writing_tasks
+            fname, self.dask.chunksize, self.dask.shape, self.dask.dtype, *writing_tasks
         )
 
         vds_task.compute()

@@ -3,14 +3,16 @@ import ray
 from deisa.ray.types import DeisaArray
 from tests.utils import ray_cluster, simple_worker, wait_for_head_node  # noqa: F401
 import pytest
-
 import numpy as np
 import zarr
 import shutil
 import os
 
+import dask
+
 NB_ITERATIONS = 10
-ZARR_PATH = "/tmp/test_deisa_simulation.zarr"
+ZARR_PATH = "test_deisa_simulation.zarr"
+
 
 @ray.remote(max_retries=0)
 def head_script(enable_distributed_scheduling) -> None:
@@ -28,13 +30,7 @@ def head_script(enable_distributed_scheduling) -> None:
         dask_arr = array[0].dask.persist()
         timestep = array[0].t
 
-        da.to_zarr(
-            dask_arr,
-            ZARR_PATH,
-            component=str(timestep),
-            compute=True
-        )
-
+        da.to_zarr(dask_arr, ZARR_PATH, component=str(timestep), compute=True)
 
     d.register_callback(
         simulation_callback,
@@ -45,7 +41,6 @@ def head_script(enable_distributed_scheduling) -> None:
 
 @pytest.mark.parametrize("enable_distributed_scheduling", [True, False])
 def test_dask_save_zarr(enable_distributed_scheduling, ray_cluster) -> None:  # noqa: F811
-
     if os.path.exists(ZARR_PATH):
         shutil.rmtree(ZARR_PATH)
 
@@ -69,11 +64,10 @@ def test_dask_save_zarr(enable_distributed_scheduling, ray_cluster) -> None:  # 
     ray.get([head_ref] + worker_refs)
 
     # Check if saved correctly
-    z_group = zarr.open_group(ZARR_PATH, mode='r')
+    z_group = zarr.open_group(ZARR_PATH, mode="r")
     assert len(z_group) == NB_ITERATIONS
 
     for timestep in range(NB_ITERATIONS):
-
         data = da.from_zarr(ZARR_PATH, component=str(timestep)).compute()
 
         assert data.sum() == timestep * 10
@@ -82,4 +76,4 @@ def test_dask_save_zarr(enable_distributed_scheduling, ray_cluster) -> None:  # 
         assert (arr == np.array(data)).all()
 
     if os.path.exists(ZARR_PATH):
-         shutil.rmtree(ZARR_PATH)
+        shutil.rmtree(ZARR_PATH)
