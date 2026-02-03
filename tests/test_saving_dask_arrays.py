@@ -6,17 +6,24 @@ import pytest
 
 import numpy as np
 import shutil
+import pathlib
 import os
 
 NB_ITERATIONS = 10
-HDF5_PATH = "interesting-event.h5"
-ZARR_PATH = "interesting-event.zarr"
 
 
-@pytest.mark.parametrize("enable_distributed_scheduling", [True, False])
-def test_dask_save_hdf5(enable_distributed_scheduling, ray_cluster) -> None:  # noqa: F811
+@pytest.mark.parametrize(
+    "fname, enable_distributed_scheduling",
+    [
+        ("interesting-event.h5", False),
+        ("~/interesting-event.h5", False),
+        ("interesting-event.h5", True),
+        ("~/interesting-event.h5", True),
+    ],
+)
+def test_dask_save_hdf5(fname, enable_distributed_scheduling, ray_cluster) -> None:  # noqa: F811
     @ray.remote(max_retries=0)
-    def head_script(enable_distributed_scheduling) -> None:
+    def head_script(fname, enable_distributed_scheduling) -> None:
         """The head node checks that the values are correct"""
         from deisa.ray.window_handler import Deisa
         from deisa.ray.types import WindowSpec
@@ -32,7 +39,7 @@ def test_dask_save_hdf5(enable_distributed_scheduling, ray_cluster) -> None:  # 
 
             # If something interesting happens:
             if 49 < arr_sum < 51:
-                array[0].to_hdf5(HDF5_PATH)
+                array[0].to_hdf5(fname)
 
         d.register_callback(
             simulation_callback,
@@ -42,10 +49,15 @@ def test_dask_save_hdf5(enable_distributed_scheduling, ray_cluster) -> None:  # 
 
     import h5py
 
-    if os.path.exists(HDF5_PATH):
-        os.system("rm -f *.h5 .*.h5")
+    # Check in the correct place.
+    full_name = pathlib.Path(fname).expanduser().resolve()
 
-    head_ref = head_script.remote(enable_distributed_scheduling)
+    if os.path.exists(full_name):
+        save_dir = full_name.parent
+        os.system(f"rm -f {save_dir}/*.h5 {save_dir}/.*h5")
+
+    # Save using relative path
+    head_ref = head_script.remote(fname, enable_distributed_scheduling)
     wait_for_head_node()
 
     worker_refs = []
@@ -64,7 +76,7 @@ def test_dask_save_hdf5(enable_distributed_scheduling, ray_cluster) -> None:  # 
 
     ray.get([head_ref] + worker_refs)
 
-    x = h5py.File(HDF5_PATH)["data"]
+    x = h5py.File(full_name)["data"]
     data = da.from_array(x, chunks=2)
 
     data_sum = data.sum().compute()
@@ -73,14 +85,23 @@ def test_dask_save_hdf5(enable_distributed_scheduling, ray_cluster) -> None:  # 
     arr = 5 * np.array([[1, 2], [3, 4]])
     assert (data.compute() == arr).all()
 
-    if os.path.exists(HDF5_PATH):
-        os.system("rm -f *.h5 .*.h5")
+    if os.path.exists(full_name):
+        save_dir = full_name.parent
+        os.system(f"rm -f {save_dir}/*.h5 {save_dir}/.*h5")
 
 
-@pytest.mark.parametrize("enable_distributed_scheduling", [True, False])
-def test_dask_save_zarr(enable_distributed_scheduling, ray_cluster) -> None:  # noqa: F811
+@pytest.mark.parametrize(
+    "fname, enable_distributed_scheduling",
+    [
+        ("interesting-event.zarr", False),
+        ("~/interesting-event.zarr", False),
+        ("interesting-event.zarr", True),
+        ("~/interesting-event.zarr", True),
+    ],
+)
+def test_dask_save_zarr(fname, enable_distributed_scheduling, ray_cluster) -> None:  # noqa: F811
     @ray.remote(max_retries=0)
-    def head_script(enable_distributed_scheduling) -> None:
+    def head_script(fname, enable_distributed_scheduling) -> None:
         """The head node checks that the values are correct"""
         from deisa.ray.window_handler import Deisa
         from deisa.ray.types import WindowSpec
@@ -96,7 +117,7 @@ def test_dask_save_zarr(enable_distributed_scheduling, ray_cluster) -> None:  # 
 
             # If something that we are looking foward happens:
             if 49 < arr_sum < 51:
-                array[0].to_zarr(ZARR_PATH, component="data")
+                array[0].to_zarr(fname, component="data")
 
         d.register_callback(
             simulation_callback,
@@ -104,10 +125,13 @@ def test_dask_save_zarr(enable_distributed_scheduling, ray_cluster) -> None:  # 
         )
         d.execute_callbacks()
 
-    if os.path.exists(ZARR_PATH):
-        shutil.rmtree(ZARR_PATH)
+    # Check in the correct place.
+    full_path = pathlib.Path(fname).expanduser().resolve()
 
-    head_ref = head_script.remote(enable_distributed_scheduling)
+    if os.path.exists(full_path):
+        shutil.rmtree(full_path)
+
+    head_ref = head_script.remote(fname, enable_distributed_scheduling)
     wait_for_head_node()
 
     worker_refs = []
@@ -126,7 +150,7 @@ def test_dask_save_zarr(enable_distributed_scheduling, ray_cluster) -> None:  # 
 
     ray.get([head_ref] + worker_refs)
 
-    data = da.from_zarr(ZARR_PATH, component="data")
+    data = da.from_zarr(full_path, component="data")
 
     data_sum = data.sum().compute()
     assert 49 < data_sum < 51
@@ -134,8 +158,8 @@ def test_dask_save_zarr(enable_distributed_scheduling, ray_cluster) -> None:  # 
     arr = 5 * np.array([[1, 2], [3, 4]])
     assert (data.compute() == arr).all()
 
-    if os.path.exists(ZARR_PATH):
-        shutil.rmtree(ZARR_PATH)
+    if os.path.exists(full_path):
+        shutil.rmtree(full_path)
 
 
 # TODO use also NetCDF
