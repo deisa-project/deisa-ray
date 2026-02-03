@@ -205,6 +205,28 @@ class DeisaArray:
     dask: da.Array
     t: int
 
+    def to_zarr(self, fname: str, component: str) -> None:
+        """
+        Save data using the zarr storage format
+
+        Parameters
+        ----------
+        fname : str
+            The name of the zarr storage where the data will be stored.
+
+        component : str
+            Component to save in zarr storage
+
+        Notes
+        -----
+        This method is a simple wrapper to `dask.to_zarr`.
+        https://docs.dask.org/en/latest/generated/dask.array.to_zarr.html#dask.array.to_zarr
+        """
+
+        import zarr
+
+        da.to_zarr(self.dask, fname, component=component, compute=True)
+
     def to_hdf5(self, fname: str) -> None:
         """
         Save data to a HDF5 file (using HDF5 VDS).
