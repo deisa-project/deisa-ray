@@ -7,9 +7,12 @@ from typing import Any, TypeAlias
 import dask.array as da
 from dask.highlevelgraph import HighLevelGraph
 from deisa.core.interface import SupportsSlidingWindow
+import dask.delayed
 import numpy as np
 import ray
 import ray.actor
+
+import pathlib
 
 from deisa.ray import Timestep
 from deisa.ray._async_dict import AsyncDict
@@ -204,6 +207,147 @@ class WindowSpec:
 class DeisaArray:
     dask: da.Array
     t: int
+
+    def to_zarr(self, fname: str, component: str) -> None:
+        """
+        Save data using the zarr storage format
+
+        Parameters
+        ----------
+        fname : str
+            The name of the zarr storage where the data will be stored.
+
+        component : str
+            Component to save in zarr storage
+
+        Notes
+        -----
+        This method is a simple wrapper to `dask.to_zarr`.
+        https://docs.dask.org/en/latest/generated/dask.array.to_zarr.html#dask.array.to_zarr
+        """
+
+        full_path = pathlib.Path(fname).expanduser().resolve()
+        da.to_zarr(self.dask.persist(), full_path, component=component, compute=True)
+
+    def to_hdf5(self, fname: str) -> None:
+        """
+        Save data to a HDF5 file (using HDF5 VDS).
+
+        Parameters
+        ----------
+        fname : str
+            The name of the final file where the data will be stored.
+
+        Notes
+        -----
+        This method creates files for each chunk, then links the
+        files using HDF5 VDS. The chunk file is named as
+        `.{filename}-{chunk_position}.h5`.
+        """
+
+        import h5py
+
+        def chunk_fname(fname: str, chunkid: tuple[int, ...] = ()):
+            """
+            Create the filename for a chunk.
+
+            Parameters
+            ----------
+            fname : str
+                The name of the final file where the data will be stored.
+            block_id : tuple[int, ...]
+                Chunk position to create the file.
+
+            Returns
+            -------
+            str
+                Filename for the chunk of position block_id.
+            """
+
+            path = pathlib.Path(fname).expanduser().resolve()
+            parents, name, suffix = path.parents[0], path.stem, path.suffix
+            chunk_str = "-".join(map(str, chunkid))
+
+            # Hidden name for the chunk files
+            new_name = "." + name + f"-{chunk_str}" + suffix
+
+            return parents / new_name
+
+        def save_chunk(
+            chunk: np.ndarray, fname: str, block_id: tuple[int, ...] | None = None
+        ) -> tuple[tuple[int, ...], str]:
+            """
+            Save one chunk to a individual hdf5 file.
+
+            Parameters
+            ----------
+            chunk : np.ndarray
+                Chunk to be stored.
+            fname : str
+                The name of the final file where the data will be stored.
+            block_id : tuple[int, ...]
+                Chunk position, used to merge into a VDS.
+
+            Returns
+            -------
+            tuple[tuple[int, ...], str]
+                Chunk position and filename of saved chunk.
+            """
+
+            filename = chunk_fname(fname, block_id)
+
+            with h5py.File(filename, "w") as f:
+                f.create_dataset("data", data=chunk)
+
+            return (block_id, filename)
+
+        def create_vds(
+            fname: str, chunk_shape: tuple[int, ...], data_shape: tuple[int, ...], data_dtype: np.dtype, *files
+        ) -> None:
+            """
+            Creates a VDS aggregating all chunk files.
+
+            Parameters
+            ----------
+            fname : str
+                The name of the final file where the data will be stored.
+            chunk_shape : tuple[int,...]
+                Shape of the chunks, used to map the chunks into the VDS.
+            data_shape : tuple[int,...]
+                Shape of the data.
+            data_dtype : np.dtype
+                The numpy dtype of the data.
+            files : tuple[tuple[int, ...], str]
+                List of all chunk files and position
+            """
+
+            layout = h5py.VirtualLayout(shape=data_shape, dtype=data_dtype)
+
+            for indices, name in files:
+                vsource = h5py.VirtualSource(name, "data", shape=chunk_shape)
+
+                selection = tuple(slice(idx * size, (idx + 1) * size) for idx, size in zip(indices, chunk_shape))
+
+                layout[selection] = vsource
+
+            with h5py.File(fname, "w", libver="latest") as f:
+                f.create_virtual_dataset("data", layout, fillvalue=-1)
+
+        chunks = self.dask.to_delayed()
+
+        full_path = pathlib.Path(fname).expanduser().resolve()
+
+        writing_tasks = []
+        for block_id in np.ndindex(chunks.shape):
+            task = dask.delayed(save_chunk)(chunks[block_id], full_path, block_id=block_id)
+
+            writing_tasks.append(task)
+
+        vds_task = dask.delayed(create_vds)(
+            full_path, self.dask.chunksize, self.dask.shape, self.dask.dtype, *writing_tasks
+        )
+
+        vds_task.compute()
 
 
 @dataclass
