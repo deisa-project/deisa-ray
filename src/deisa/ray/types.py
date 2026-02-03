@@ -11,6 +11,8 @@ import numpy as np
 import ray
 import ray.actor
 
+import pathlib
+
 from deisa.ray import Timestep
 from deisa.ray._async_dict import AsyncDict
 
@@ -225,7 +227,7 @@ class DeisaArray:
 
         import zarr
 
-        da.to_zarr(self.dask, fname, component=component, compute=True)
+        da.to_zarr(self.dask.persist(), fname, component=component, compute=True)
 
     def to_hdf5(self, fname: str) -> None:
         """
