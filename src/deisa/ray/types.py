@@ -12,6 +12,7 @@ import numpy as np
 import ray
 import ray.actor
 
+import pathlib
 
 from deisa.ray import Timestep
 from deisa.ray._async_dict import AsyncDict
@@ -225,8 +226,6 @@ class DeisaArray:
         https://docs.dask.org/en/latest/generated/dask.array.to_zarr.html#dask.array.to_zarr
         """
 
-        import zarr
-
         da.to_zarr(self.dask, fname, component=component, compute=True)
 
     def to_hdf5(self, fname: str) -> None:
@@ -246,6 +245,32 @@ class DeisaArray:
         """
 
         import h5py
+
+        def chunk_fname(fname: str, chunkid: tuple[int, ...] = ()):
+            """
+            Create the filename for a chunk.
+
+            Parameters
+            ----------
+            fname : str
+                The name of the final file where the data will be stored.
+            block_id : tuple[int, ...]
+                Chunk position to create the file.
+
+            Returns
+            -------
+            str
+                Filename for the chunk of position block_id.
+            """
+
+            path = pathlib.Path(fname).resolve()
+            parents, name, suffix = path.parents[0], path.stem, path.suffix
+            chunk_str = "-".join(map(str, chunkid))
+
+            # Hidden name for the chunk files
+            new_name = "." + name + f"-{chunk_str}" + suffix
+
+            return parents / new_name
 
         def save_chunk(
             chunk: np.ndarray, fname: str, block_id: tuple[int, ...] | None = None
@@ -268,12 +293,7 @@ class DeisaArray:
                 Chunk position and filename of saved chunk.
             """
 
-            dirs = fname.split("/")[:-1]
-            path = "" if len(dirs) == 0 else "/".join(dirs) + "/"
-
-            name = fname.split("/")[-1]
-
-            filename = f"{path}.{name}-{'-'.join(map(str, block_id))}.h5"
+            filename = chunk_fname(fname, block_id)
 
             with h5py.File(filename, "w") as f:
                 f.create_dataset("data", data=chunk)
