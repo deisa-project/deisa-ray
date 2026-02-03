@@ -226,7 +226,7 @@ class DeisaArray:
         https://docs.dask.org/en/latest/generated/dask.array.to_zarr.html#dask.array.to_zarr
         """
 
-        da.to_zarr(self.dask, fname, component=component, compute=True)
+        da.to_zarr(self.dask.persist(), fname, component=component, compute=True)
 
     def to_hdf5(self, fname: str) -> None:
         """
