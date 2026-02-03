@@ -227,7 +227,8 @@ class DeisaArray:
 
         import zarr
 
-        da.to_zarr(self.dask.persist(), fname, component=component, compute=True)
+        full_path = pathlib.Path(fname).expanduser().resolve()
+        da.to_zarr(self.dask.persist(), full_path, component=component, compute=True)
 
     def to_hdf5(self, fname: str) -> None:
         """
@@ -264,7 +265,7 @@ class DeisaArray:
                 Filename for the chunk of position block_id.
             """
 
-            path = pathlib.Path(fname).resolve()
+            path = pathlib.Path(fname).expanduser().resolve()
             parents, name, suffix = path.parents[0], path.stem, path.suffix
             chunk_str = "-".join(map(str, chunkid))
 
@@ -335,14 +336,16 @@ class DeisaArray:
 
         chunks = self.dask.to_delayed()
 
+        full_path = pathlib.Path(fname).expanduser().resolve()
+
         writing_tasks = []
         for block_id in np.ndindex(chunks.shape):
-            task = dask.delayed(save_chunk)(chunks[block_id], fname, block_id=block_id)
+            task = dask.delayed(save_chunk)(chunks[block_id], full_path, block_id=block_id)
 
             writing_tasks.append(task)
 
         vds_task = dask.delayed(create_vds)(
-            fname, self.dask.chunksize, self.dask.shape, self.dask.dtype, *writing_tasks
+            full_path, self.dask.chunksize, self.dask.shape, self.dask.dtype, *writing_tasks
         )
 
         vds_task.compute()
