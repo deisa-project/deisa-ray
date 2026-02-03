@@ -11,6 +11,7 @@ import os
 NB_ITERATIONS = 10
 HDF5_PATH = "amazing-event.h5"
 
+
 @ray.remote(max_retries=0)
 def head_script(enable_distributed_scheduling) -> None:
     """The head node checks that the values are correct"""
@@ -24,12 +25,10 @@ def head_script(enable_distributed_scheduling) -> None:
     d = Deisa(n_sim_nodes=4)
 
     def simulation_callback(array: list[DeisaArray]):
-
-        timestep = array[0].t
         arr_sum = array[0].dask.sum().compute()
 
         # If something that we are looking foward happens:
-        if  49 < arr_sum < 51:
+        if 49 < arr_sum < 51:
             array[0].to_hdf5("amazing-event.h5")
 
     d.register_callback(
@@ -41,7 +40,6 @@ def head_script(enable_distributed_scheduling) -> None:
 
 @pytest.mark.parametrize("enable_distributed_scheduling", [True, False])
 def test_dask_save_hdf5(enable_distributed_scheduling, ray_cluster) -> None:  # noqa: F811
-
     if os.path.exists(HDF5_PATH):
         os.system("rm -f *amazing-event.h5 .amazing-event*.h5")
 
@@ -64,7 +62,6 @@ def test_dask_save_hdf5(enable_distributed_scheduling, ray_cluster) -> None:  # 
 
     ray.get([head_ref] + worker_refs)
 
-
     x = h5py.File(HDF5_PATH)["data"]
     a = da.from_array(x, chunks=2)
 
@@ -72,4 +69,4 @@ def test_dask_save_hdf5(enable_distributed_scheduling, ray_cluster) -> None:  # 
     assert 49 < a.sum().compute() < 51
 
     if os.path.exists(HDF5_PATH):
-         os.system("rm -f *amazing-event.h5 .amazing-event*.h5")
+        os.system("rm -f *amazing-event.h5 .amazing-event*.h5")
