@@ -63,7 +63,7 @@ def test_cross_actor_graph_no_deadlock(ray_three_node_cluster: dict[str, Any]) -
     """
     node_ids = ray_three_node_cluster["ids"]
 
-    head = HeadNodeActor.options(**get_head_actor_options()).remote()
+    head = HeadNodeActor.options(**get_head_actor_options()).remote(n_sim_nodes = 2)
     ray.get(head.ready.remote())
 
     a0 = SchedulingActor.options(

@@ -51,7 +51,7 @@ class HeadNodeActor:
     # TODO: Discuss if max_pending_arrays should be here or in register callback. In that case, what
     # should happen when the freqs are diff and max_pending_arrays are diff too? When does the sim
     # stop?''
-    def __init__(self, max_simulation_ahead: int = 1) -> None:
+    def __init__(self, *,n_sim_nodes: int, max_simulation_ahead: int = 1) -> None:
         """
         Initialize synchronization primitives and bookkeeping containers.
 
@@ -65,6 +65,7 @@ class HeadNodeActor:
         """
         # For each ID of a actor_handle, the corresponding scheduling actor
         self.scheduling_actors: dict[str, RayActorHandle] = {}
+        self.n_sim_nodes_counter = n_sim_nodes
 
         # TODO: document what this event signals and update documentation
         self.new_array_created: dict[str, asyncio.Event] = {}
@@ -141,7 +142,15 @@ class HeadNodeActor:
         created by Bridge instances.
         """
         if actor_id not in self.scheduling_actors:
-            self.scheduling_actors[actor_id] = actor_handle
+            if self.n_sim_nodes_counter>0:
+                self.scheduling_actors[actor_id] = actor_handle
+                self.n_sim_nodes_counter-=1
+                return True
+            else:
+                return False
+
+    def get_n_sim_nodes_counter(self):
+        return self.n_sim_nodes_counter
 
     def register_partial_array(
         self,

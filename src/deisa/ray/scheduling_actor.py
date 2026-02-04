@@ -78,7 +78,10 @@ class NodeActorBase:
         self.actor_handle = ray.get_runtime_context().current_actor
 
         self.head = await get_ready_actor_with_retry(name="simulation_head", namespace="deisa_ray")
-        await self.head.register_scheduling_actor.remote(actor_id, self.actor_handle)
+        ok = await self.head.register_scheduling_actor.remote(actor_id, self.actor_handle)
+        if not ok:
+            raise RuntimeError(f"Actor was not able to register! Maybe there is a mismatch between "
+                               f"sim nodes and actors being created.")
 
         # Keeps track of array metadata AND ref per timestep.
         # TODO: I think these two responsabilities could be separated.
