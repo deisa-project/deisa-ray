@@ -29,16 +29,16 @@ def _ray_start_impl() -> None:
         ray.init(address="auto", log_to_driver=False, logging_level=logging.ERROR)
 
 
-def count_connected_actors()->tuple[int, int]:
-    connected_actors = 0
+def count_connected_node_and_head_actors()->tuple[int, int]:
+    node_actors = 0
     head_actors = 0
     for a in list_actors(filters=[("state", "=", "ALIVE")]):
         if a.get("ray_namespace") == "deisa_ray":
             if a.get("name") == "simulation_head":
                 head_actors += 1
-            else:
-                connected_actors += 1
-    return head_actors, connected_actors
+            elif a.get("name", "").startswith("sched-"):
+                node_actors += 1
+    return head_actors, node_actors
 
 
 class Deisa:
@@ -52,6 +52,7 @@ class Deisa:
         _timeout_s: Optional[int] = None
     ) -> None:
         # cheap constructor: no Ray side effects
+        self.needed_arrays = set()
         config.lock()
         self.n_sim_nodes = n_sim_nodes
 
@@ -84,7 +85,7 @@ class Deisa:
         expected_ray_actors = self.n_sim_nodes
         deadline_s = time.monotonic() + timeout_s
         while True:
-            head_actors, connected_actors = count_connected_actors()
+            head_actors, connected_actors = count_connected_node_and_head_actors()
             if connected_actors>=expected_ray_actors or head_actors>=2:
                 break
             if time.monotonic() >= deadline_s:
@@ -145,7 +146,7 @@ class Deisa:
     def register_callback(
         self,
         simulation_callback: SupportsSlidingWindow.Callback,
-        arrays_description: list[WindowSpec],
+        arrays_spec: list[WindowSpec],
         exception_handler: Optional[SupportsSlidingWindow.ExceptionHandler] = None,
         when: Literal['AND', 'OR'] = Literal['AND'],
     ) -> None:
@@ -157,7 +158,7 @@ class Deisa:
         simulation_callback : Callable
             Function to run for each iteration; receives arrays as kwargs
             and ``timestep``.
-        arrays_description : list[WindowSpec]
+        arrays_spec : list[WindowSpec]
             Descriptions of arrays to stream to the callback (with optional
             sliding windows).
             Maximum iterations to execute. Default is a large sentinel.
@@ -172,13 +173,13 @@ class Deisa:
         self._ensure_connected()  # connect + handshake before accepting callbacks
         cfg = _CallbackConfig(
             simulation_callback=simulation_callback,
-            arrays_description=arrays_description,
+            arrays_description=arrays_spec,
             exception_handler=exception_handler or _default_exception_handler,
             when = when,
         )
         self.registered_callbacks.append(cfg)
-        array_names = [definition.name for definition in arrays_description]
-        ray.get(self.head.register_arrays.remote(array_names))
+        array_names = [spec.name for spec in arrays_spec]
+        self.needed_arrays.update(array_names)
 
     def unregister_callback(
         self,
@@ -231,9 +232,9 @@ class Deisa:
         self._ensure_connected()
 
         # register special array that indicates end of sim.
-        head_arrays_description = ["__deisa_last_iteration_array"]
-        ray.get(self.head.register_arrays.remote(head_arrays_description))
-
+        self.needed_arrays.add("__deisa_last_iteration_array")
+        # register all arrays in one go
+        ray.get(self.head.register_array_needed_by_analytics.remote(self.needed_arrays))
         # signal analytics ready to start
         ray.get(self.head.set_analytics_ready_for_execution.remote())
 

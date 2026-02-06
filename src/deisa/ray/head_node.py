@@ -74,7 +74,7 @@ class HeadNodeActor:
 
         # All the newly created arrays
         self.arrays_ready: asyncio.Queue[tuple[str, Timestep, da.Array]] = asyncio.Queue()
-        self.registered_arrays: dict[str, DaskArrayData] = {}
+        self.arrays_needed_by_analytics: dict[str, DaskArrayData] = {}
         self.analytics_ready_for_execution: asyncio.Event = asyncio.Event()
 
     def set_analytics_ready_for_execution(self):
@@ -85,7 +85,7 @@ class HeadNodeActor:
         await self.analytics_ready_for_execution.wait()
 
     # TODO rename or move creation of global container elsewhere
-    def register_arrays(self, arrays_definitions: list[str]) -> None:
+    def register_array_needed_by_analytics(self, arrays_definitions: list[str]) -> None:
         """
         Register array definitions and set back-pressure on pending timesteps.
 
@@ -109,7 +109,7 @@ class HeadNodeActor:
         """
         # regulate how far ahead sim can go wrt to analytics
         for name in arrays_definitions:
-            self.registered_arrays[name] = DaskArrayData(name)
+            self.arrays_needed_by_analytics[name] = DaskArrayData(name)
             self.semaphore_per_array[name] = asyncio.Semaphore(self.max_simulation_ahead + 1)
             self.new_array_created[name] = asyncio.Event()
 
@@ -186,7 +186,7 @@ class HeadNodeActor:
         """
         # TODO no checks done for when all nodeactors have called this
         # TODO missing check that analytics and sim have required/set same name of arrays, otherwise array is created and nothing happens
-        array = self.registered_arrays[array_name]
+        array = self.arrays_needed_by_analytics[array_name]
 
         for bridge_id, position, size in chunks_meta:
             array.update_meta(nb_chunks_per_dim, dtype, position, size, actor_id_who_owns, bridge_id)
@@ -240,7 +240,7 @@ class HeadNodeActor:
         distributed-scheduling graph) is put into ``arrays_ready``. The
         semaphore is released when analytics later consume the array.
         """
-        array = self.registered_arrays[array_name]
+        array = self.arrays_needed_by_analytics[array_name]
         semaphore = self.semaphore_per_array[array_name]
         created_event = self.new_array_created[array_name]
 

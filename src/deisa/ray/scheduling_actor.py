@@ -239,7 +239,7 @@ class NodeActorBase:
         partial_array.bid_to_pos[bridge_id] = chunk_position
 
         # Technically, no race conditions should happen since its calls to the same actor method
-        # happen synchrnously (in ray). Since the method is async, it will run the method one a at
+        # happen synchronously (in ray). Since the method is async, it will run the method one a at
         # a time, and give control to async runtime when it encounters await below.
         # HOWEVER - with certain implementation of MPI, there have been problems here.
         if len(partial_array.chunks_contained_meta) == nb_chunks_of_node:

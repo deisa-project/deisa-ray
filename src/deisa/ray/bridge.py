@@ -500,7 +500,13 @@ class Bridge:
         self._backend: _BridgeBackend
 
         try:
-            # create node actor
+            # Create one actor per node, regardless of whether its needed or not
+            # NOTE: node actor init awaits until analytics have set the "ready" event
+            # which means that all register_callbacks have been done. This has to be done
+            # before registering the meta from the bridge, so that we can decide what is
+            # needed and what is not. The assumption is that the user can expose things that
+            # might NOT get analyzed. A different, ulterior problem, is that user could mess up
+            # the configuration and assign more nodes than what the metadata implies.
             self._create_node_actor(scheduling_actor_cls, node_actor_options)
 
             # use real backend only after node_actor exists
@@ -623,7 +629,6 @@ class Bridge:
                 )  # type: ignore
                 break  # success
             except ActorRegistryError as e:
-                # TODO: Make bridge dummy?
                 raise e
             except Exception as e:
                 last_err = e
