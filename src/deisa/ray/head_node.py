@@ -64,6 +64,7 @@ class HeadNodeActor:
         creation).
         """
         # For each ID of a actor_handle, the corresponding scheduling actor
+        self.needed_arrays = None
         self.scheduling_actors: dict[str, RayActorHandle] = {}
         self.n_sim_nodes_counter = n_sim_nodes
 
@@ -85,7 +86,7 @@ class HeadNodeActor:
         await self.analytics_ready_for_execution.wait()
 
     # TODO rename or move creation of global container elsewhere
-    def register_array_needed_by_analytics(self, arrays_definitions: list[str]) -> None:
+    def register_array_needed_by_analytics(self, array_names: set[str]) -> None:
         """
         Register array definitions and set back-pressure on pending timesteps.
 
@@ -108,7 +109,7 @@ class HeadNodeActor:
         the provided definitions.
         """
         # regulate how far ahead sim can go wrt to analytics
-        for name in arrays_definitions:
+        for name in array_names:
             self.arrays_needed_by_analytics[name] = DaskArrayData(name)
             self.semaphore_per_array[name] = asyncio.Semaphore(self.max_simulation_ahead + 1)
             self.new_array_created[name] = asyncio.Event()

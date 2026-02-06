@@ -16,8 +16,31 @@ from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 from deisa.ray.scheduling_actor import SchedulingActor as _RealSchedulingActor
 from deisa.ray.types import RayActorHandle
 from deisa.ray.errors import _default_exception_handler,ActorRegistryError
-
+import datetime
+import torch.distributed as dist
 logger = logging.getLogger(__name__)
+
+def init_gloo(world_size: int, rank: int, master_addr: str = "127.0.0.1", master_port: int = 29500, timeout_s: int = 120):
+    timeout = datetime.timedelta(seconds=timeout_s)
+
+    # Rank 0 hosts the rendezvous store; everyone else connects.
+    store = dist.TCPStore(
+        host_name=master_addr,
+        port=master_port,
+        world_size=world_size,
+        is_master=(rank == 0),
+        timeout=timeout,
+        wait_for_workers=True,   # optional; OK to leave default
+    )
+
+    dist.init_process_group(
+        backend="gloo",
+        store=store,
+        world_size=world_size,
+        rank=rank,
+        timeout=timeout,
+    )
+    return store
 
 
 def get_node_actor_options(name: str, namespace: str) -> Dict[str, Any]:
@@ -138,7 +161,7 @@ class _RealBackend:
                     nb_chunks_per_dim=meta["nb_chunks_per_dim"],
                     nb_chunks_of_node=meta["nb_chunks_of_node"],
                     dtype=meta["dtype"],
-                    bridge_id=self._b.id,
+                    bridge_id=self._b.bridge_id,
                     chunk_position=meta["chunk_position"],
                 )
             )
@@ -156,7 +179,7 @@ class _RealBackend:
         # owner keeps ref alive after sim task exits
         ref = ray.put(chunk, _owner=self._b.node_actor)
         future: ray.ObjectRef = self._b.node_actor.add_chunk.remote(
-            bridge_id=self._b.id,
+            bridge_id=self._b.bridge_id,
             array_name=array_name,
             chunk_ref=[ref],
             timestep=timestep,
@@ -168,7 +191,7 @@ class _RealBackend:
     def close(self, *, timestep: int, store_externally: bool) -> None:
         ref = ray.put(0, _owner=self._b.node_actor)
         future: ray.ObjectRef = self._b.node_actor.add_chunk.remote(
-            bridge_id=self._b.id,
+            bridge_id=self._b.bridge_id,
             array_name="__deisa_last_iteration_array",
             chunk_ref=[ref],
             timestep=timestep,
@@ -461,11 +484,11 @@ class Bridge:
             Currently ignored. Present for backward compatibility with older
             versions of the API.
         """
-
-        self.id = bridge_id
+        self.bridge_id = bridge_id
         self._init_retries = _init_retries
 
         self.arrays_metadata = _validate_arrays_meta(arrays_metadata)
+
         # NOTE : Possible error : if two bridges have different first array it will have different
         # shape and will be declared twice.
         # Possible fix : do it somewhere else (Head or SchedulingActor)
@@ -476,6 +499,9 @@ class Bridge:
             list(self.arrays_metadata.keys())[0]
         ]
         self.system_metadata = _validate_system_meta(system_metadata)
+
+        init_gloo(system_metadata["world_size"], self.bridge_id, system_metadata["master_address"], system_metadata["master_port"])
+        dist.barrier()
 
         if not ray.is_initialized():
             ray.init(address="auto", log_to_driver=False, logging_level=logging.ERROR)
