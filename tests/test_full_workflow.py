@@ -16,7 +16,7 @@ def head_script(enable_distributed_scheduling, nb_nodes) -> None:
 
     deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
 
-    d = Deisa(n_sim_nodes=nb_nodes)
+    d = Deisa()
 
     def simulation_callback(array: list[DeisaArray]):
         x = array[0].dask.sum().compute()

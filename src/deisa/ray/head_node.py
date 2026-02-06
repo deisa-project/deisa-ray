@@ -19,24 +19,13 @@ class HeadNodeActor:
 
     Parameters
     ----------
-    arrays_definitions : list[ArrayDefinition]
-        List of array definitions describing the arrays to be created.
-    max_pending_arrays : int, optional
-        Maximum number of arrays that can be being built or waiting to be
-        collected at the same time. Setting this value can prevent the
-        simulation from being many iterations ahead of the analytics.
-        Default is 1_000_000_000.
 
     Attributes
     ----------
     scheduling_actors : dict[str, RayActorHandle]
         Mapping from scheduling actor IDs to their actor handles.
-    new_pending_array_semaphore : asyncio.Semaphore
-        Semaphore used to limit the number of pending arrays.
     new_array_created : asyncio.Event
         Event set when a new array timestep is created.
-    arrays : dict[str, DaskArrayData]
-        Mapping from array names to their data structures.
     arrays_ready : asyncio.Queue[tuple[str, Timestep, da.Array]]
         Queue of ready arrays waiting to be collected by analytics.
 
@@ -51,7 +40,7 @@ class HeadNodeActor:
     # TODO: Discuss if max_pending_arrays should be here or in register callback. In that case, what
     # should happen when the freqs are diff and max_pending_arrays are diff too? When does the sim
     # stop?''
-    def __init__(self, *,n_sim_nodes: int, max_simulation_ahead: int = 1) -> None:
+    def __init__(self, *, max_simulation_ahead: int = 1) -> None:
         """
         Initialize synchronization primitives and bookkeeping containers.
 
@@ -66,7 +55,6 @@ class HeadNodeActor:
         # For each ID of a actor_handle, the corresponding scheduling actor
         self.needed_arrays = None
         self.scheduling_actors: dict[str, RayActorHandle] = {}
-        self.n_sim_nodes_counter = n_sim_nodes
 
         # TODO: document what this event signals and update documentation
         self.new_array_created: dict[str, asyncio.Event] = {}
@@ -92,15 +80,10 @@ class HeadNodeActor:
 
         Parameters
         ----------
-        arrays_definitions : list[tuple[str, Callable]]
+        array_names : list[tuple[str, Callable]]
             Sequence of ``(name)`` pairs for each array
             produced by the simulation. Each entry becomes a
             :class:`~deisa.ray.types.DaskArrayData` instance.
-        max_pending_arrays : int, optional
-            Upper bound on the number of array timesteps that may be created
-            but not yet consumed. Used to throttle simulations that outrun
-            analytics. Default is ``1_000_000_000``.
-
         Notes
         -----
         This method must be called before any scheduling actors register
@@ -143,15 +126,7 @@ class HeadNodeActor:
         created by Bridge instances.
         """
         if actor_id not in self.scheduling_actors:
-            if self.n_sim_nodes_counter>0:
-                self.scheduling_actors[actor_id] = actor_handle
-                self.n_sim_nodes_counter-=1
-                return True
-            else:
-                return False
-
-    def get_n_sim_nodes_counter(self):
-        return self.n_sim_nodes_counter
+            self.scheduling_actors[actor_id] = actor_handle
 
     def register_partial_array(
         self,

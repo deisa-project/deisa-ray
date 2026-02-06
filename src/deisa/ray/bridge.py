@@ -501,6 +501,7 @@ class Bridge:
         self.system_metadata = _validate_system_meta(system_metadata)
 
         init_gloo(system_metadata["world_size"], self.bridge_id, system_metadata["master_address"], system_metadata["master_port"])
+        # sync point
         dist.barrier()
 
         if not ray.is_initialized():
