@@ -71,19 +71,20 @@ class Deisa:
             connected_actors = 0
             head_actors = 0
             for a in list_actors(filters=[("state", "=", "ALIVE")]):
-                if a.get("ray_namespace") == "deisa_ray" :
+                if a.get("ray_namespace") == "deisa_ray":
                     if a.get("name") == "simulation_head":
                         head_actors += 1
                     else:
                         connected_actors += 1
-        if connected_actors>expected_ray_actors:
+        if connected_actors > expected_ray_actors:
             # TODO add test
-            raise RuntimeError(f"More nodes connected than expected. Got {connected_actors}, expected {expected_ray_actors}. "
-                                f"Strange things may happen!\n"
-                                f"Please configure Deisa to reflect the correct number of sim nodes. Closing analytics...")
+            raise RuntimeError(
+                f"More nodes connected than expected. Got {connected_actors}, expected {expected_ray_actors}. "
+                f"Strange things may happen!\n"
+                f"Please configure Deisa to reflect the correct number of sim nodes. Closing analytics..."
+            )
         if head_actors > 1:
-            raise RuntimeError(f"Something went wrong: two head actors initialized. Contact developers.")
-
+            raise RuntimeError("Something went wrong: two head actors initialized. Contact developers.")
 
     def _ensure_connected(self) -> None:
         """
@@ -134,8 +135,10 @@ class Deisa:
         returns decorator.
 
         """
+
         def deco(fn):
             return self.register_callback(fn, list(window_specs))
+
         return deco
 
     def register_callback(
@@ -143,7 +146,7 @@ class Deisa:
         simulation_callback: SupportsSlidingWindow.Callback,
         arrays_description: list[WindowSpec],
         exception_handler: Optional[SupportsSlidingWindow.ExceptionHandler] = None,
-        when: Literal['AND', 'OR'] = 'AND',
+        when: Literal["AND", "OR"] = "AND",
     ) -> SupportsSlidingWindow.Callback:
         """
         Register the analytics callback and array descriptions.
@@ -170,7 +173,7 @@ class Deisa:
             simulation_callback=simulation_callback,
             arrays_description=arrays_description,
             exception_handler=exception_handler or _default_exception_handler,
-            when = when,
+            when=when,
         )
         self.registered_callbacks.append(cfg)
         array_names = [definition.name for definition in arrays_description]
@@ -252,7 +255,6 @@ class Deisa:
 
         end_reached = False
         while not end_reached:
-
             # inner while loop stops once a bigger timestep has been pushed to queue
             # WARNING: Big assumption is that it is impossible for any array in timestep i+1 to be placed
             # BEFORE timestep i. This is violated in embarrassingly parallel workflows where each rank can go ahead
@@ -265,7 +267,9 @@ class Deisa:
                 # guarantee sequential flow of data.
                 # TODO add test
                 if arr_timestep < current_timestep:
-                    raise RuntimeError(f"Logical flow of data was violated. Timestep {arr_timestep} sent after timestep {current_timestep}. Exiting...")
+                    raise RuntimeError(
+                        f"Logical flow of data was violated. Timestep {arr_timestep} sent after timestep {current_timestep}. Exiting..."
+                    )
                 if name == "__deisa_last_iteration_array":
                     end_reached = True
                     break
@@ -323,12 +327,9 @@ class Deisa:
                 callback_args[name] = list(queue)[-window_size:]
         return callback_args
 
-    def should_call(self, description_of_arrays_needed, when: Literal['AND', 'OR']) -> bool:
-        values = (
-            self.has_new_timestep[description.name]
-            for description in description_of_arrays_needed
-        )
-        if when == 'AND':
+    def should_call(self, description_of_arrays_needed, when: Literal["AND", "OR"]) -> bool:
+        values = (self.has_new_timestep[description.name] for description in description_of_arrays_needed)
+        if when == "AND":
             return all(values)
         else:  # when == 'OR'
             return any(values)

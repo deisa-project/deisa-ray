@@ -72,6 +72,7 @@ def test_multiple_callbacks(enable_distributed_scheduling: bool, ray_cluster) ->
 
     ray.get([head_ref] + worker_refs)
 
+
 @ray.remote(max_retries=0)
 def head_script2(enable_distributed_scheduling) -> None:
     """The head node checks that the values are correct"""

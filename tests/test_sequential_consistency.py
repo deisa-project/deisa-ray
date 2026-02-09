@@ -2,24 +2,25 @@ import pytest
 import ray
 
 from deisa.ray.types import DeisaArray
-from tests.utils import ray_cluster, simple_worker, wait_for_head_node  # noqa: F401
+from tests.utils import wait_for_head_node  # noqa: F401
 import numpy as np
 
 NB_ITERATIONS = 10
 
+
 @ray.remote(num_cpus=0, max_retries=0)
 def strange_worker(
-        *,
-        rank: int,
-        position: tuple[int, ...],
-        chunks_per_dim: tuple[int, ...],
-        nb_chunks_of_node: int,
-        chunk_size: tuple[int, ...],
-        nb_iterations: int,
-        node_id: str | None = None,
-        array_name: str | list[str] = "array",
-        dtype: np.dtype = np.int32,  # type: ignore
-        **kwargs,
+    *,
+    rank: int,
+    position: tuple[int, ...],
+    chunks_per_dim: tuple[int, ...],
+    nb_chunks_of_node: int,
+    chunk_size: tuple[int, ...],
+    nb_iterations: int,
+    node_id: str | None = None,
+    array_name: str | list[str] = "array",
+    dtype: np.dtype = np.int32,  # type: ignore
+    **kwargs,
 ) -> None:
     """Strange worker that sends nodes out of order!"""
     from deisa.ray.bridge import Bridge
@@ -46,13 +47,13 @@ def strange_worker(
 
     array = (rank + 1) * np.ones(chunk_size, dtype=dtype)
 
-    for i in range(start_iteration, nb_iterations//2):
+    for i in range(start_iteration, nb_iterations // 2):
         for array_described in list(arrays_md.keys()):
             chunk = i * array
             client.send(array_name=array_described, chunk=chunk, timestep=i, chunked=True)
     mid_t = i
     # skip 2 iterations
-    i+=3
+    i += 3
     for array_described in list(arrays_md.keys()):
         chunk = i * array
         client.send(array_name=array_described, chunk=chunk, timestep=i, chunked=True)
@@ -62,6 +63,7 @@ def strange_worker(
             chunk = i * array
             client.send(array_name=array_described, chunk=chunk, timestep=i, chunked=True)
     client.close(timestep=nb_iterations)
+
 
 @ray.remote(max_retries=0)
 def head_script(enable_distributed_scheduling, nb_nodes) -> None:
@@ -91,7 +93,9 @@ def head_script(enable_distributed_scheduling, nb_nodes) -> None:
         (4, False),
     ],
 )
-def test_arrays_sent_out_of_order_fails_analytics(nb_nodes: int, enable_distributed_scheduling: bool, ray_cluster) -> None:  # noqa: F811
+def test_arrays_sent_out_of_order_fails_analytics(
+    nb_nodes: int, enable_distributed_scheduling: bool, ray_cluster
+) -> None:  # noqa: F811
     with pytest.raises(RuntimeError):
         head_ref = head_script.remote(enable_distributed_scheduling, nb_nodes)
         wait_for_head_node()

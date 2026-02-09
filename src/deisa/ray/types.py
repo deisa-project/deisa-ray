@@ -211,7 +211,7 @@ class _CallbackConfig:
     simulation_callback: SupportsSlidingWindow.Callback
     arrays_description: list[WindowSpec]
     exception_handler: SupportsSlidingWindow.ExceptionHandler
-    when: Literal['AND', 'OR']
+    when: Literal["AND", "OR"]
 
 
 class DaskArrayData:
