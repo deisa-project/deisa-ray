@@ -143,7 +143,7 @@ class Deisa:
         simulation_callback: SupportsSlidingWindow.Callback,
         arrays_description: list[WindowSpec],
         exception_handler: Optional[SupportsSlidingWindow.ExceptionHandler] = None,
-        when: Literal['AND', 'OR'] = Literal['AND'],
+        when: Literal['AND', 'OR'] = 'AND',
     ) -> SupportsSlidingWindow.Callback:
         """
         Register the analytics callback and array descriptions.
@@ -211,7 +211,6 @@ class Deisa:
                 else:
                     self.queue_per_array[name] = deque(maxlen=window_size)
 
-    # TODO: introduce a method that will generate the final array spec for each registered array
     def execute_callbacks(
         self,
     ) -> None:
@@ -282,8 +281,9 @@ class Deisa:
                 simulation_callback = cb_cfg.simulation_callback
                 description_arrays_needed = cb_cfg.arrays_description
                 exception_handler = cb_cfg.exception_handler
+                when = cb_cfg.when
 
-                should_call = self.should_call(description_arrays_needed)
+                should_call = self.should_call(description_arrays_needed, when)
                 if should_call:
                     # Compute the arrays to pass to the callback
                     callback_args: dict[str, List[DeisaArray]] = self.determine_callback_args(description_arrays_needed)
@@ -323,11 +323,15 @@ class Deisa:
                 callback_args[name] = list(queue)[-window_size:]
         return callback_args
 
-    def should_call(self, description_of_arrays_needed) -> bool:
-        should_call = True
-        for description in description_of_arrays_needed:
-            should_call = should_call and self.has_new_timestep[description.name]
-        return should_call
+    def should_call(self, description_of_arrays_needed, when: Literal['AND', 'OR']) -> bool:
+        values = (
+            self.has_new_timestep[description.name]
+            for description in description_of_arrays_needed
+        )
+        if when == 'AND':
+            return all(values)
+        else:  # when == 'OR'
+            return any(values)
 
     # TODO add persist
     def set(self, *args, key: Hashable, value: Any, chunked: bool = False, persist: bool = False, **kwargs) -> None:
