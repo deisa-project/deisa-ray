@@ -121,13 +121,30 @@ class Deisa:
     def _create_head_actor(self) -> None:
         self.head = HeadNodeActor.options(**get_head_actor_options()).remote(self.max_simulation_ahead)
 
+    def callback(self, *window_specs):
+        """
+        Decorator for easy registration
+
+        Parameters
+        ----------
+        window_spec: tuple of WindowSpec descriptions
+
+        Returns
+        -------
+        returns decorator.
+
+        """
+        def deco(fn):
+            return self.register_callback(fn, list(window_specs))
+        return deco
+
     def register_callback(
         self,
         simulation_callback: SupportsSlidingWindow.Callback,
         arrays_description: list[WindowSpec],
         exception_handler: Optional[SupportsSlidingWindow.ExceptionHandler] = None,
         when: Literal['AND', 'OR'] = Literal['AND'],
-    ) -> None:
+    ) -> SupportsSlidingWindow.Callback:
         """
         Register the analytics callback and array descriptions.
 
@@ -158,6 +175,7 @@ class Deisa:
         self.registered_callbacks.append(cfg)
         array_names = [definition.name for definition in arrays_description]
         ray.get(self.head.register_arrays.remote(array_names))
+        return simulation_callback
 
     def unregister_callback(
         self,
