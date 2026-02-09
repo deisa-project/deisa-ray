@@ -358,6 +358,7 @@ def test_analytics_raise_if_too_many_actors_connect(ray_multinode_cluster):
             arrays_md = {
                 "array": {
                     "chunk_shape": (1, 1),
+                    # TODO: if 2,2 as before, its stuck at deadlock bc it waits until appropriate num of chunks arrive
                     "nb_chunks_per_dim": (2, 2),
                     "nb_chunks_of_node": 1,
                     "dtype": np.int32,

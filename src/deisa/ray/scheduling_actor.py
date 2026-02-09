@@ -227,6 +227,7 @@ class NodeActorBase:
         event so concurrent callers can proceed. Until that point additional
         callers block on ``ready_event``.
         """
+        # TODO monday look here
         await self.head.wait_until_analytics_ready.remote()
 
         partial_array = self._create_or_retrieve_partial_array(array_name, nb_chunks_of_node)

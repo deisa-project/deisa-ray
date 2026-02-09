@@ -53,7 +53,7 @@ class HeadNodeActor:
         creation).
         """
         # For each ID of a actor_handle, the corresponding scheduling actor
-        self.needed_arrays = None
+        self.required = set()
         self.scheduling_actors: dict[str, RayActorHandle] = {}
 
         # TODO: document what this event signals and update documentation
@@ -92,6 +92,8 @@ class HeadNodeActor:
         the provided definitions.
         """
         # regulate how far ahead sim can go wrt to analytics
+        self.required = array_names
+
         for name in array_names:
             self.arrays_needed_by_analytics[name] = DaskArrayData(name)
             self.semaphore_per_array[name] = asyncio.Semaphore(self.max_simulation_ahead + 1)
