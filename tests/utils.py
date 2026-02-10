@@ -34,6 +34,7 @@ def simple_worker(
     nb_chunks_of_node: int,
     chunk_size: tuple[int, ...],
     nb_iterations: int,
+    nb_nodes: int,
     node_id: str | None = None,
     array_name: str | list[str] = "array",
     dtype: np.dtype = np.int32,  # type: ignore
@@ -48,7 +49,7 @@ def simple_worker(
 
     start_iteration = kwargs.get("start_iteration", 0)
 
-    sys_md = get_system_metadata()
+    sys_md = {"world_size": nb_nodes, "master_address": "127.0.0.1", "master_port": 29500}
     arrays_md = {
         name: {
             "chunk_shape": chunk_size,
@@ -81,6 +82,7 @@ def simple_worker_error_test(
     nb_chunks_of_node: int,
     chunk_size: tuple[int, ...],
     nb_iterations: int,
+    nb_nodes: int,
     node_id: str | None = None,
     array_name: str = "array",
     dtype: np.dtype = np.int32,  # type: ignore
@@ -89,7 +91,7 @@ def simple_worker_error_test(
     from deisa.ray.bridge import Bridge
     from deisa.ray.utils import get_system_metadata
 
-    sys_md = get_system_metadata()
+    sys_md = {"world_size": nb_nodes, "master_address": "127.0.0.1", "master_port": 29500}
     arrays_md = {
         array_name: {
             "chunk_shape": chunk_size,

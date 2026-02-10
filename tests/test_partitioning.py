@@ -18,7 +18,7 @@ def head_script(partitioning_strategy: str) -> None:
 
     deisa.config.enable_experimental_distributed_scheduling(True)
 
-    d = Deisa(n_sim_nodes=4)
+    d = Deisa()
 
     def simulation_callback(array: list[DeisaArray]):
         x = array[0].dask.sum().compute(deisa_ray_partitioning_strategy=partitioning_strategy)
@@ -50,6 +50,7 @@ def test_partitioning(partitioning_strategy: str, ray_cluster) -> None:  # noqa:
                 chunk_size=(1, 1),
                 nb_iterations=NB_ITERATIONS,
                 node_id=f"node_{rank % 4}",
+                nb_nodes = 4,
             )
         )
 

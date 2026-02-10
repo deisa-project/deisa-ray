@@ -17,6 +17,7 @@ def strange_worker(
     nb_chunks_of_node: int,
     chunk_size: tuple[int, ...],
     nb_iterations: int,
+    nb_nodes: int,
     node_id: str | None = None,
     array_name: str | list[str] = "array",
     dtype: np.dtype = np.int32,  # type: ignore
@@ -31,7 +32,7 @@ def strange_worker(
 
     start_iteration = kwargs.get("start_iteration", 0)
 
-    sys_md = get_system_metadata()
+    sys_md = {"world_size": nb_nodes, "master_address": "127.0.0.1", "master_port": 29500}
     arrays_md = {
         name: {
             "chunk_shape": chunk_size,
@@ -74,7 +75,7 @@ def head_script(enable_distributed_scheduling, nb_nodes) -> None:
 
     deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
 
-    d = Deisa(n_sim_nodes=nb_nodes)
+    d = Deisa()
 
     def simulation_callback(array: list[DeisaArray]):
         pass
@@ -111,6 +112,7 @@ def test_arrays_sent_out_of_order_fails_analytics(
                     chunk_size=(1, 1),
                     nb_iterations=NB_ITERATIONS,
                     node_id=f"node_{rank % nb_nodes}",
+                    nb_nodes = 4,
                 )
             )
 

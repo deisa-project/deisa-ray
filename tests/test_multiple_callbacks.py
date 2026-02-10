@@ -16,7 +16,7 @@ def head_script(enable_distributed_scheduling) -> None:
 
     deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
 
-    d = Deisa(n_sim_nodes=16)
+    d = Deisa()
 
     def simulation_callback1(array: list[DeisaArray]):
         x = array[0].dask.sum().compute()
@@ -67,6 +67,7 @@ def test_multiple_callbacks(enable_distributed_scheduling: bool, ray_cluster) ->
                 nb_iterations=NB_ITERATIONS,
                 node_id=f"node_{rank}",
                 array_name=["array", "array1"],
+                nb_nodes=16
             )
         )
 
@@ -82,7 +83,7 @@ def head_script2(enable_distributed_scheduling) -> None:
 
     deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
 
-    d = Deisa(n_sim_nodes=16)
+    d = Deisa()
 
     @d.callback(WindowSpec("array"))
     def simulation_callback1(array: list[DeisaArray]):
@@ -124,6 +125,7 @@ def test_multiple_callbacks_decorator(enable_distributed_scheduling: bool, ray_c
                 nb_iterations=NB_ITERATIONS,
                 node_id=f"node_{rank}",
                 array_name=["array", "array1"],
+                nb_nodes = 16
             )
         )
 

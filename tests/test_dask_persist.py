@@ -17,7 +17,7 @@ def head_script(enable_distributed_scheduling) -> None:
 
     deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
 
-    d = Deisa(n_sim_nodes=4)
+    d = Deisa()
 
     def simulation_callback(array: list[DeisaArray]):
         # This is the standard dask task graph
@@ -47,7 +47,8 @@ def test_dask_persist(enable_distributed_scheduling, ray_cluster) -> None:  # no
     wait_for_head_node()
 
     worker_refs = []
-    for rank in range(4):
+    nb_nodes = 4
+    for rank in range(nb_nodes):
         worker_refs.append(
             simple_worker.remote(
                 rank=rank,
@@ -57,6 +58,7 @@ def test_dask_persist(enable_distributed_scheduling, ray_cluster) -> None:  # no
                 chunk_size=(1, 1),
                 nb_iterations=NB_ITERATIONS,
                 node_id=f"node_{rank}",
+                nb_nodes=nb_nodes,
             )
         )
 

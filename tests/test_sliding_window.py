@@ -16,7 +16,7 @@ def head_script(enable_distributed_scheduling) -> None:
 
     deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
 
-    d = Deisa(n_sim_nodes=4)
+    d = Deisa()
 
     def simulation_callback(array: list[DeisaArray]):
         if array[-1].t == 0:
@@ -55,6 +55,7 @@ def test_sliding_window(enable_distributed_scheduling, ray_cluster) -> None:  # 
                 chunk_size=(1, 1),
                 nb_iterations=NB_ITERATIONS,
                 node_id=f"node_{rank}",
+                nb_nodes = 4,
             )
         )
 

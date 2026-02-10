@@ -16,7 +16,7 @@ def head_script(enable_distributed_scheduling) -> None:
 
     deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
 
-    d = Deisa(n_sim_nodes=1)
+    d = Deisa()
 
     def simulation_callback(array: list[DeisaArray]):
         assert array[0].dask.dtype == np.int8
@@ -42,6 +42,7 @@ def test_dtype(enable_distributed_scheduling, ray_cluster) -> None:  # noqa: F81
         nb_iterations=1,
         node_id="node",
         dtype=np.int8,
+        nb_nodes=1,
     )
 
     ray.get([head_ref, worker_ref])

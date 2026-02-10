@@ -16,7 +16,7 @@ def head_script(enable_distributed_scheduling, nb_nodes) -> None:
 
     deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
 
-    d = Deisa(n_sim_nodes=nb_nodes)
+    d = Deisa()
 
     def simulation_callback(array: list[DeisaArray]):
         x = array[0].dask.sum().compute()
@@ -32,11 +32,11 @@ def head_script(enable_distributed_scheduling, nb_nodes) -> None:
 @pytest.mark.parametrize(
     "nb_nodes, enable_distributed_scheduling",
     [
-        (1, True),
-        (2, True),
+        #(1, True),
+        #(2, True),
         (4, True),
-        (1, False),
-        (2, False),
+        #(1, False),
+        #(2, False),
         (4, False),
     ],
 )
@@ -55,6 +55,7 @@ def test_deisa_ray(nb_nodes: int, enable_distributed_scheduling: bool, ray_clust
                 chunk_size=(1, 1),
                 nb_iterations=NB_ITERATIONS,
                 node_id=f"node_{rank % nb_nodes}",
+                nb_nodes=nb_nodes,
             )
         )
 

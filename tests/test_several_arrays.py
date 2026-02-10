@@ -17,7 +17,7 @@ def head_script(enable_distributed_scheduling) -> None:
 
     deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
 
-    d = Deisa(n_sim_nodes=4)
+    d = Deisa()
 
     def simulation_callback(a: list[DeisaArray], b: list[DeisaArray]):
         assert b[0].dask.sum().compute() == 10 * b[0].t
@@ -62,6 +62,7 @@ def test_several_arrays(enable_distributed_scheduling, ray_cluster) -> None:  # 
                 nb_iterations=NB_ITERATIONS,
                 node_id=f"node_{rank}",
                 array_name=["a", "b"],
+                nb_nodes = 4
             )
         )
 

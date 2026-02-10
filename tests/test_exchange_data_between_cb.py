@@ -16,7 +16,7 @@ def head_script(enable_distributed_scheduling) -> None:
 
     deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
 
-    d = Deisa(n_sim_nodes=4)
+    d = Deisa()
 
     class Shared_variables:
         def __init__(self) -> None:
@@ -78,6 +78,7 @@ def test_multiple_callbacks(enable_distributed_scheduling: bool, ray_cluster) ->
                 nb_iterations=NB_ITERATIONS,
                 node_id=f"node_{rank}",
                 array_name=["array", "array1"],
+                nb_nodes = 4
             )
         )
 
