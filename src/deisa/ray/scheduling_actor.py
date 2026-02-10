@@ -78,7 +78,7 @@ class NodeActorBase:
         self.actor_handle = ray.get_runtime_context().current_actor
 
         self.head = await get_ready_actor_with_retry(name="simulation_head", namespace="deisa_ray")
-        await self.head.register_scheduling_actor.remote(actor_id, self.actor_handle)
+        self.head.register_scheduling_actor.remote(actor_id, self.actor_handle)
 
         # Keeps track of array metadata AND ref per timestep.
         # TODO: I think these two responsabilities could be separated.
@@ -227,6 +227,7 @@ class NodeActorBase:
         event so concurrent callers can proceed. Until that point additional
         callers block on ``ready_event``.
         """
+        # TODO monday look here
         await self.head.wait_until_analytics_ready.remote()
 
         partial_array = self._create_or_retrieve_partial_array(array_name, nb_chunks_of_node)
@@ -236,7 +237,7 @@ class NodeActorBase:
         partial_array.bid_to_pos[bridge_id] = chunk_position
 
         # Technically, no race conditions should happen since its calls to the same actor method
-        # happen synchrnously (in ray). Since the method is async, it will run the method one a at
+        # happen synchronously (in ray). Since the method is async, it will run the method one a at
         # a time, and give control to async runtime when it encounters await below.
         # HOWEVER - with certain implementation of MPI, there have been problems here.
         if len(partial_array.chunks_contained_meta) == nb_chunks_of_node:

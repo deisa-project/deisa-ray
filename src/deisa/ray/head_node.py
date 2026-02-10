@@ -19,24 +19,13 @@ class HeadNodeActor:
 
     Parameters
     ----------
-    arrays_definitions : list[ArrayDefinition]
-        List of array definitions describing the arrays to be created.
-    max_pending_arrays : int, optional
-        Maximum number of arrays that can be being built or waiting to be
-        collected at the same time. Setting this value can prevent the
-        simulation from being many iterations ahead of the analytics.
-        Default is 1_000_000_000.
 
     Attributes
     ----------
     scheduling_actors : dict[str, RayActorHandle]
         Mapping from scheduling actor IDs to their actor handles.
-    new_pending_array_semaphore : asyncio.Semaphore
-        Semaphore used to limit the number of pending arrays.
     new_array_created : asyncio.Event
         Event set when a new array timestep is created.
-    arrays : dict[str, DaskArrayData]
-        Mapping from array names to their data structures.
     arrays_ready : asyncio.Queue[tuple[str, Timestep, da.Array]]
         Queue of ready arrays waiting to be collected by analytics.
 
@@ -51,7 +40,7 @@ class HeadNodeActor:
     # TODO: Discuss if max_pending_arrays should be here or in register callback. In that case, what
     # should happen when the freqs are diff and max_pending_arrays are diff too? When does the sim
     # stop?''
-    def __init__(self, max_simulation_ahead: int = 1) -> None:
+    def __init__(self, *, max_simulation_ahead: int = 1) -> None:
         """
         Initialize synchronization primitives and bookkeeping containers.
 
@@ -64,6 +53,7 @@ class HeadNodeActor:
         creation).
         """
         # For each ID of a actor_handle, the corresponding scheduling actor
+        self.required = set()
         self.scheduling_actors: dict[str, RayActorHandle] = {}
 
         # TODO: document what this event signals and update documentation
@@ -73,7 +63,7 @@ class HeadNodeActor:
 
         # All the newly created arrays
         self.arrays_ready: asyncio.Queue[tuple[str, Timestep, da.Array]] = asyncio.Queue()
-        self.registered_arrays: dict[str, DaskArrayData] = {}
+        self.arrays_needed_by_analytics: dict[str, DaskArrayData] = {}
         self.analytics_ready_for_execution: asyncio.Event = asyncio.Event()
 
     def set_analytics_ready_for_execution(self):
@@ -84,21 +74,16 @@ class HeadNodeActor:
         await self.analytics_ready_for_execution.wait()
 
     # TODO rename or move creation of global container elsewhere
-    def register_arrays(self, arrays_definitions: list[str]) -> None:
+    def register_array_needed_by_analytics(self, array_names: set[str]) -> None:
         """
         Register array definitions and set back-pressure on pending timesteps.
 
         Parameters
         ----------
-        arrays_definitions : list[tuple[str, Callable]]
+        array_names : list[tuple[str, Callable]]
             Sequence of ``(name)`` pairs for each array
             produced by the simulation. Each entry becomes a
             :class:`~deisa.ray.types.DaskArrayData` instance.
-        max_pending_arrays : int, optional
-            Upper bound on the number of array timesteps that may be created
-            but not yet consumed. Used to throttle simulations that outrun
-            analytics. Default is ``1_000_000_000``.
-
         Notes
         -----
         This method must be called before any scheduling actors register
@@ -107,8 +92,10 @@ class HeadNodeActor:
         the provided definitions.
         """
         # regulate how far ahead sim can go wrt to analytics
-        for name in arrays_definitions:
-            self.registered_arrays[name] = DaskArrayData(name)
+        self.required = array_names
+
+        for name in array_names:
+            self.arrays_needed_by_analytics[name] = DaskArrayData(name)
             self.semaphore_per_array[name] = asyncio.Semaphore(self.max_simulation_ahead + 1)
             self.new_array_created[name] = asyncio.Event()
 
@@ -177,7 +164,7 @@ class HeadNodeActor:
         """
         # TODO no checks done for when all nodeactors have called this
         # TODO missing check that analytics and sim have required/set same name of arrays, otherwise array is created and nothing happens
-        array = self.registered_arrays[array_name]
+        array = self.arrays_needed_by_analytics[array_name]
 
         for bridge_id, position, size in chunks_meta:
             array.update_meta(nb_chunks_per_dim, dtype, position, size, actor_id_who_owns, bridge_id)
@@ -231,7 +218,7 @@ class HeadNodeActor:
         distributed-scheduling graph) is put into ``arrays_ready``. The
         semaphore is released when analytics later consume the array.
         """
-        array = self.registered_arrays[array_name]
+        array = self.arrays_needed_by_analytics[array_name]
         semaphore = self.semaphore_per_array[array_name]
         created_event = self.new_array_created[array_name]
 

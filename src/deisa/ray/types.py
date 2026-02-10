@@ -2,7 +2,7 @@ import asyncio
 from collections import defaultdict
 from dataclasses import dataclass
 import math
-from typing import Any, TypeAlias
+from typing import Any, TypeAlias, Literal
 
 import dask.array as da
 from dask.highlevelgraph import HighLevelGraph
@@ -211,6 +211,7 @@ class _CallbackConfig:
     simulation_callback: SupportsSlidingWindow.Callback
     arrays_description: list[WindowSpec]
     exception_handler: SupportsSlidingWindow.ExceptionHandler
+    when: Literal['AND', 'OR']
 
 
 class DaskArrayData:
