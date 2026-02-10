@@ -4,6 +4,7 @@ This module exposes the :class:`Bridge` class used by simulation ranks to
 register their data chunks and exchange information with analytics running on
 top of Ray.
 """
+from __future__ import annotations
 
 import logging
 from typing import Any, Dict, Mapping
@@ -15,8 +16,31 @@ from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 from deisa.ray.scheduling_actor import SchedulingActor as _RealSchedulingActor
 from deisa.ray.types import RayActorHandle
 from deisa.ray.errors import _default_exception_handler
-
+import datetime
+import torch.distributed as dist
 logger = logging.getLogger(__name__)
+
+def init_gloo(world_size: int, rank: int, master_addr: str = "127.0.0.1", master_port: int = 29500, timeout_s: int = 120):
+    timeout = datetime.timedelta(seconds=timeout_s)
+
+    # Rank 0 hosts the rendezvous store; everyone else connects.
+    store = dist.TCPStore(
+        host_name=master_addr,
+        port=master_port,
+        world_size=world_size,
+        is_master=(rank == 0),
+        timeout=timeout,
+        wait_for_workers=True,   # optional; OK to leave default
+    )
+
+    dist.init_process_group(
+        backend="gloo",
+        store=store,
+        world_size=world_size,
+        rank=rank,
+        timeout=timeout,
+    )
+    return store
 
 
 def get_node_actor_options(name: str, namespace: str) -> Dict[str, Any]:
@@ -57,6 +81,156 @@ def get_node_actor_options(name: str, namespace: str) -> Dict[str, Any]:
         "enable_task_events": False,
     }
 
+def _validate_system_meta(system_meta: Mapping[str, Any]) -> dict[str, Any]:
+    """
+    Validate and normalize the ``system_metadata`` argument.
+
+    Parameters
+    ----------
+    system_meta : Mapping[str, Any]
+        User-provided system-level metadata.
+
+    Returns
+    -------
+    dict[str, Any]
+        A shallow-copied version of the input mapping.
+
+    Raises
+    ------
+    TypeError
+        If ``system_meta`` is not a mapping.
+    """
+    if not isinstance(system_meta, Mapping):
+        raise TypeError(f"system_metadata must be a mapping, got {type(system_meta).__name__}")
+    return dict(system_meta)
+
+
+def _validate_single_array_metadata(
+        name: str,
+    meta: Mapping[str, Any],
+) -> None:
+    """
+    Validate metadata for a single array entry.
+
+    Parameters
+    ----------
+    name : str
+        Array name.
+    meta : Mapping[str, Any]
+        Metadata for this array. Must contain at least:
+
+        - ``chunk_shape``: sequence of positive ints
+        - ``nb_chunks_per_dim``: sequence of positive ints
+        - ``nb_chunks_of_node``: positive int
+        - ``dtype``: NumPy dtype or anything accepted by ``np.dtype``
+        - ``chunk_position``: sequence of ints of same length as
+          ``chunk_shape``
+
+    Raises
+    ------
+    TypeError
+        If any field has an invalid type.
+    ValueError
+        If shapes/positions have inconsistent lengths.
+    """
+    # chunk_shape: tuple/list of positive ints
+    chunk_shape = meta["chunk_shape"]
+    if not (isinstance(chunk_shape, (tuple, list)) and all(isinstance(n, int) and n > 0 for n in chunk_shape)):
+        raise TypeError(
+            f"arrays_metadata['{name}']['chunk_shape'] must be a sequence of positive ints, got {chunk_shape!r}"
+        )
+
+    # nb_chunks_per_dim: same pattern
+    nb_chunks_per_dim = meta["nb_chunks_per_dim"]
+    if not (
+        isinstance(nb_chunks_per_dim, (tuple, list))
+        and all(isinstance(n, int) and n > 0 for n in nb_chunks_per_dim)
+    ):
+        raise TypeError(
+            f"arrays_metadata['{name}']['nb_chunks_per_dim'] must be a "
+            f"sequence of positive ints, got {nb_chunks_per_dim!r}"
+        )
+
+    # nb_chunks_of_node: positive int
+    nb_chunks_of_node = meta["nb_chunks_of_node"]
+    if not (isinstance(nb_chunks_of_node, int) and nb_chunks_of_node > 0):
+        raise TypeError(
+            f"arrays_metadata['{name}']['nb_chunks_of_node'] must be a positive int, "
+            f"got {type(meta['nb_chunks_of_node']).__name__}"
+        )
+
+    # chunk_position: sequence of ints of same length as chunk_shape (optional)
+    chunk_position = meta["chunk_position"]
+    if not (
+        isinstance(chunk_position, (tuple, list))
+        and all(
+            isinstance(pos, int) and 0 <= pos < nb_chunks
+            for pos, nb_chunks in zip(chunk_position, nb_chunks_per_dim)
+        )
+    ):
+        raise TypeError(
+            f"arrays_metadata['{name}']['chunk_position'] must be a sequence of ints, got {chunk_position!r}"
+        )
+
+    if len(chunk_position) != len(meta["chunk_shape"]):
+        raise ValueError(f"arrays_metadata['{name}']['chunk_position'] must have the same length as 'chunk_shape'")
+
+
+def _validate_arrays_meta(
+        arrays_metadata: Mapping[str, Mapping[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    """
+    Validate and normalize the ``arrays_metadata`` argument.
+
+    Parameters
+    ----------
+    arrays_metadata : Mapping[str, Mapping[str, Any]]
+        User-provided metadata for all arrays handled by this bridge.
+
+    Returns
+    -------
+    dict[str, dict[str, Any]]
+        A shallow-copied and validated version of the input mapping.
+
+    Raises
+    ------
+    TypeError
+        If the top-level mapping, keys or values have incorrect types.
+    ValueError
+        If required keys are missing for any array.
+    """
+    if not isinstance(arrays_metadata, Mapping):
+        raise TypeError(f"arrays_metadata must be a mapping from str to dict, got {type(arrays_metadata).__name__}")
+
+    required_keys = {
+        "chunk_shape",
+        "nb_chunks_per_dim",
+        "nb_chunks_of_node",
+        "dtype",
+        "chunk_position",
+    }
+
+    validated: dict[str, dict[str, Any]] = {}
+
+    for array_name, meta in arrays_metadata.items():
+        # key type
+        if not isinstance(array_name, str):
+            raise TypeError(f"arrays_metadata keys must be str, got {type(array_name).__name__}")
+
+        # value type
+        if not isinstance(meta, Mapping):
+            raise TypeError(f"arrays_metadata['{array_name}'] must be a mapping, got {type(meta).__name__}")
+
+        # required keys present?
+        missing = required_keys - meta.keys()
+        if missing:
+            raise ValueError(f"arrays_metadata['{array_name}'] is missing required keys: {missing}")
+
+        _validate_single_array_metadata(array_name, meta)
+        validated[array_name] = dict(meta)
+
+    return validated
+
 
 class Bridge:
     """
@@ -83,8 +257,6 @@ class Bridge:
     ----------
     node_id : str
         The ID of the node this Bridge is associated with.
-    scheduling_actor : RayActorHandle
-        The Ray actor handle for the scheduling actor.
 
     Notes
     -----
@@ -114,26 +286,27 @@ class Bridge:
         bridge = Bridge(
             id=0,
             arrays_metadata=arrays_metadata,
-            system_metadata=system_metadata,
+            system_metadata=system_metadata
         )
 
         bridge.send(
             array_name="temperature",
             chunk=np.zeros((10, 10), dtype=np.float64),
-            timestep=0,
+            timestep=0
         )
     """
 
+    # TODO: add exception handler? what should default be? If bridge is not instantiated,
+    # should sim crash? Keep going?
     def __init__(
         self,
         bridge_id: int,
         arrays_metadata: Mapping[str, Mapping[str, Any]],
         system_metadata: Mapping[str, Any],
-        *args: Any,
+        *,
         _node_id: str | None = None,
         scheduling_actor_cls: ActorClass = _RealSchedulingActor,
         _init_retries: int = 3,
-        **kwargs: Any,
     ) -> None:
         """
         Initialize the Bridge to connect MPI rank to Ray cluster.
@@ -175,15 +348,12 @@ class Bridge:
         to the scheduling actor serves as a readiness check.
         Other Parameters
         ----------------
-        *args, **kwargs
-            Currently ignored. Present for backward compatibility with older
-            versions of the API.
         """
-
-        self.id = bridge_id
+        self.bridge_id = bridge_id
         self._init_retries = _init_retries
 
-        self.arrays_metadata = self._validate_arrays_meta(arrays_metadata)
+        self.arrays_metadata = _validate_arrays_meta(arrays_metadata)
+
         # NOTE : Possible error : if two bridges have different first array it will have different
         # shape and will be declared twice.
         # Possible fix : do it somewhere else (Head or SchedulingActor)
@@ -193,7 +363,10 @@ class Bridge:
         self.arrays_metadata["__deisa_last_iteration_array"] = self.arrays_metadata[
             list(self.arrays_metadata.keys())[0]
         ]
-        self.system_metadata = self._validate_system_meta(system_metadata)
+        self.system_metadata = _validate_system_meta(system_metadata)
+
+        init_gloo(system_metadata["world_size"], self.bridge_id, system_metadata["master_address"], system_metadata["master_port"])
+        # sync point
 
         if not ray.is_initialized():
             ray.init(address="auto", log_to_driver=False, logging_level=logging.ERROR)
@@ -213,9 +386,18 @@ class Bridge:
 
         # create node actor
         self._create_node_actor(scheduling_actor_cls, node_actor_options)
+        # exchange meta with node actor
         self._exchange_chunks_meta_with_node_actor()
-
+        # make sure node actor is ready
         ray.get(self.node_actor.ready.remote())
+        # barrier to make sure that all ranks have reached this point
+        dist.barrier()
+        # after this function returns we are sure that
+        # 1. analytics have started
+        # 2. head actor is created
+        # 3. all bridges have connected
+        # 4. all node actors have been created
+        # 5. all node actors have received description of arrays_md
 
     def _exchange_chunks_meta_with_node_actor(self):
         """
@@ -239,7 +421,7 @@ class Bridge:
                     nb_chunks_of_node=meta["nb_chunks_of_node"],
                     dtype=meta["dtype"],
                     # local info of array specific to bridge
-                    bridge_id=self.id,
+                    bridge_id=self.bridge_id,
                     chunk_position=meta["chunk_position"],
                 )
             )
@@ -247,13 +429,12 @@ class Bridge:
 
     def send(
         self,
-        *args: Any,
+        *,
         array_name: str,
         chunk: np.ndarray,
         timestep: int,
         chunked: bool = True,
         store_externally: bool = False,
-        **kwargs: Any,
     ) -> None:
         """
         Make a chunk of data available to the analytics.
@@ -286,202 +467,45 @@ class Bridge:
         Raises
         ------
         """
-        # ``chunked`` and additional args/kwargs are currently reserved for
-        # future extensions (e.g. multi-chunk sends). For now we only support
-        # sending a single chunk described by ``arrays_metadata``.
-        del args, kwargs  # explicitly unused
-
         try:
             # Setting the owner allows keeping the reference when the simulation script terminates.
             ref = ray.put(chunk, _owner=self.node_actor)
-
             future: ray.ObjectRef = self.node_actor.add_chunk.remote(
-                bridge_id=self.id,
+                bridge_id=self.bridge_id,
                 array_name=array_name,
                 chunk_ref=[ref],
                 timestep=timestep,
                 chunked=True,
                 store_externally=store_externally,
             )  # type: ignore
-
             # Wait until the data is processed before returning to the simulation
             ray.get(future)
-
         except Exception as e:
             _default_exception_handler(e)
 
     def close(
         self,
-        *args: Any,
+        *,
         timestep: int,
         store_externally: bool = False,
-        **kwargs: Any,
     ) -> None:
         """
         Close the bridge by creating a special array that has a special name which signals to the analytics
         that the simulation has finished and that it should stop.
         """
-        del args, kwargs  # explicitly unused
-        ref = ray.put(0, _owner=self.node_actor)
-        future: ray.ObjectRef = self.node_actor.add_chunk.remote(
-            bridge_id=self.id,
-            array_name="__deisa_last_iteration_array",
-            chunk_ref=[ref],
-            timestep=timestep,
-            chunked=True,
-            store_externally=store_externally,
-        )  # type: ignore
-        ray.get(future)
-
-    def _validate_arrays_meta(
-        self,
-        arrays_metadata: Mapping[str, Mapping[str, Any]],
-    ) -> dict[str, dict[str, Any]]:
-        """
-        Validate and normalize the ``arrays_metadata`` argument.
-
-        Parameters
-        ----------
-        arrays_metadata : Mapping[str, Mapping[str, Any]]
-            User-provided metadata for all arrays handled by this bridge.
-
-        Returns
-        -------
-        dict[str, dict[str, Any]]
-            A shallow-copied and validated version of the input mapping.
-
-        Raises
-        ------
-        TypeError
-            If the top-level mapping, keys or values have incorrect types.
-        ValueError
-            If required keys are missing for any array.
-        """
-        if not isinstance(arrays_metadata, Mapping):
-            raise TypeError(f"arrays_metadata must be a mapping from str to dict, got {type(arrays_metadata).__name__}")
-
-        required_keys = {
-            "chunk_shape",
-            "nb_chunks_per_dim",
-            "nb_chunks_of_node",
-            "dtype",
-            "chunk_position",
-        }
-
-        validated: dict[str, dict[str, Any]] = {}
-
-        for array_name, meta in arrays_metadata.items():
-            # key type
-            if not isinstance(array_name, str):
-                raise TypeError(f"arrays_metadata keys must be str, got {type(array_name).__name__}")
-
-            # value type
-            if not isinstance(meta, Mapping):
-                raise TypeError(f"arrays_metadata['{array_name}'] must be a mapping, got {type(meta).__name__}")
-
-            # required keys present?
-            missing = required_keys - meta.keys()
-            if missing:
-                raise ValueError(f"arrays_metadata['{array_name}'] is missing required keys: {missing}")
-
-            self._validate_single_array_metadata(array_name, meta)
-            validated[array_name] = dict(meta)
-
-        return validated
-
-    def _validate_single_array_metadata(
-        self,
-        name: str,
-        meta: Mapping[str, Any],
-    ) -> None:
-        """
-        Validate metadata for a single array entry.
-
-        Parameters
-        ----------
-        name : str
-            Array name.
-        meta : Mapping[str, Any]
-            Metadata for this array. Must contain at least:
-
-            - ``chunk_shape``: sequence of positive ints
-            - ``nb_chunks_per_dim``: sequence of positive ints
-            - ``nb_chunks_of_node``: positive int
-            - ``dtype``: NumPy dtype or anything accepted by ``np.dtype``
-            - ``chunk_position``: sequence of ints of same length as
-              ``chunk_shape``
-
-        Raises
-        ------
-        TypeError
-            If any field has an invalid type.
-        ValueError
-            If shapes/positions have inconsistent lengths.
-        """
-        # chunk_shape: tuple/list of positive ints
-        chunk_shape = meta["chunk_shape"]
-        if not (isinstance(chunk_shape, (tuple, list)) and all(isinstance(n, int) and n > 0 for n in chunk_shape)):
-            raise TypeError(
-                f"arrays_metadata['{name}']['chunk_shape'] must be a sequence of positive ints, got {chunk_shape!r}"
-            )
-
-        # nb_chunks_per_dim: same pattern
-        nb_chunks_per_dim = meta["nb_chunks_per_dim"]
-        if not (
-            isinstance(nb_chunks_per_dim, (tuple, list))
-            and all(isinstance(n, int) and n > 0 for n in nb_chunks_per_dim)
-        ):
-            raise TypeError(
-                f"arrays_metadata['{name}']['nb_chunks_per_dim'] must be a "
-                f"sequence of positive ints, got {nb_chunks_per_dim!r}"
-            )
-
-        # nb_chunks_of_node: positive int
-        nb_chunks_of_node = meta["nb_chunks_of_node"]
-        if not (isinstance(nb_chunks_of_node, int) and nb_chunks_of_node > 0):
-            raise TypeError(
-                f"arrays_metadata['{name}']['nb_chunks_of_node'] must be a positive int, "
-                f"got {type(meta['nb_chunks_of_node']).__name__}"
-            )
-
-        # chunk_position: sequence of ints of same length as chunk_shape (optional)
-        chunk_position = meta["chunk_position"]
-        if not (
-            isinstance(chunk_position, (tuple, list))
-            and all(
-                isinstance(pos, int) and 0 <= pos < nb_chunks
-                for pos, nb_chunks in zip(chunk_position, nb_chunks_per_dim)
-            )
-        ):
-            raise TypeError(
-                f"arrays_metadata['{name}']['chunk_position'] must be a sequence of ints, got {chunk_position!r}"
-            )
-
-        if len(chunk_position) != len(meta["chunk_shape"]):
-            raise ValueError(f"arrays_metadata['{name}']['chunk_position'] must have the same length as 'chunk_shape'")
-
-    def _validate_system_meta(self, system_meta: Mapping[str, Any]) -> dict[str, Any]:
-        """
-        Validate and normalize the ``system_metadata`` argument.
-
-        Parameters
-        ----------
-        system_meta : Mapping[str, Any]
-            User-provided system-level metadata.
-
-        Returns
-        -------
-        dict[str, Any]
-            A shallow-copied version of the input mapping.
-
-        Raises
-        ------
-        TypeError
-            If ``system_meta`` is not a mapping.
-        """
-        if not isinstance(system_meta, Mapping):
-            raise TypeError(f"system_metadata must be a mapping, got {type(system_meta).__name__}")
-        return dict(system_meta)
+        try:
+            ref = ray.put(0, _owner=self.node_actor)
+            future: ray.ObjectRef = self.node_actor.add_chunk.remote(
+                bridge_id=self.bridge_id,
+                array_name="__deisa_last_iteration_array",
+                chunk_ref=[ref],
+                timestep=timestep,
+                chunked=True,
+                store_externally=store_externally,
+            )  # type: ignore
+            ray.get(future)
+        except Exception as e:
+            _default_exception_handler(e)
 
     def _create_node_actor(
         self,
@@ -533,11 +557,10 @@ class Bridge:
     # TODO feedback needs testing
     def get(
         self,
-        *args: Any,
+        *,
         name: str,
         default: Any | None = None,
         chunked: bool = False,
-        **kwargs: Any,
     ) -> Any | None:
         """
         Retrieve information back from Analytics.
@@ -570,14 +593,12 @@ class Bridge:
         the node actor and returns the result (or ``default`` if not set).
         When ``chunked`` is True, a :class:`NotImplementedError` is raised.
         """
-        del args, kwargs  # explicitly unused
-
         if not chunked:
             return ray.get(self.node_actor.get.remote(name, default, chunked))
 
         raise NotImplementedError("Retrieving chunked arrays via Bridge.get is not implemented yet.")
 
-    def _delete(self, *args: Any, name: str, **kwargs: Any) -> None:
+    def _delete(self, *, name: str) -> None:
         """
         Delete a feedback key from the node actor if present.
 
@@ -592,7 +613,4 @@ class Bridge:
         repeatedly signaling the same event. Missing keys are silently
         ignored.
         """
-        del args, kwargs  # explicitly unused
-        # Currently the semantics of deletion are still under discussion. For
-        # now, delegate to the node actor which maintains the shared state.
         self.node_actor.delete.remote(name)
