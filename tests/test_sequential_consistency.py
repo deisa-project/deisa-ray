@@ -25,7 +25,6 @@ def strange_worker(
 ) -> None:
     """Strange worker that sends nodes out of order!"""
     from deisa.ray.bridge import Bridge
-    from deisa.ray.utils import get_system_metadata
 
     if isinstance(array_name, str):
         array_name = [array_name]
@@ -112,7 +111,7 @@ def test_arrays_sent_out_of_order_fails_analytics(
                     chunk_size=(1, 1),
                     nb_iterations=NB_ITERATIONS,
                     node_id=f"node_{rank % nb_nodes}",
-                    nb_nodes = 4,
+                    nb_nodes=4,
                 )
             )
 

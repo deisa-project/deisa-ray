@@ -52,7 +52,7 @@ def test_start_any_timestep(enable_distributed_scheduling: bool, ray_cluster) ->
                 nb_iterations=NB_ITERATIONS,
                 node_id=f"node_{rank}",
                 start_iteration=START_ITERATION,
-                nb_nodes = 4,
+                nb_nodes=4,
             )
         )
 

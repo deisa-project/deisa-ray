@@ -85,7 +85,9 @@ class Deisa:
         self._connected = True
 
     def _create_head_actor(self) -> None:
-        self.head = HeadNodeActor.options(**get_head_actor_options()).remote(max_simulation_ahead=self.max_simulation_ahead)
+        self.head = HeadNodeActor.options(**get_head_actor_options()).remote(
+            max_simulation_ahead=self.max_simulation_ahead
+        )
 
     def callback(self, *window_specs):
         """

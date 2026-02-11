@@ -62,7 +62,7 @@ def test_several_arrays(enable_distributed_scheduling, ray_cluster) -> None:  # 
                 nb_iterations=NB_ITERATIONS,
                 node_id=f"node_{rank}",
                 array_name=["a", "b"],
-                nb_nodes = 4
+                nb_nodes=4,
             )
         )
 

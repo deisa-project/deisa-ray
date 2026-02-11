@@ -4,6 +4,7 @@ This module exposes the :class:`Bridge` class used by simulation ranks to
 register their data chunks and exchange information with analytics running on
 top of Ray.
 """
+
 from __future__ import annotations
 
 import logging
@@ -18,9 +19,13 @@ from deisa.ray.types import RayActorHandle
 from deisa.ray.errors import _default_exception_handler
 import datetime
 import torch.distributed as dist
+
 logger = logging.getLogger(__name__)
 
-def init_gloo(world_size: int, rank: int, master_addr: str = "127.0.0.1", master_port: int = 29500, timeout_s: int = 120):
+
+def init_gloo(
+    world_size: int, rank: int, master_addr: str = "127.0.0.1", master_port: int = 29500, timeout_s: int = 120
+):
     timeout = datetime.timedelta(seconds=timeout_s)
 
     # Rank 0 hosts the rendezvous store; everyone else connects.
@@ -30,7 +35,7 @@ def init_gloo(world_size: int, rank: int, master_addr: str = "127.0.0.1", master
         world_size=world_size,
         is_master=(rank == 0),
         timeout=timeout,
-        wait_for_workers=True,   # optional; OK to leave default
+        wait_for_workers=True,  # optional; OK to leave default
     )
 
     dist.init_process_group(
@@ -81,6 +86,7 @@ def get_node_actor_options(name: str, namespace: str) -> Dict[str, Any]:
         "enable_task_events": False,
     }
 
+
 def _validate_system_meta(system_meta: Mapping[str, Any]) -> dict[str, Any]:
     """
     Validate and normalize the ``system_metadata`` argument.
@@ -106,7 +112,7 @@ def _validate_system_meta(system_meta: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _validate_single_array_metadata(
-        name: str,
+    name: str,
     meta: Mapping[str, Any],
 ) -> None:
     """
@@ -143,8 +149,7 @@ def _validate_single_array_metadata(
     # nb_chunks_per_dim: same pattern
     nb_chunks_per_dim = meta["nb_chunks_per_dim"]
     if not (
-        isinstance(nb_chunks_per_dim, (tuple, list))
-        and all(isinstance(n, int) and n > 0 for n in nb_chunks_per_dim)
+        isinstance(nb_chunks_per_dim, (tuple, list)) and all(isinstance(n, int) and n > 0 for n in nb_chunks_per_dim)
     ):
         raise TypeError(
             f"arrays_metadata['{name}']['nb_chunks_per_dim'] must be a "
@@ -164,8 +169,7 @@ def _validate_single_array_metadata(
     if not (
         isinstance(chunk_position, (tuple, list))
         and all(
-            isinstance(pos, int) and 0 <= pos < nb_chunks
-            for pos, nb_chunks in zip(chunk_position, nb_chunks_per_dim)
+            isinstance(pos, int) and 0 <= pos < nb_chunks for pos, nb_chunks in zip(chunk_position, nb_chunks_per_dim)
         )
     ):
         raise TypeError(
@@ -177,7 +181,7 @@ def _validate_single_array_metadata(
 
 
 def _validate_arrays_meta(
-        arrays_metadata: Mapping[str, Mapping[str, Any]],
+    arrays_metadata: Mapping[str, Mapping[str, Any]],
 ) -> dict[str, dict[str, Any]]:
     """
     Validate and normalize the ``arrays_metadata`` argument.
@@ -365,7 +369,12 @@ class Bridge:
         ]
         self.system_metadata = _validate_system_meta(system_metadata)
 
-        init_gloo(system_metadata["world_size"], self.bridge_id, system_metadata["master_address"], system_metadata["master_port"])
+        init_gloo(
+            system_metadata["world_size"],
+            self.bridge_id,
+            system_metadata["master_address"],
+            system_metadata["master_port"],
+        )
         # sync point
 
         if not ray.is_initialized():

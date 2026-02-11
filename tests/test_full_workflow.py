@@ -32,11 +32,11 @@ def head_script(enable_distributed_scheduling, nb_nodes) -> None:
 @pytest.mark.parametrize(
     "nb_nodes, enable_distributed_scheduling",
     [
-        #(1, True),
-        #(2, True),
+        # (1, True),
+        # (2, True),
         (4, True),
-        #(1, False),
-        #(2, False),
+        # (1, False),
+        # (2, False),
         (4, False),
     ],
 )

@@ -42,7 +42,6 @@ def simple_worker(
 ) -> None:
     """Worker node sending chunks of data"""
     from deisa.ray.bridge import Bridge
-    from deisa.ray.utils import get_system_metadata
 
     if isinstance(array_name, str):
         array_name = [array_name]
@@ -89,7 +88,6 @@ def simple_worker_error_test(
 ) -> None:
     """Worker node sending chunks of data"""
     from deisa.ray.bridge import Bridge
-    from deisa.ray.utils import get_system_metadata
 
     sys_md = {"world_size": nb_nodes, "master_address": "127.0.0.1", "master_port": 29500}
     arrays_md = {

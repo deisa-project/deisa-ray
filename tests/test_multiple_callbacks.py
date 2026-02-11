@@ -67,7 +67,7 @@ def test_multiple_callbacks(enable_distributed_scheduling: bool, ray_cluster) ->
                 nb_iterations=NB_ITERATIONS,
                 node_id=f"node_{rank}",
                 array_name=["array", "array1"],
-                nb_nodes=16
+                nb_nodes=16,
             )
         )
 
@@ -125,7 +125,7 @@ def test_multiple_callbacks_decorator(enable_distributed_scheduling: bool, ray_c
                 nb_iterations=NB_ITERATIONS,
                 node_id=f"node_{rank}",
                 array_name=["array", "array1"],
-                nb_nodes = 16
+                nb_nodes=16,
             )
         )
 

@@ -117,8 +117,6 @@ def test_actor_placement(enable_distributed_scheduling, ray_multinode_cluster):
         scheduling_strategy=NodeAffinitySchedulingStrategy(node_id=worker_node_id, soft=False),
     )
     def make_client_and_return_ids():
-        from deisa.ray.utils import get_system_metadata
-
         arrays_md = {
             "array": {
                 "chunk_shape": (1, 1),

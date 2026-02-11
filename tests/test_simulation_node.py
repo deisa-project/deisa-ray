@@ -10,7 +10,7 @@ from deisa.ray.types import RayActorHandle
 from tests.stubs import StubSchedulingActor
 
 from deisa.ray.bridge import Bridge
-from deisa.ray.utils import get_system_metadata
+
 
 def _actor_names_by_prefix(prefix="sched-"):
     actors = list_actors(filters=[("state", "=", "ALIVE")])
@@ -21,6 +21,7 @@ def _actor_names_by_prefix(prefix="sched-"):
         if name and ns == "deisa_ray" and name.startswith(prefix):
             names.append(name)
     return set(names)
+
 
 arrays_md = {
     "array": {
@@ -58,11 +59,7 @@ def test_init_race_free(nb_nodes, ray_cluster, monkeypatch):
     monkeypatch.setattr("deisa.ray.bridge.dist.barrier", lambda *a, **k: None)
 
     ranks_per_node = 10
-    fake_node_ids = [
-        f"FAKE-NODE-{n + 1}"
-        for _ in range(ranks_per_node)
-        for n in range(nb_nodes)
-    ]
+    fake_node_ids = [f"FAKE-NODE-{n + 1}" for _ in range(ranks_per_node) for n in range(nb_nodes)]
 
     world_size = len(fake_node_ids)
 

@@ -1,14 +1,14 @@
-#import time
-#import dask.array as da
-#import pytest
-#import ray
-#import numpy as np
-#from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
-#from ray.cluster_utils import Cluster
-#from deisa.ray.types import DeisaArray
+# import time
+# import dask.array as da
+# import pytest
+# import ray
+# import numpy as np
+# from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
+# from ray.cluster_utils import Cluster
+# from deisa.ray.types import DeisaArray
 #
-#@pytest.fixture
-#def ray_multinode_cluster():
+# @pytest.fixture
+# def ray_multinode_cluster():
 #
 #    cluster = Cluster(
 #        initialize_head=True,
@@ -36,10 +36,10 @@
 #    ray.shutdown()
 #    cluster.shutdown()
 #
-#NAMESPACE = "deisa_ray"
+# NAMESPACE = "deisa_ray"
 #
-#@pytest.mark.parametrize("sleep_t", [30])
-#def test_sim_start_first_and_analytics_after_x_secs(ray_multinode_cluster, sleep_t):
+# @pytest.mark.parametrize("sleep_t", [30])
+# def test_sim_start_first_and_analytics_after_x_secs(ray_multinode_cluster, sleep_t):
 #    cluster = ray_multinode_cluster["cluster"]
 #    head_node_id = None
 #    worker_nodes = []
@@ -128,8 +128,8 @@
 #    assert ray.get(ref_analytics) == True
 #
 #
-#@pytest.mark.parametrize("sleep_t", [30])
-#def test_analytics_start_first_and_sim_after_x_secs(ray_multinode_cluster, sleep_t):
+# @pytest.mark.parametrize("sleep_t", [30])
+# def test_analytics_start_first_and_sim_after_x_secs(ray_multinode_cluster, sleep_t):
 #    cluster = ray_multinode_cluster["cluster"]
 #    head_node_id = None
 #    worker_nodes = []
@@ -217,7 +217,7 @@
 #        assert n_id == worker_nodes[i]
 #    assert ray.get(ref_analytics) == True
 #
-#def test_analytics_raise_if_not_enough_actors_connect(ray_multinode_cluster):
+# def test_analytics_raise_if_not_enough_actors_connect(ray_multinode_cluster):
 #    with pytest.raises(RuntimeError):
 #        cluster = ray_multinode_cluster["cluster"]
 #        head_node_id = None
@@ -310,7 +310,7 @@
 #
 ## TODO window handler raises runtime error but also on bridge the Bridge becomes null
 ## we need one path of decision.
-#def test_analytics_raise_if_too_many_actors_connect(ray_multinode_cluster):
+# def test_analytics_raise_if_too_many_actors_connect(ray_multinode_cluster):
 #    with pytest.raises(RuntimeError):
 #        cluster = ray_multinode_cluster["cluster"]
 #        head_node_id = None
