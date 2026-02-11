@@ -3,7 +3,7 @@ import ray
 import numpy as np
 
 from deisa.ray.types import DeisaArray
-from tests.utils import ray_cluster, simple_worker, wait_for_head_node  # noqa: F401
+from tests.utils import ray_cluster, simple_worker, wait_for_head_node, pick_free_port  # noqa: F401
 
 NB_ITERATIONS = 10
 
@@ -43,6 +43,7 @@ def head_script(enable_distributed_scheduling) -> None:
 def test_deisa_ray(nb_nodes: int, enable_distributed_scheduling, ray_cluster) -> None:  # noqa: F811
     head_ref = head_script.remote(enable_distributed_scheduling)
     wait_for_head_node()
+    port = pick_free_port()
 
     worker_refs = []
     for rank in range(4):
@@ -56,6 +57,7 @@ def test_deisa_ray(nb_nodes: int, enable_distributed_scheduling, ray_cluster) ->
                 nb_iterations=NB_ITERATIONS,
                 node_id=f"node_{rank % nb_nodes}",
                 nb_nodes=4,
+                port=port,
             )
         )
 

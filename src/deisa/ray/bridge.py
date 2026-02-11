@@ -6,10 +6,8 @@ top of Ray.
 """
 
 from __future__ import annotations
-
 import logging
-from typing import Any, Dict, Mapping
-
+from typing import Any, Dict, Mapping, Optional
 import numpy as np
 import ray
 from ray.actor import ActorClass
@@ -17,223 +15,12 @@ from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 from deisa.ray.scheduling_actor import SchedulingActor as _RealSchedulingActor
 from deisa.ray.types import RayActorHandle
 from deisa.ray.errors import _default_exception_handler
-import datetime
+from deisa.ray.comm import Comm, init_gloo_comm
+from deisa.ray.validate import _validate_arrays_meta, _validate_system_meta
+from deisa.ray.utils import get_node_actor_options
 import torch.distributed as dist
 
 logger = logging.getLogger(__name__)
-
-
-def init_gloo(
-    world_size: int, rank: int, master_addr: str = "127.0.0.1", master_port: int = 29500, timeout_s: int = 120
-):
-    timeout = datetime.timedelta(seconds=timeout_s)
-
-    # Rank 0 hosts the rendezvous store; everyone else connects.
-    store = dist.TCPStore(
-        host_name=master_addr,
-        port=master_port,
-        world_size=world_size,
-        is_master=(rank == 0),
-        timeout=timeout,
-        wait_for_workers=True,  # optional; OK to leave default
-    )
-
-    dist.init_process_group(
-        backend="gloo",
-        store=store,
-        world_size=world_size,
-        rank=rank,
-        timeout=timeout,
-    )
-    return store
-
-
-def get_node_actor_options(name: str, namespace: str) -> Dict[str, Any]:
-    """Return Ray options used to create (or get) a node scheduling actor.
-
-    Parameters
-    ----------
-    name : str
-        Actor name to use for the node actor.
-    namespace : str
-        Ray namespace where the actor will live.
-
-    Returns
-    -------
-    dict
-        Dictionary of options to be passed to ``SchedulingActor.options``.
-
-    Notes
-    -----
-    The options use ``get_if_exists=True`` to avoid race conditions when
-    several bridges on the same node attempt to create the same actor.
-    The actor is configured with:
-
-    - ``lifetime='detached'`` so it survives the creating task
-    - ``num_cpus=0`` so it does not reserve CPU resources
-    - a very large ``max_concurrency`` because the actor is async-only
-      and used mainly as a coordination point.
-    """
-    return {
-        "name": name,
-        "namespace": namespace,
-        "lifetime": "detached",
-        "get_if_exists": True,
-        # WARNING: if not using async actor this will make OS try to spawn many threads
-        # and blow everything up. Scheduling actors need to be async because of this.
-        "max_concurrency": 1_000_000_000,
-        "num_cpus": 0,
-        "enable_task_events": False,
-    }
-
-
-def _validate_system_meta(system_meta: Mapping[str, Any]) -> dict[str, Any]:
-    """
-    Validate and normalize the ``system_metadata`` argument.
-
-    Parameters
-    ----------
-    system_meta : Mapping[str, Any]
-        User-provided system-level metadata.
-
-    Returns
-    -------
-    dict[str, Any]
-        A shallow-copied version of the input mapping.
-
-    Raises
-    ------
-    TypeError
-        If ``system_meta`` is not a mapping.
-    """
-    if not isinstance(system_meta, Mapping):
-        raise TypeError(f"system_metadata must be a mapping, got {type(system_meta).__name__}")
-    return dict(system_meta)
-
-
-def _validate_single_array_metadata(
-    name: str,
-    meta: Mapping[str, Any],
-) -> None:
-    """
-    Validate metadata for a single array entry.
-
-    Parameters
-    ----------
-    name : str
-        Array name.
-    meta : Mapping[str, Any]
-        Metadata for this array. Must contain at least:
-
-        - ``chunk_shape``: sequence of positive ints
-        - ``nb_chunks_per_dim``: sequence of positive ints
-        - ``nb_chunks_of_node``: positive int
-        - ``dtype``: NumPy dtype or anything accepted by ``np.dtype``
-        - ``chunk_position``: sequence of ints of same length as
-          ``chunk_shape``
-
-    Raises
-    ------
-    TypeError
-        If any field has an invalid type.
-    ValueError
-        If shapes/positions have inconsistent lengths.
-    """
-    # chunk_shape: tuple/list of positive ints
-    chunk_shape = meta["chunk_shape"]
-    if not (isinstance(chunk_shape, (tuple, list)) and all(isinstance(n, int) and n > 0 for n in chunk_shape)):
-        raise TypeError(
-            f"arrays_metadata['{name}']['chunk_shape'] must be a sequence of positive ints, got {chunk_shape!r}"
-        )
-
-    # nb_chunks_per_dim: same pattern
-    nb_chunks_per_dim = meta["nb_chunks_per_dim"]
-    if not (
-        isinstance(nb_chunks_per_dim, (tuple, list)) and all(isinstance(n, int) and n > 0 for n in nb_chunks_per_dim)
-    ):
-        raise TypeError(
-            f"arrays_metadata['{name}']['nb_chunks_per_dim'] must be a "
-            f"sequence of positive ints, got {nb_chunks_per_dim!r}"
-        )
-
-    # nb_chunks_of_node: positive int
-    nb_chunks_of_node = meta["nb_chunks_of_node"]
-    if not (isinstance(nb_chunks_of_node, int) and nb_chunks_of_node > 0):
-        raise TypeError(
-            f"arrays_metadata['{name}']['nb_chunks_of_node'] must be a positive int, "
-            f"got {type(meta['nb_chunks_of_node']).__name__}"
-        )
-
-    # chunk_position: sequence of ints of same length as chunk_shape (optional)
-    chunk_position = meta["chunk_position"]
-    if not (
-        isinstance(chunk_position, (tuple, list))
-        and all(
-            isinstance(pos, int) and 0 <= pos < nb_chunks for pos, nb_chunks in zip(chunk_position, nb_chunks_per_dim)
-        )
-    ):
-        raise TypeError(
-            f"arrays_metadata['{name}']['chunk_position'] must be a sequence of ints, got {chunk_position!r}"
-        )
-
-    if len(chunk_position) != len(meta["chunk_shape"]):
-        raise ValueError(f"arrays_metadata['{name}']['chunk_position'] must have the same length as 'chunk_shape'")
-
-
-def _validate_arrays_meta(
-    arrays_metadata: Mapping[str, Mapping[str, Any]],
-) -> dict[str, dict[str, Any]]:
-    """
-    Validate and normalize the ``arrays_metadata`` argument.
-
-    Parameters
-    ----------
-    arrays_metadata : Mapping[str, Mapping[str, Any]]
-        User-provided metadata for all arrays handled by this bridge.
-
-    Returns
-    -------
-    dict[str, dict[str, Any]]
-        A shallow-copied and validated version of the input mapping.
-
-    Raises
-    ------
-    TypeError
-        If the top-level mapping, keys or values have incorrect types.
-    ValueError
-        If required keys are missing for any array.
-    """
-    if not isinstance(arrays_metadata, Mapping):
-        raise TypeError(f"arrays_metadata must be a mapping from str to dict, got {type(arrays_metadata).__name__}")
-
-    required_keys = {
-        "chunk_shape",
-        "nb_chunks_per_dim",
-        "nb_chunks_of_node",
-        "dtype",
-        "chunk_position",
-    }
-
-    validated: dict[str, dict[str, Any]] = {}
-
-    for array_name, meta in arrays_metadata.items():
-        # key type
-        if not isinstance(array_name, str):
-            raise TypeError(f"arrays_metadata keys must be str, got {type(array_name).__name__}")
-
-        # value type
-        if not isinstance(meta, Mapping):
-            raise TypeError(f"arrays_metadata['{array_name}'] must be a mapping, got {type(meta).__name__}")
-
-        # required keys present?
-        missing = required_keys - meta.keys()
-        if missing:
-            raise ValueError(f"arrays_metadata['{array_name}'] is missing required keys: {missing}")
-
-        _validate_single_array_metadata(array_name, meta)
-        validated[array_name] = dict(meta)
-
-    return validated
 
 
 class Bridge:
@@ -307,10 +94,12 @@ class Bridge:
         bridge_id: int,
         arrays_metadata: Mapping[str, Mapping[str, Any]],
         system_metadata: Mapping[str, Any],
+        comm: Optional[Comm] = None,
         *,
         _node_id: str | None = None,
         scheduling_actor_cls: ActorClass = _RealSchedulingActor,
         _init_retries: int = 3,
+        _comm_timeout: Optional[int] = None,
     ) -> None:
         """
         Initialize the Bridge to connect MPI rank to Ray cluster.
@@ -368,14 +157,32 @@ class Bridge:
             list(self.arrays_metadata.keys())[0]
         ]
         self.system_metadata = _validate_system_meta(system_metadata)
+        self._comm_timeout = 120 if _comm_timeout is None else int(_comm_timeout)
+        if self._comm_timeout <= 0:
+            raise ValueError(f"_comm_timeout must be > 0 seconds, got {self._comm_timeout}")
 
-        init_gloo(
-            system_metadata["world_size"],
-            self.bridge_id,
-            system_metadata["master_address"],
-            system_metadata["master_port"],
-        )
-        # sync point
+        if comm is None:
+            try:
+                comm = init_gloo_comm(
+                    system_metadata["world_size"],
+                    self.bridge_id,
+                    system_metadata["master_address"],
+                    system_metadata["master_port"],
+                    self._comm_timeout,
+                )
+            except dist.DistStoreError as e:
+                e.add_note(
+                    "Gloo rendezvous timeout.\n"
+                    f"Rank: {self.bridge_id}\n"
+                    f"Expected world size: {self.system_metadata['world_size']}\n"
+                    f"Master: {self.system_metadata['master_address']}:{self.system_metadata['master_port']}\n"
+                    "Not all Bridge processes connected before the deadline.\n"
+                    "This usually indicates that one or more Bridge instances crashed, "
+                    "never started, or are blocked during initialization."
+                )
+                raise
+
+        self.comm = comm
 
         if not ray.is_initialized():
             ray.init(address="auto", log_to_driver=False, logging_level=logging.ERROR)
@@ -399,8 +206,10 @@ class Bridge:
         self._exchange_chunks_meta_with_node_actor()
         # make sure node actor is ready
         ray.get(self.node_actor.ready.remote())
+
         # barrier to make sure that all ranks have reached this point
-        dist.barrier()
+        self.comm.barrier()
+
         # after this function returns we are sure that
         # 1. analytics have started
         # 2. head actor is created

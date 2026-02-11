@@ -3,6 +3,15 @@ import time
 import numpy as np
 import pytest
 import ray
+import socket
+
+
+def pick_free_port():
+    s = socket.socket()
+    s.bind(("127.0.0.1", 0))
+    port = s.getsockname()[1]
+    s.close()
+    return port
 
 
 # @pytest.fixture(scope = "session")
@@ -35,6 +44,7 @@ def simple_worker(
     chunk_size: tuple[int, ...],
     nb_iterations: int,
     nb_nodes: int,
+    port: int,
     node_id: str | None = None,
     array_name: str | list[str] = "array",
     dtype: np.dtype = np.int32,  # type: ignore
@@ -48,7 +58,7 @@ def simple_worker(
 
     start_iteration = kwargs.get("start_iteration", 0)
 
-    sys_md = {"world_size": nb_nodes, "master_address": "127.0.0.1", "master_port": 29500}
+    sys_md = {"world_size": nb_nodes, "master_address": "127.0.0.1", "master_port": port}
     arrays_md = {
         name: {
             "chunk_shape": chunk_size,
@@ -82,6 +92,7 @@ def simple_worker_error_test(
     chunk_size: tuple[int, ...],
     nb_iterations: int,
     nb_nodes: int,
+    port: int,
     node_id: str | None = None,
     array_name: str = "array",
     dtype: np.dtype = np.int32,  # type: ignore
@@ -89,7 +100,7 @@ def simple_worker_error_test(
     """Worker node sending chunks of data"""
     from deisa.ray.bridge import Bridge
 
-    sys_md = {"world_size": nb_nodes, "master_address": "127.0.0.1", "master_port": 29500}
+    sys_md = {"world_size": nb_nodes, "master_address": "127.0.0.1", "master_port": port}
     arrays_md = {
         array_name: {
             "chunk_shape": chunk_size,

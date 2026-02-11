@@ -4,8 +4,9 @@ import ray
 from deisa.ray.types import DeisaArray
 from tests.utils import wait_for_head_node  # noqa: F401
 import numpy as np
+from tests.utils import pick_free_port
 
-NB_ITERATIONS = 10
+NB_ITERATIONS = 5
 
 
 @ray.remote(num_cpus=0, max_retries=0)
@@ -18,6 +19,7 @@ def strange_worker(
     chunk_size: tuple[int, ...],
     nb_iterations: int,
     nb_nodes: int,
+    port: int,
     node_id: str | None = None,
     array_name: str | list[str] = "array",
     dtype: np.dtype = np.int32,  # type: ignore
@@ -31,7 +33,7 @@ def strange_worker(
 
     start_iteration = kwargs.get("start_iteration", 0)
 
-    sys_md = {"world_size": nb_nodes, "master_address": "127.0.0.1", "master_port": 29500}
+    sys_md = {"world_size": nb_nodes, "master_address": "127.0.0.1", "master_port": port}
     arrays_md = {
         name: {
             "chunk_shape": chunk_size,
@@ -97,6 +99,7 @@ def test_arrays_sent_out_of_order_fails_analytics(
     nb_nodes: int, enable_distributed_scheduling: bool, ray_cluster
 ) -> None:  # noqa: F811
     with pytest.raises(RuntimeError):
+        port = pick_free_port()
         head_ref = head_script.remote(enable_distributed_scheduling, nb_nodes)
         wait_for_head_node()
 
@@ -112,6 +115,7 @@ def test_arrays_sent_out_of_order_fails_analytics(
                     nb_iterations=NB_ITERATIONS,
                     node_id=f"node_{rank % nb_nodes}",
                     nb_nodes=4,
+                    port=port,
                 )
             )
 

@@ -8,8 +8,9 @@ import numpy as np
 from ray.util.state import list_actors
 from deisa.ray.types import RayActorHandle
 from tests.stubs import StubSchedulingActor
-
 from deisa.ray.bridge import Bridge
+from deisa.ray.comm import NoOpComm
+from tests.utils import pick_free_port
 
 
 def _actor_names_by_prefix(prefix="sched-"):
@@ -34,16 +35,16 @@ arrays_md = {
 }
 
 
-def test_init(ray_cluster, monkeypatch):
+def test_init(ray_cluster):
     fake_node_id = "FAKE-NODE-1"
-    sys_md = {"world_size": 1, "master_address": "127.0.0.1", "master_port": 29500}
-    monkeypatch.setattr("deisa.ray.bridge.init_gloo", lambda *a, **k: None)
-    monkeypatch.setattr("deisa.ray.bridge.dist.barrier", lambda *a, **k: None)
+    port = pick_free_port()
+    sys_md = {"world_size": 1, "master_address": "127.0.0.1", "master_port": port}
     c = Bridge(
         bridge_id=0,
         arrays_metadata=arrays_md,
         system_metadata=sys_md,
         _node_id=fake_node_id,
+        comm=NoOpComm(0, 1),
         scheduling_actor_cls=StubSchedulingActor,
     )
     assert c.node_id == fake_node_id
@@ -52,29 +53,29 @@ def test_init(ray_cluster, monkeypatch):
 
 
 @pytest.mark.parametrize("nb_nodes", [1, 2, 4])
-def test_init_race_free(nb_nodes, ray_cluster, monkeypatch):
+def test_init_race_free(nb_nodes, ray_cluster):
     # IMPORTANT: torch.distributed cannot be initialized from multiple threads in one process.
     # This test is about Ray actor init race-freedom, so stub gloo init and dist barrier
-    monkeypatch.setattr("deisa.ray.bridge.init_gloo", lambda *a, **k: None)
-    monkeypatch.setattr("deisa.ray.bridge.dist.barrier", lambda *a, **k: None)
 
     ranks_per_node = 10
-    fake_node_ids = [f"FAKE-NODE-{n + 1}" for _ in range(ranks_per_node) for n in range(nb_nodes)]
+    port = pick_free_port()
+    fake_node_ids = [(f"FAKE-NODE-{n + 1}", port) for _ in range(ranks_per_node) for n in range(nb_nodes)]
 
     world_size = len(fake_node_ids)
 
     def _mk(args):
-        rank, node_id = args
+        rank, (node_id, port) = args
         sys_md = {
             "world_size": world_size,
             "master_address": "127.0.0.1",
-            "master_port": 29500,
+            "master_port": port,
         }
         Bridge(
             bridge_id=rank,  # IMPORTANT: unique rank per simulated process
             arrays_metadata=arrays_md,
             system_metadata=sys_md,
             _node_id=node_id,
+            comm=NoOpComm(rank, world_size),
             scheduling_actor_cls=StubSchedulingActor,
         )
         return True
@@ -91,19 +92,19 @@ def test_init_race_free(nb_nodes, ray_cluster, monkeypatch):
     assert len(names) == nb_nodes
 
 
-def test_actor_dies_and_client_recovers(ray_cluster, monkeypatch):
+def test_actor_dies_and_client_recovers(ray_cluster):
     # NOTE: not sure needed because client init happens just once at the beginning.
-    monkeypatch.setattr("deisa.ray.bridge.init_gloo", lambda *a, **k: None)
-    monkeypatch.setattr("deisa.ray.bridge.dist.barrier", lambda *a, **k: None)
     fake_node_id = "CRASHY-NODE"
+    port = pick_free_port()
 
     # First client brings up the actor
-    sys_md = {"world_size": 1, "master_address": "127.0.0.1", "master_port": 29500}
+    sys_md = {"world_size": 1, "master_address": "127.0.0.1", "master_port": port}
     Bridge(
         bridge_id=0,
         arrays_metadata=arrays_md,
         system_metadata=sys_md,
         _node_id=fake_node_id,
+        comm=NoOpComm(0, 1),
         scheduling_actor_cls=StubSchedulingActor,
     )
     # Find the actor handle and kill it
@@ -117,6 +118,7 @@ def test_actor_dies_and_client_recovers(ray_cluster, monkeypatch):
         system_metadata=sys_md,
         _node_id=fake_node_id,
         scheduling_actor_cls=StubSchedulingActor,
+        comm=NoOpComm(0, 1),
         _init_retries=5,
     )
 
