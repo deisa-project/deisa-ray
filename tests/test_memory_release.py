@@ -5,7 +5,7 @@ import pytest
 import ray
 
 from deisa.ray.types import DeisaArray
-from tests.utils import ray_cluster, simple_worker, wait_for_head_node  # noqa: F401
+from tests.utils import ray_cluster, simple_worker, wait_for_head_node, pick_free_port  # noqa: F401
 
 NB_ITERATIONS = 100  # Should be enough to saturate the memory in case the chunks are not released
 
@@ -20,7 +20,7 @@ def head_script(enable_distributed_scheduling) -> None:
 
     deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
 
-    d = Deisa(n_sim_nodes=1)
+    d = Deisa()
 
     def simulation_callback(array: list[DeisaArray]):
         pass
@@ -50,6 +50,7 @@ def test_memory_release(enable_distributed_scheduling, ray_spilling_cluster: str
     """
     head_ref = head_script.remote(enable_distributed_scheduling)
     wait_for_head_node()
+    port = pick_free_port()
 
     worker = simple_worker.remote(
         rank=0,
@@ -58,6 +59,8 @@ def test_memory_release(enable_distributed_scheduling, ray_spilling_cluster: str
         nb_chunks_of_node=1,
         chunk_size=(1024, 1024),
         nb_iterations=NB_ITERATIONS,
+        nb_nodes=1,
+        port=port,
     )
 
     ray.get([head_ref, worker])

@@ -1,9 +1,47 @@
 import random
 import time
-from typing import Dict
-
+from typing import Dict, Any
 import ray
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
+
+
+def get_node_actor_options(name: str, namespace: str) -> Dict[str, Any]:
+    """Return Ray options used to create (or get) a node scheduling actor.
+
+    Parameters
+    ----------
+    name : str
+        Actor name to use for the node actor.
+    namespace : str
+        Ray namespace where the actor will live.
+
+    Returns
+    -------
+    dict
+        Dictionary of options to be passed to ``SchedulingActor.options``.
+
+    Notes
+    -----
+    The options use ``get_if_exists=True`` to avoid race conditions when
+    several bridges on the same node attempt to create the same actor.
+    The actor is configured with:
+
+    - ``lifetime='detached'`` so it survives the creating task
+    - ``num_cpus=0`` so it does not reserve CPU resources
+    - a very large ``max_concurrency`` because the actor is async-only
+      and used mainly as a coordination point.
+    """
+    return {
+        "name": name,
+        "namespace": namespace,
+        "lifetime": "detached",
+        "get_if_exists": True,
+        # WARNING: if not using async actor this will make OS try to spawn many threads
+        # and blow everything up. Scheduling actors need to be async because of this.
+        "max_concurrency": 1_000_000_000,
+        "num_cpus": 0,
+        "enable_task_events": False,
+    }
 
 
 def get_system_metadata() -> Dict:

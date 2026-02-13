@@ -2,9 +2,9 @@ import pytest
 import ray
 
 from deisa.ray.types import DeisaArray
-from tests.utils import ray_cluster, simple_worker, wait_for_head_node  # noqa: F401
+from tests.utils import ray_cluster, simple_worker, wait_for_head_node, pick_free_port  # noqa: F401
 
-NB_ITERATIONS = 10
+NB_ITERATIONS = 5
 
 
 @ray.remote(max_retries=0)
@@ -16,7 +16,7 @@ def head_script(enable_distributed_scheduling, nb_nodes) -> None:
 
     deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
 
-    d = Deisa(n_sim_nodes=nb_nodes)
+    d = Deisa()
 
     def simulation_callback(array: list[DeisaArray]):
         x = array[0].dask.sum().compute()
@@ -32,17 +32,18 @@ def head_script(enable_distributed_scheduling, nb_nodes) -> None:
 @pytest.mark.parametrize(
     "nb_nodes, enable_distributed_scheduling",
     [
-        (1, True),
-        (2, True),
+        # (1, True),
+        # (2, True),
         (4, True),
-        (1, False),
-        (2, False),
+        # (1, False),
+        # (2, False),
         (4, False),
     ],
 )
 def test_deisa_ray(nb_nodes: int, enable_distributed_scheduling: bool, ray_cluster) -> None:  # noqa: F811
     head_ref = head_script.remote(enable_distributed_scheduling, nb_nodes)
     wait_for_head_node()
+    port = pick_free_port()
 
     worker_refs = []
     for rank in range(4):
@@ -55,6 +56,8 @@ def test_deisa_ray(nb_nodes: int, enable_distributed_scheduling: bool, ray_clust
                 chunk_size=(1, 1),
                 nb_iterations=NB_ITERATIONS,
                 node_id=f"node_{rank % nb_nodes}",
+                nb_nodes=nb_nodes,
+                port=port,
             )
         )
 

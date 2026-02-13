@@ -1,7 +1,7 @@
 from collections import deque
 import gc
 import logging
-from typing import Any, Callable, Hashable, List, Optional
+from typing import Any, Callable, Hashable, List, Optional, Literal
 
 import dask
 from deisa.core.interface import SupportsSlidingWindow
@@ -22,53 +22,34 @@ from deisa.ray.types import (
 from deisa.ray.utils import get_head_actor_options
 
 
+def _ray_start_impl() -> None:
+    if not ray.is_initialized():
+        ray.init(address="auto", log_to_driver=False, logging_level=logging.ERROR)
+
+
 class Deisa:
     def __init__(
         self,
-        n_sim_nodes: int,
         *,
         ray_start: Optional[Callable[[], None]] = None,
-        handshake: Optional[Callable[["Deisa"], None]] = None,
         max_simulation_ahead: int = 1,
     ) -> None:
         # cheap constructor: no Ray side effects
         config.lock()
-        self.n_sim_nodes = n_sim_nodes
-
         self._experimental_distributed_scheduling_enabled = config.experimental_distributed_scheduling_enabled
 
         # Do NOT mutate global config here if you want cheap unit tests;
         # do it when connecting, or inject it similarly.
-        self._ray_start = ray_start or self._ray_start_impl
-        self._handshake = handshake or self._handshake_impl
+        self._ray_start = ray_start or _ray_start_impl
 
+        self.needed_arrays = set()
         self._connected = False
         self.node_actors: dict[ActorID, RayActorHandle] = {}
         self.registered_callbacks: list[_CallbackConfig] = []
         self.queue_per_array: dict[str, deque]
         self.max_simulation_ahead: int = max_simulation_ahead
         self.has_new_timestep: dict[str, bool] = {}
-
-    def _handshake_impl(self) -> None:
-        """
-        Implementation for handshake between window handler (Deisa) and the Simulation side Bridges.
-
-        The handshake occurs when all the expected Ray Node Actors are connected.
-
-        :param self: Description
-        :param _: Description
-        :type _: "Deisa"
-        """
-        # TODO :finish and add this config option to Deisa use get_connection_info
-        from ray.util.state import list_actors
-
-        expected_ray_actors = self.n_sim_nodes
-        connected_actors = 0
-        while connected_actors < expected_ray_actors:
-            connected_actors = 0
-            for a in list_actors(filters=[("state", "=", "ALIVE")]):
-                if a.get("ray_namespace") == "deisa_ray":
-                    connected_actors += 1
+        self.queue_per_array = {}
 
     def _ensure_connected(self) -> None:
         """
@@ -95,28 +76,45 @@ class Deisa:
 
         # head is created
         self._create_head_actor()
-        # readyness gate for head actor - only return when its alive
+        # readiness gate for head actor - only return when its alive
         ray.get(
             self.head.exchange_config.remote(
                 {"experimental_distributed_scheduling_enabled": self._experimental_distributed_scheduling_enabled}
             )
         )
-
         self._connected = True
 
     def _create_head_actor(self) -> None:
-        self.head = HeadNodeActor.options(**get_head_actor_options()).remote(self.max_simulation_ahead)
+        self.head = HeadNodeActor.options(**get_head_actor_options()).remote(
+            max_simulation_ahead=self.max_simulation_ahead
+        )
 
-    def _ray_start_impl(self) -> None:
-        if not ray.is_initialized():
-            ray.init(address="auto", log_to_driver=False, logging_level=logging.ERROR)
+    def callback(self, *window_specs):
+        """
+        Decorator for easy registration
+
+        Parameters
+        ----------
+        window_specs: tuple of WindowSpec descriptions
+
+        Returns
+        -------
+        returns decorator.
+
+        """
+
+        def deco(fn):
+            return self.register_callback(fn, list(window_specs))
+
+        return deco
 
     def register_callback(
         self,
         simulation_callback: SupportsSlidingWindow.Callback,
-        arrays_description: list[WindowSpec],
+        arrays_spec: list[WindowSpec],
         exception_handler: Optional[SupportsSlidingWindow.ExceptionHandler] = None,
-    ) -> None:
+        when: Literal["AND", "OR"] = "AND",
+    ) -> SupportsSlidingWindow.Callback:
         """
         Register the analytics callback and array descriptions.
 
@@ -125,23 +123,29 @@ class Deisa:
         simulation_callback : Callable
             Function to run for each iteration; receives arrays as kwargs
             and ``timestep``.
-        arrays_description : list[WindowSpec]
+        arrays_spec : list[WindowSpec]
             Descriptions of arrays to stream to the callback (with optional
             sliding windows).
             Maximum iterations to execute. Default is a large sentinel.
+        exception_handler : Callable(e: Exception)
+            Exception handler to handle any exception thrown by simulation (like division by zero).
+            Default to print error and go to next iteration.
+        when : Literal['AND', 'OR']
+            When callback have multiple arrays, govern when callback should be called.
+            `AND`: only call callback if ALL required arrays have been shared for a given timestep.
+            `OR`: call callback if ANY array has been shared for a given timestep.
         """
         self._ensure_connected()  # connect + handshake before accepting callbacks
         cfg = _CallbackConfig(
             simulation_callback=simulation_callback,
-            arrays_description=arrays_description,
+            arrays_description=arrays_spec,
             exception_handler=exception_handler or _default_exception_handler,
+            when=when,
         )
         self.registered_callbacks.append(cfg)
-
-        # TODO make head node take the entire type
-        head_arrays_description = [definition.name for definition in arrays_description]
-
-        ray.get(self.head.register_arrays.remote(head_arrays_description))
+        array_names = [spec.name for spec in arrays_spec]
+        self.needed_arrays.update(array_names)
+        return simulation_callback
 
     def unregister_callback(
         self,
@@ -163,12 +167,11 @@ class Deisa:
         raise NotImplementedError("method not yet implemented.")
 
     def generate_queue_per_array(self):
-        self.queue_per_array = {}
         for cb_cfg in self.registered_callbacks:
             description = cb_cfg.arrays_description
-            for arraydef in description:
-                name = arraydef.name
-                window_size: int = arraydef.window_size if arraydef.window_size is not None else 2
+            for array_def in description:
+                name = array_def.name
+                window_size: int = array_def.window_size if array_def.window_size is not None else 2
 
                 if name in self.queue_per_array:
                     if self.queue_per_array[name].maxlen < window_size:
@@ -178,7 +181,6 @@ class Deisa:
                 else:
                     self.queue_per_array[name] = deque(maxlen=window_size)
 
-    # TODO: introduce a method that will generate the final array spec for each registered array
     def execute_callbacks(
         self,
     ) -> None:
@@ -191,37 +193,59 @@ class Deisa:
         retrieval from the head actor, windowed
         array delivery, and garbage collection between iterations.
         """
+        # ensure connected to ray cluster
         self._ensure_connected()
 
-        head_arrays_description = ["__deisa_last_iteration_array"]
-        ray.get(self.head.register_arrays.remote(head_arrays_description))
+        # register special array that indicates end of sim.
+        self.needed_arrays.add("__deisa_last_iteration_array")
+        # register all arrays in one go
+        ray.get(self.head.register_arrays_needed_by_analytics.remote(self.needed_arrays))
+        # signal analytics ready to start
         ray.get(self.head.set_analytics_ready_for_execution.remote())
+        # ray.get(self.head.wait_for_bridges_ready.remote())
 
-        self._handshake()
-
+        # TODO: test
+        # raise error and kill analytics
         if not self.registered_callbacks:
             raise RuntimeError("Please register at least one callback before calling execute_callbacks()")
 
+        # generate one queue per array which cleanly handles the window size
         self.generate_queue_per_array()
 
-        # get first array just to kickstart the process and add to queue
-        name, timestep, array = ray.get(self.head.get_next_array.remote())
-        self.queue_per_array[name].append(DeisaArray(dask=array, t=timestep))
+        # get first array to kickstart the process
+        # - Add to queue, mark as new timestep arrived
+        name, arr_timestep, array = ray.get(self.head.get_next_array.remote())
+        if name == "__deisa_last_iteration_array":
+            return
+
+        self.queue_per_array[name].append(DeisaArray(dask=array, t=arr_timestep))
         self.has_new_timestep[name] = True
 
         end_reached = False
         while not end_reached:
-            # get next available array
-            time = timestep
+            # inner while loop stops once a bigger timestep has been pushed to queue
+            # WARNING: Big assumption is that it is impossible for any array in timestep i+1 to be placed
+            # BEFORE timestep i. This is violated in embarrassingly parallel workflows where each rank can go ahead
+            # independently. Without this assumption, it would be much more complex to determine a good moment to analyze
+            # which callbacks should be called - as such, memory handling and flow execution become difficult to
+            # guarantee.
+            current_timestep = arr_timestep
             while True:
-                name, timestep, array = ray.get(self.head.get_next_array.remote())
+                name, arr_timestep, array = ray.get(self.head.get_next_array.remote())
+                # guarantee sequential flow of data.
+                # TODO add test
+                if arr_timestep < current_timestep:
+                    raise RuntimeError(
+                        f"Logical flow of data was violated. Timestep {arr_timestep} sent after timestep {current_timestep}. Exiting..."
+                    )
                 if name == "__deisa_last_iteration_array":
                     end_reached = True
                     break
-                if time < timestep:
+                # simulation has produced a higher timestep -> process all arrays for current_timestep
+                if arr_timestep > current_timestep:
                     break
 
-                self.queue_per_array[name].append(DeisaArray(dask=array, t=timestep))
+                self.queue_per_array[name].append(DeisaArray(dask=array, t=arr_timestep))
                 self.has_new_timestep[name] = True
 
             # inspect what callbacks can be called
@@ -229,8 +253,9 @@ class Deisa:
                 simulation_callback = cb_cfg.simulation_callback
                 description_arrays_needed = cb_cfg.arrays_description
                 exception_handler = cb_cfg.exception_handler
+                when = cb_cfg.when
 
-                should_call = self.should_call(description_arrays_needed)
+                should_call = self.should_call(description_arrays_needed, when)
                 if should_call:
                     # Compute the arrays to pass to the callback
                     callback_args: dict[str, List[DeisaArray]] = self.determine_callback_args(description_arrays_needed)
@@ -255,7 +280,7 @@ class Deisa:
 
             # add the first "bigger" timestep back into queue and set new_timestep flag
             if not end_reached:
-                self.queue_per_array[name].append(DeisaArray(dask=array, t=timestep))
+                self.queue_per_array[name].append(DeisaArray(dask=array, t=arr_timestep))
                 self.has_new_timestep[name] = True
 
     def determine_callback_args(self, description_of_arrays_needed) -> dict[str, List[DeisaArray]]:
@@ -270,19 +295,21 @@ class Deisa:
                 callback_args[name] = list(queue)[-window_size:]
         return callback_args
 
-    def should_call(self, description_of_arrays_needed) -> bool:
-        should_call = True
-        for description in description_of_arrays_needed:
-            should_call = should_call and self.has_new_timestep[description.name]
-        return should_call
+    def should_call(self, description_of_arrays_needed, when: Literal["AND", "OR"]) -> bool:
+        values = (self.has_new_timestep[description.name] for description in description_of_arrays_needed)
+        if when == "AND":
+            return all(values)
+        else:  # when == 'OR'
+            return any(values)
 
     # TODO add persist
-    def set(self, *args, key: Hashable, value: Any, chunked: bool = False, persist: bool = False, **kwargs) -> None:
+    def set(self, *, key: Hashable, value: Any, chunked: bool = False, persist: bool = False) -> None:
         """
         Broadcast a feedback value to all node actors.
 
         Parameters
         ----------
+        persist: whether val should persist
         key : Hashable
             Identifier for the shared value.
         value : Any

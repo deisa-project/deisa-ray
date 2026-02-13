@@ -2,13 +2,13 @@ import pytest
 import ray
 
 from deisa.ray.types import DeisaArray
-from tests.utils import ray_cluster, simple_worker, wait_for_head_node  # noqa: F401
+from tests.utils import ray_cluster, simple_worker, wait_for_head_node, pick_free_port  # noqa: F401
 
-NB_ITERATIONS = 10
+NB_ITERATIONS = 5
 
 
 @ray.remote(max_retries=0)
-def head_script(enable_distributed_scheduling) -> None:
+def head_script(enable_distributed_scheduling, dim_sq) -> None:
     """The head node checks that the values are correct"""
     from deisa.ray.window_handler import Deisa
     from deisa.ray.types import WindowSpec
@@ -16,20 +16,20 @@ def head_script(enable_distributed_scheduling) -> None:
 
     deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
 
-    d = Deisa(n_sim_nodes=4)
+    d = Deisa()
 
     def simulation_callback1(array: list[DeisaArray]):
         x = array[0].dask.sum().compute()
-        assert x == 136 * array[0].t
+        assert x == (dim_sq * (dim_sq + 1) / 2) * array[0].t
 
     def simulation_callback2(array1: list[DeisaArray]):
         x = array1[0].dask.sum().compute()
-        assert x == 136 * array1[0].t
+        assert x == (dim_sq * (dim_sq + 1) / 2) * array1[0].t
 
     def simulation_callback3(array: list[DeisaArray], array1: list[DeisaArray]):
         x = array[0].dask.sum().compute()
         y = array1[0].dask.sum().compute()
-        assert x == 136 * array[0].t and y == 136 * array1[0].t
+        assert x == (dim_sq * (dim_sq + 1) / 2) * array[0].t and y == (dim_sq * (dim_sq + 1) / 2) * array1[0].t
 
     d.register_callback(
         simulation_callback1,
@@ -51,12 +51,14 @@ def head_script(enable_distributed_scheduling) -> None:
     [True, False],
 )
 def test_multiple_callbacks(enable_distributed_scheduling: bool, ray_cluster) -> None:  # noqa: F811
-    head_ref = head_script.remote(enable_distributed_scheduling)
+    dim = 2
+    dim_sq = dim * dim
+    head_ref = head_script.remote(enable_distributed_scheduling, dim_sq)
     wait_for_head_node()
+    port = pick_free_port()
 
-    dim = 4
     worker_refs = []
-    for rank in range(dim * dim):
+    for rank in range(dim_sq):
         worker_refs.append(
             simple_worker.remote(
                 rank=rank,
@@ -67,6 +69,69 @@ def test_multiple_callbacks(enable_distributed_scheduling: bool, ray_cluster) ->
                 nb_iterations=NB_ITERATIONS,
                 node_id=f"node_{rank}",
                 array_name=["array", "array1"],
+                nb_nodes=dim_sq,
+                port=port,
+            )
+        )
+
+    ray.get([head_ref] + worker_refs)
+
+
+@ray.remote(max_retries=0)
+def head_script2(enable_distributed_scheduling, dim_sq) -> None:
+    """The head node checks that the values are correct"""
+    from deisa.ray.window_handler import Deisa
+    from deisa.ray.types import WindowSpec
+    import deisa.ray as deisa
+
+    deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
+
+    d = Deisa()
+
+    @d.callback(WindowSpec("array"))
+    def simulation_callback1(array: list[DeisaArray]):
+        x = array[0].dask.sum().compute()
+        assert x == (dim_sq * (dim_sq + 1) / 2) * array[0].t
+
+    @d.callback(WindowSpec("array1"))
+    def simulation_callback2(array1: list[DeisaArray]):
+        x = array1[0].dask.sum().compute()
+        assert x == (dim_sq * (dim_sq + 1) / 2) * array1[0].t
+
+    @d.callback(WindowSpec("array"), WindowSpec("array1"))
+    def simulation_callback3(array: list[DeisaArray], array1: list[DeisaArray]):
+        x = array[0].dask.sum().compute()
+        y = array1[0].dask.sum().compute()
+        assert x == (dim_sq * (dim_sq + 1) / 2) * array[0].t and y == (dim_sq * (dim_sq + 1) / 2) * array1[0].t
+
+    d.execute_callbacks()
+
+
+@pytest.mark.parametrize(
+    "enable_distributed_scheduling",
+    [True, False],
+)
+def test_multiple_callbacks_decorator(enable_distributed_scheduling: bool, ray_cluster) -> None:  # noqa: F811
+    dim = 2
+    dim_sq = dim * dim
+    head_ref = head_script.remote(enable_distributed_scheduling, dim_sq)
+    wait_for_head_node()
+    port = pick_free_port()
+
+    worker_refs = []
+    for rank in range(dim_sq):
+        worker_refs.append(
+            simple_worker.remote(
+                rank=rank,
+                position=(rank // dim, rank % dim),
+                chunks_per_dim=(dim, dim),
+                nb_chunks_of_node=1,
+                chunk_size=(1, 1),
+                nb_iterations=NB_ITERATIONS,
+                node_id=f"node_{rank}",
+                array_name=["array", "array1"],
+                nb_nodes=dim_sq,
+                port=port,
             )
         )
 

@@ -3,7 +3,7 @@ import ray
 import pytest
 
 from deisa.ray.types import DeisaArray
-from tests.utils import ray_cluster, simple_worker, wait_for_head_node  # noqa: F401
+from tests.utils import ray_cluster, simple_worker, wait_for_head_node, pick_free_port  # noqa: F401
 
 
 @ray.remote(max_retries=0)
@@ -16,7 +16,7 @@ def head_script(enable_distributed_scheduling) -> None:
 
     deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
 
-    d = Deisa(n_sim_nodes=1)
+    d = Deisa()
 
     def simulation_callback(array: list[DeisaArray]):
         assert array[0].dask.dtype == np.int8
@@ -32,6 +32,7 @@ def head_script(enable_distributed_scheduling) -> None:
 def test_dtype(enable_distributed_scheduling, ray_cluster) -> None:  # noqa: F811
     head_ref = head_script.remote(enable_distributed_scheduling)
     wait_for_head_node()
+    port = pick_free_port()
 
     worker_ref = simple_worker.remote(
         rank=0,
@@ -42,6 +43,8 @@ def test_dtype(enable_distributed_scheduling, ray_cluster) -> None:  # noqa: F81
         nb_iterations=1,
         node_id="node",
         dtype=np.int8,
+        nb_nodes=1,
+        port=port,
     )
 
     ray.get([head_ref, worker_ref])

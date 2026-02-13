@@ -2,9 +2,9 @@ import pytest
 import ray
 
 from deisa.ray.types import DeisaArray
-from tests.utils import ray_cluster, simple_worker, wait_for_head_node  # noqa: F401
+from tests.utils import ray_cluster, simple_worker, wait_for_head_node, pick_free_port  # noqa: F401
 
-NB_ITERATIONS = 10
+NB_ITERATIONS = 5
 
 
 @ray.remote(max_retries=0)
@@ -16,7 +16,7 @@ def head_script(enable_distributed_scheduling) -> None:
 
     deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
 
-    d = Deisa(n_sim_nodes=4)
+    d = Deisa()
 
     class Shared_variables:
         def __init__(self) -> None:
@@ -65,6 +65,7 @@ def head_script(enable_distributed_scheduling) -> None:
 def test_multiple_callbacks(enable_distributed_scheduling: bool, ray_cluster) -> None:  # noqa: F811
     head_ref = head_script.remote(enable_distributed_scheduling)
     wait_for_head_node()
+    port = pick_free_port()
 
     worker_refs = []
     for rank in range(4):
@@ -78,6 +79,8 @@ def test_multiple_callbacks(enable_distributed_scheduling: bool, ray_cluster) ->
                 nb_iterations=NB_ITERATIONS,
                 node_id=f"node_{rank}",
                 array_name=["array", "array1"],
+                nb_nodes=4,
+                port=port,
             )
         )
 

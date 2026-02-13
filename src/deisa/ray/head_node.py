@@ -84,7 +84,7 @@ class HeadNodeActor:
         await self.analytics_ready_for_execution.wait()
 
     # TODO rename or move creation of global container elsewhere
-    def register_arrays(self, arrays_definitions: list[str]) -> None:
+    def register_arrays_needed_by_analytics(self, arrays_definitions: list[str]) -> None:
         """
         Register array definitions and set back-pressure on pending timesteps.
 
@@ -94,10 +94,6 @@ class HeadNodeActor:
             Sequence of ``(name)`` pairs for each array
             produced by the simulation. Each entry becomes a
             :class:`~deisa.ray.types.DaskArrayData` instance.
-        max_pending_arrays : int, optional
-            Upper bound on the number of array timesteps that may be created
-            but not yet consumed. Used to throttle simulations that outrun
-            analytics. Default is ``1_000_000_000``.
 
         Notes
         -----

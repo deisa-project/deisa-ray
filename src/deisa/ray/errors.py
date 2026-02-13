@@ -16,6 +16,6 @@ class ConfigError(RuntimeError):
     pass
 
 
-def _default_exception_handler(e: Exception):
+def _default_exception_handler(e: BaseException):
     traceback.print_exc(file=sys.stderr)
     print(e, file=sys.stderr)

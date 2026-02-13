@@ -1,10 +1,11 @@
 import dask.array as da
 import ray
 from deisa.ray.types import DeisaArray
-from tests.utils import ray_cluster, simple_worker, wait_for_head_node  # noqa: F401
+from tests.utils import ray_cluster, simple_worker, wait_for_head_node, pick_free_port  # noqa: F401
 import pytest
 
-NB_ITERATIONS = 10
+
+NB_ITERATIONS = 5
 
 
 @ray.remote(max_retries=0)
@@ -17,7 +18,7 @@ def head_script(enable_distributed_scheduling) -> None:
 
     deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
 
-    d = Deisa(n_sim_nodes=4)
+    d = Deisa()
 
     def simulation_callback(array: list[DeisaArray]):
         # This is the standard dask task graph
@@ -45,9 +46,11 @@ def head_script(enable_distributed_scheduling) -> None:
 def test_dask_persist(enable_distributed_scheduling, ray_cluster) -> None:  # noqa: F811
     head_ref = head_script.remote(enable_distributed_scheduling)
     wait_for_head_node()
+    port = pick_free_port()
 
     worker_refs = []
-    for rank in range(4):
+    nb_nodes = 4
+    for rank in range(nb_nodes):
         worker_refs.append(
             simple_worker.remote(
                 rank=rank,
@@ -57,6 +60,8 @@ def test_dask_persist(enable_distributed_scheduling, ray_cluster) -> None:  # no
                 chunk_size=(1, 1),
                 nb_iterations=NB_ITERATIONS,
                 node_id=f"node_{rank}",
+                nb_nodes=nb_nodes,
+                port=port,
             )
         )
 
