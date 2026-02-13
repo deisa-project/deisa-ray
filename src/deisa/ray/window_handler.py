@@ -1,4 +1,4 @@
-from collections import deque
+from collections import deque, defaultdict
 import gc
 import logging
 from typing import Any, Callable, Hashable, List, Optional, Literal
@@ -48,7 +48,8 @@ class Deisa:
         self.registered_callbacks: list[_CallbackConfig] = []
         self.queue_per_array: dict[str, deque]
         self.max_simulation_ahead: int = max_simulation_ahead
-        self.has_new_timestep: dict[str, bool] = {}
+        self.has_new_timestep: dict[str, bool] = defaultdict(bool)
+        self.has_seen_array: dict[str, bool] = defaultdict(bool)
         self.queue_per_array = {}
 
     def _ensure_connected(self) -> None:
@@ -89,13 +90,20 @@ class Deisa:
             max_simulation_ahead=self.max_simulation_ahead
         )
 
-    def callback(self, *window_specs):
+    def callback(
+        self,
+        *window_specs,
+        exception_handler: Optional[SupportsSlidingWindow.ExceptionHandler] = None,
+        when: Literal["AND", "OR"] = "AND",
+    ):
         """
         Decorator for easy registration
 
         Parameters
         ----------
         window_specs: tuple of WindowSpec descriptions
+        exception_handler:
+        when:
 
         Returns
         -------
@@ -104,7 +112,7 @@ class Deisa:
         """
 
         def deco(fn):
-            return self.register_callback(fn, list(window_specs))
+            return self.register_callback(fn, list(window_specs), exception_handler, when)
 
         return deco
 
@@ -220,6 +228,7 @@ class Deisa:
 
         self.queue_per_array[name].append(DeisaArray(dask=array, t=arr_timestep))
         self.has_new_timestep[name] = True
+        self.has_seen_array[name] = True
 
         end_reached = False
         while not end_reached:
@@ -247,6 +256,7 @@ class Deisa:
 
                 self.queue_per_array[name].append(DeisaArray(dask=array, t=arr_timestep))
                 self.has_new_timestep[name] = True
+                self.has_seen_array[name] = True
 
             # inspect what callbacks can be called
             for cb_cfg in self.registered_callbacks:
@@ -282,6 +292,7 @@ class Deisa:
             if not end_reached:
                 self.queue_per_array[name].append(DeisaArray(dask=array, t=arr_timestep))
                 self.has_new_timestep[name] = True
+                self.has_seen_array[name] = True
 
     def determine_callback_args(self, description_of_arrays_needed) -> dict[str, List[DeisaArray]]:
         callback_args = {}
@@ -296,11 +307,11 @@ class Deisa:
         return callback_args
 
     def should_call(self, description_of_arrays_needed, when: Literal["AND", "OR"]) -> bool:
-        values = (self.has_new_timestep[description.name] for description in description_of_arrays_needed)
+        names = [d.name for d in description_of_arrays_needed]
         if when == "AND":
-            return all(values)
+            return all(self.has_new_timestep[n] for n in names)
         else:  # when == 'OR'
-            return any(values)
+            return all(self.has_seen_array[n] for n in names) and any(self.has_new_timestep[n] for n in names)
 
     # TODO add persist
     def set(self, *, key: Hashable, value: Any, chunked: bool = False, persist: bool = False) -> None:
