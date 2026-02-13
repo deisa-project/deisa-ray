@@ -117,8 +117,8 @@ def simple_worker_error_test(
 
     for i in range(nb_iterations):
         chunk = i * array
-        if i == nb_iterations / 2:
-            client.send(array_name="error", chunk=chunk, timestep=i, chunked=True)
+        if i == nb_iterations - 2:
+            client.send(array_name="error", chunk=chunk, timestep=i, chunked=True, test_mode=True)
         else:
             client.send(array_name=array_name, chunk=chunk, timestep=i, chunked=True)
     client.close(timestep=nb_iterations)

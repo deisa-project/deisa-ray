@@ -83,31 +83,6 @@ class HeadNodeActor:
     async def wait_until_analytics_ready(self):
         await self.analytics_ready_for_execution.wait()
 
-    # TODO rename or move creation of global container elsewhere
-    def register_arrays_needed_by_analytics(self, arrays_definitions: list[str]) -> None:
-        """
-        Register array definitions and set back-pressure on pending timesteps.
-
-        Parameters
-        ----------
-        arrays_definitions : list[tuple[str, Callable]]
-            Sequence of ``(name)`` pairs for each array
-            produced by the simulation. Each entry becomes a
-            :class:`~deisa.ray.types.DaskArrayData` instance.
-
-        Notes
-        -----
-        This method must be called before any scheduling actors register
-        themselves or send chunks. It creates a semaphore that gates the
-        creation of new timesteps and populates ``registered_arrays`` with
-        the provided definitions.
-        """
-        # regulate how far ahead sim can go wrt to analytics
-        for name in arrays_definitions:
-            self.registered_arrays[name] = DaskArrayData(name)
-            self.semaphore_per_array[name] = asyncio.Semaphore(self.max_simulation_ahead + 1)
-            self.new_array_created[name] = asyncio.Event()
-
     def list_scheduling_actors(self) -> dict[str, RayActorHandle]:
         """
         Return the list of scheduling actors.
@@ -171,9 +146,15 @@ class HeadNodeActor:
         :class:`~deisa.ray.types.DaskArrayData` and later used to build the
         Dask arrays when chunk payloads arrive.
         """
+
+        if array_name not in self.registered_arrays:
+            self.registered_arrays[array_name] = DaskArrayData(array_name)
+            self.semaphore_per_array[array_name] = asyncio.Semaphore(self.max_simulation_ahead + 1)
+            self.new_array_created[array_name] = asyncio.Event()
+
+        array = self.registered_arrays[array_name]
         # TODO no checks done for when all nodeactors have called this
         # TODO missing check that analytics and sim have required/set same name of arrays, otherwise array is created and nothing happens
-        array = self.registered_arrays[array_name]
 
         for bridge_id, position, size in chunks_meta:
             array.update_meta(nb_chunks_per_dim, dtype, position, size, actor_id_who_owns, bridge_id)
