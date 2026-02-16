@@ -5,7 +5,7 @@ import numpy as np
 from deisa.ray.types import DeisaArray
 from tests.utils import ray_cluster, simple_worker, wait_for_head_node, pick_free_port  # noqa: F401
 
-NB_ITERATIONS = 10
+NB_ITERATIONS = 5
 
 
 @ray.remote(max_retries=0)

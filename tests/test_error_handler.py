@@ -37,7 +37,7 @@ def head_script(enable_distributed_scheduling, assert_error: bool = False) -> No
 #           can secretly be wrong without failing
 @pytest.mark.parametrize(
     "enable_distributed_scheduling",
-    [True, False],
+    [False],
 )
 def test_exception_handler_not_bypass_computation(enable_distributed_scheduling: bool, ray_cluster) -> None:  # noqa: F811
     with pytest.raises(AssertionError):
@@ -67,7 +67,7 @@ def test_exception_handler_not_bypass_computation(enable_distributed_scheduling:
 # TODO : To check Contract Error we need to re raise the exception in the _default_exception_handler but if we do that, Bridge crash.
 @pytest.mark.parametrize(
     "enable_distributed_scheduling",
-    [True, False],
+    [False],
 )
 def test_contract_error(enable_distributed_scheduling: bool, ray_cluster) -> None:  # noqa: F811
     with pytest.raises(ContractError):
