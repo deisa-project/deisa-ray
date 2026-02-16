@@ -1,39 +1,42 @@
-name: CI
-
-on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - '**'
-
-permissions:
-  contents: read
-
 jobs:
-  tests:
-    name: ${{ matrix.os }} / ${{ matrix.python-version }}
-    runs-on: ${{ matrix.os }}-latest
-    timeout-minutes: 25
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [Ubuntu]
-        python-version: ['3.12', '3.13']
+  tests_py312:
+    name: Ubuntu / 3.12
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install uv with Python ${{ matrix.python-version }}
+      - name: Install uv with Python 3.12
         uses: astral-sh/setup-uv@v7
         with:
           version: "0.9.13"
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.12"
           enable-cache: true
 
       - name: Install dependencies
         run: uv sync --locked --all-extras --all-groups
 
       - name: Execute the tests
-        shell: bash
         run: uv run pytest -vv .
+
+  tests_py313:
+    name: Ubuntu / 3.13
+    needs: tests_py312
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv with Python 3.13
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.9.13"
+          python-version: "3.13"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked --all-extras --all-groups
+
+      - name: Execute the tests
+        run: uv run pytest -vv .
+
