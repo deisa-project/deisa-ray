@@ -11,8 +11,8 @@ Simple example
 
     deisa = Deisa()
 
-    def simulation_callback(array: da.Array, timestep: int):
-        x = array.sum().compute()
+    def simulation_callback(array: list[DeisaArray]):
+        x = array[0].dask.sum().compute()
         print("Sum:", x)
 
     deisa.register_callback(
@@ -31,8 +31,8 @@ Several arrays
 
     deisa = Deisa()
 
-    def simulation_callback(a: da.Array, b: da.Array, timestep: int):
-        r = (a - b).mean().compute()
+    def simulation_callback(a: list[DeisaArray], b: list[DeisaArray]):
+        r = (a[0].dask - a[0].dask).sum().compute()
 
     deisa.register_callback(
         simulation_callback,
@@ -53,12 +53,12 @@ a time derivative), it is possible to use the ``window_size`` parameter.
 
     deisa = Deisa()
 
-    def simulation_callback(arrays: list[da.Array], timestep: int):
+    def simulation_callback(arrays: list[DeisaArray]):
         if len(arrays) < 2:  # For the first iteration
             return
 
-        current_array = arrays[1]
-        previous_array = arrays[0]
+        current_array = arrays[1].dask
+        previous_array = arrays[0].dask
 
         ...
 
@@ -82,8 +82,8 @@ Dask's ``persist`` is supported:
 
     deisa = Deisa()
 
-    def simulation_callback(array: da.Array, timestep: int):
-        x = array.sum().persist()
+    def simulation_callback(array: list[DeisaArray]):
+        x = array[0].dask.sum().persist()
 
         # x is still a Dask array, but the sum is being computed in the background
         assert isinstance(x, da.Array)
@@ -94,7 +94,7 @@ Dask's ``persist`` is supported:
     deisa.register_callback(
         simulation_callback,
         [WindowSpec("array")],
-        max_iterations=NB_ITERATIONS,
     )
+
     deisa.execute_callbacks()
 
