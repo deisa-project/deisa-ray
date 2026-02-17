@@ -153,10 +153,16 @@ class Bridge:
         # we add a special array with a name that will signal the end of the simulation
         # note we only need the metadata so that it can pass through the entire pipeline correctly and
         # in sequential order, so we just replicate the first metadata we have.
-        self.arrays_metadata["__deisa_last_iteration_array"] = self.arrays_metadata[
-            list(self.arrays_metadata.keys())[0]
-        ]
+
         self.system_metadata = _validate_system_meta(system_metadata)
+        if self.bridge_id == 0:
+            self.arrays_metadata["__deisa_last_iteration_array"] = {
+                "chunk_shape": (1, 1),
+                "nb_chunks_per_dim": (1, 1),
+                "nb_chunks_of_node": 1,
+                "dtype": np.int16,
+                "chunk_position": (0, 0),
+            }
         self._comm_timeout = 120 if _comm_timeout is None else int(_comm_timeout)
         if self._comm_timeout <= 0:
             raise ValueError(f"_comm_timeout must be > 0 seconds, got {self._comm_timeout}")
@@ -311,19 +317,21 @@ class Bridge:
         Close the bridge by creating a special array that has a special name which signals to the analytics
         that the simulation has finished and that it should stop.
         """
-        try:
-            ref = ray.put(0, _owner=self.node_actor)
-            future: ray.ObjectRef = self.node_actor.add_chunk.remote(
-                bridge_id=self.bridge_id,
-                array_name="__deisa_last_iteration_array",
-                chunk_ref=[ref],
-                timestep=timestep,
-                chunked=True,
-                store_externally=store_externally,
-            )  # type: ignore
-            ray.get(future)
-        except Exception as e:
-            _default_exception_handler(e)
+        self.comm.barrier()
+        if self.bridge_id == 0:
+            try:
+                ref = ray.put(0, _owner=self.node_actor)
+                future: ray.ObjectRef = self.node_actor.add_chunk.remote(
+                    bridge_id=self.bridge_id,
+                    array_name="__deisa_last_iteration_array",
+                    chunk_ref=[ref],
+                    timestep=timestep,
+                    chunked=True,
+                    store_externally=store_externally,
+                )  # type: ignore
+                ray.get(future)
+            except Exception as e:
+                _default_exception_handler(e)
 
     def _create_node_actor(
         self,

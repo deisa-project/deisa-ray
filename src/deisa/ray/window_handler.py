@@ -179,7 +179,7 @@ class Deisa:
             description = cb_cfg.arrays_description
             for array_def in description:
                 name = array_def.name
-                window_size: int = array_def.window_size if array_def.window_size is not None else 2
+                window_size: int = array_def.window_size if array_def.window_size is not None else 1
 
                 if name in self.queue_per_array:
                     if self.queue_per_array[name].maxlen < window_size:
@@ -226,9 +226,11 @@ class Deisa:
         if name == "__deisa_last_iteration_array":
             return
 
-        self.queue_per_array[name].append(DeisaArray(dask=array, t=arr_timestep))
-        self.has_new_timestep[name] = True
-        self.has_seen_array[name] = True
+        queue = self.queue_per_array.get(name)
+        if queue is not None:
+            queue.append(DeisaArray(dask=array, t=arr_timestep))
+            self.has_new_timestep[name] = True
+            self.has_seen_array[name] = True
 
         end_reached = False
         while not end_reached:
@@ -254,9 +256,11 @@ class Deisa:
                 if arr_timestep > current_timestep:
                     break
 
-                self.queue_per_array[name].append(DeisaArray(dask=array, t=arr_timestep))
-                self.has_new_timestep[name] = True
-                self.has_seen_array[name] = True
+                queue = self.queue_per_array.get(name)
+                if queue is not None:
+                    queue.append(DeisaArray(dask=array, t=arr_timestep))
+                    self.has_new_timestep[name] = True
+                    self.has_seen_array[name] = True
 
             # inspect what callbacks can be called
             for cb_cfg in self.registered_callbacks:
@@ -290,9 +294,11 @@ class Deisa:
 
             # add the first "bigger" timestep back into queue and set new_timestep flag
             if not end_reached:
-                self.queue_per_array[name].append(DeisaArray(dask=array, t=arr_timestep))
-                self.has_new_timestep[name] = True
-                self.has_seen_array[name] = True
+                queue = self.queue_per_array.get(name)
+                if queue is not None:
+                    queue.append(DeisaArray(dask=array, t=arr_timestep))
+                    self.has_new_timestep[name] = True
+                    self.has_seen_array[name] = True
 
     def determine_callback_args(self, description_of_arrays_needed) -> dict[str, List[DeisaArray]]:
         callback_args = {}
