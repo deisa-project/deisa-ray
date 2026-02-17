@@ -48,6 +48,8 @@ def simple_worker(
     node_id: str | None = None,
     array_name: str | list[str] = "array",
     dtype: np.dtype = np.int32,  # type: ignore
+    _sleep_b4_send=0,
+    _sleep_intra_send=0,
     **kwargs,
 ) -> None:
     """Worker node sending chunks of data"""
@@ -74,7 +76,9 @@ def simple_worker(
 
     array = (rank + 1) * np.ones(chunk_size, dtype=dtype)
 
+    time.sleep(_sleep_b4_send)
     for i in range(start_iteration, nb_iterations):
+        time.sleep(_sleep_intra_send)
         for array_described in list(arrays_md.keys()):
             chunk = i * array
             client.send(array_name=array_described, chunk=chunk, timestep=i, chunked=True)
@@ -117,8 +121,8 @@ def simple_worker_error_test(
 
     for i in range(nb_iterations):
         chunk = i * array
-        if i == nb_iterations - 2:
-            client.send(array_name="error", chunk=chunk, timestep=i, chunked=True, test_mode=True)
+        if i == nb_iterations // 2:
+            client.send(array_name="error", chunk=chunk, timestep=i, chunked=True)
         else:
             client.send(array_name=array_name, chunk=chunk, timestep=i, chunked=True)
     client.close(timestep=nb_iterations)

@@ -3,6 +3,7 @@ import torch.distributed as dist
 import datetime
 
 
+# TODO : Add test about comm size > declared wolrd size
 def init_gloo_comm(
     world_size: int, rank: int, master_addr: str = "127.0.0.1", master_port: int = 29500, timeout_s: int = 120
 ):
