@@ -5,6 +5,8 @@ import pytest
 import ray
 import socket
 
+from deisa.ray.bridge import Bridge
+
 
 def pick_free_port():
     s = socket.socket()
@@ -49,7 +51,7 @@ def simple_worker(
     array_name: str | list[str] = "array",
     dtype: np.dtype = np.int32,  # type: ignore
     **kwargs,
-) -> None:
+) -> Bridge | None:
     """Worker node sending chunks of data"""
     from deisa.ray.bridge import Bridge
 
@@ -57,6 +59,7 @@ def simple_worker(
         array_name = [array_name]
 
     start_iteration = kwargs.get("start_iteration", 0)
+    close_client = kwargs.get("close_client", True)
 
     sys_md = {"world_size": nb_nodes, "master_address": "127.0.0.1", "master_port": port}
     arrays_md = {
@@ -79,7 +82,10 @@ def simple_worker(
             chunk = i * array
             client.send(array_name=array_described, chunk=chunk, timestep=i, chunked=True)
 
-    client.close(timestep=nb_iterations)
+    if close_client:
+        client.close(timestep=nb_iterations)
+    else:
+        return client
 
 
 @ray.remote(num_cpus=0, max_retries=0)
