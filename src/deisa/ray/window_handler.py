@@ -42,7 +42,6 @@ class Deisa:
         # do it when connecting, or inject it similarly.
         self._ray_start = ray_start or _ray_start_impl
 
-        self.needed_arrays = set()
         self._connected = False
         self.node_actors: dict[ActorID, RayActorHandle] = {}
         self.registered_callbacks: list[_CallbackConfig] = []
@@ -151,8 +150,6 @@ class Deisa:
             when=when,
         )
         self.registered_callbacks.append(cfg)
-        array_names = [spec.name for spec in arrays_spec]
-        self.needed_arrays.update(array_names)
         return simulation_callback
 
     def unregister_callback(
@@ -204,10 +201,6 @@ class Deisa:
         # ensure connected to ray cluster
         self._ensure_connected()
 
-        # register special array that indicates end of sim.
-        self.needed_arrays.add("__deisa_last_iteration_array")
-        # register all arrays in one go
-        ray.get(self.head.register_arrays_needed_by_analytics.remote(self.needed_arrays))
         # signal analytics ready to start
         ray.get(self.head.set_analytics_ready_for_execution.remote())
         # ray.get(self.head.wait_for_bridges_ready.remote())

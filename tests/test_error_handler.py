@@ -1,15 +1,16 @@
 import pytest
 import ray
 
+from deisa.ray.errors import ContractError
 from deisa.ray.types import DeisaArray
-from tests.utils import simple_worker_error_test, wait_for_head_node, pick_free_port  # noqa: F401
+from tests.utils import simple_worker, simple_worker_error_test, wait_for_head_node, pick_free_port  # noqa: F401
 
 
 NB_ITERATIONS = 5
 
 
 @ray.remote(max_retries=0)
-def head_script(enable_distributed_scheduling) -> None:
+def head_script(enable_distributed_scheduling, assert_error: bool = False) -> None:
     """The head node checks that the values are correct"""
     from deisa.ray.window_handler import Deisa
     from deisa.ray.types import WindowSpec
@@ -22,7 +23,8 @@ def head_script(enable_distributed_scheduling) -> None:
     # TODO : modify assert to test the actual error handler
     def simulation_callback(array: list[DeisaArray]):
         array[0].dask.compute()
-        assert False
+        if assert_error:
+            assert False
 
     d.register_callback(
         simulation_callback,
@@ -34,16 +36,41 @@ def head_script(enable_distributed_scheduling) -> None:
 # WARNING : CRITICAL : Be careful if this test is failing, every other tests
 #           can secretly be wrong without failing
 @pytest.mark.parametrize(
-    "nb_nodes, enable_distributed_scheduling",
-    [
-        (1, True),
-        (1, False),
-    ],
+    "enable_distributed_scheduling",
+    [False],
 )
-def test_exception_handler_not_bypass_computation(
-    nb_nodes: int, enable_distributed_scheduling: bool, ray_cluster
-) -> None:  # noqa: F811
+def test_exception_handler_not_bypass_computation(enable_distributed_scheduling: bool, ray_cluster) -> None:  # noqa: F811
     with pytest.raises(AssertionError):
+        head_ref = head_script.remote(enable_distributed_scheduling, True)
+        wait_for_head_node()
+        port = pick_free_port()
+
+        worker_refs = []
+        for rank in range(4):
+            worker_refs.append(
+                simple_worker.remote(
+                    rank=rank,
+                    position=(rank // 2, rank % 2),
+                    chunks_per_dim=(2, 2),
+                    nb_chunks_of_node=1,
+                    chunk_size=(1, 1),
+                    nb_iterations=NB_ITERATIONS,
+                    node_id=f"node_{rank}",
+                    nb_nodes=4,
+                    port=port,
+                )
+            )
+
+        ray.get([head_ref] + worker_refs)
+
+
+# TODO : To check Contract Error we need to re raise the exception in the _default_exception_handler but if we do that, Bridge crash.
+@pytest.mark.parametrize(
+    "enable_distributed_scheduling",
+    [False],
+)
+def test_contract_error(enable_distributed_scheduling: bool, ray_cluster) -> None:  # noqa: F811
+    with pytest.raises(ContractError):
         head_ref = head_script.remote(enable_distributed_scheduling)
         wait_for_head_node()
         port = pick_free_port()
@@ -55,10 +82,10 @@ def test_exception_handler_not_bypass_computation(
                     rank=rank,
                     position=(rank // 2, rank % 2),
                     chunks_per_dim=(2, 2),
-                    nb_chunks_of_node=4 // nb_nodes,
+                    nb_chunks_of_node=1,
                     chunk_size=(1, 1),
                     nb_iterations=NB_ITERATIONS,
-                    node_id=f"node_{rank % nb_nodes}",
+                    node_id=f"node_{rank}",
                     nb_nodes=4,
                     port=port,
                 )

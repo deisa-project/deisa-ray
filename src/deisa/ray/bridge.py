@@ -14,7 +14,7 @@ from ray.actor import ActorClass
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 from deisa.ray.scheduling_actor import SchedulingActor as _RealSchedulingActor
 from deisa.ray.types import RayActorHandle
-from deisa.ray.errors import _default_exception_handler
+from deisa.ray.errors import ContractError, _default_exception_handler
 from deisa.ray.comm import Comm, init_gloo_comm
 from deisa.ray.validate import _validate_arrays_meta, _validate_system_meta
 from deisa.ray.utils import get_node_actor_options
@@ -259,6 +259,7 @@ class Bridge:
         timestep: int,
         chunked: bool = True,
         store_externally: bool = False,
+        test_mode: bool = False,
     ) -> None:
         """
         Make a chunk of data available to the analytics.
@@ -304,6 +305,8 @@ class Bridge:
             )  # type: ignore
             # Wait until the data is processed before returning to the simulation
             ray.get(future)
+        except ContractError as e:
+            raise e
         except Exception as e:
             _default_exception_handler(e)
 

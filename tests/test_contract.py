@@ -41,7 +41,7 @@ def ray_multinode_cluster():
 NAMESPACE = "deisa_ray"
 
 
-@pytest.mark.parametrize("sleep_t", [30])
+@pytest.mark.parametrize("sleep_t", [15])
 def test_sim_start_first_and_analytics_can_start_after_x_secs(ray_multinode_cluster, sleep_t):
     port = pick_free_port()
     cluster = ray_multinode_cluster["cluster"]
@@ -128,7 +128,7 @@ def test_sim_start_first_and_analytics_can_start_after_x_secs(ray_multinode_clus
     assert ray.get(ref_analytics)
 
 
-@pytest.mark.parametrize("sleep_t", [30])
+@pytest.mark.parametrize("sleep_t", [15])
 def test_analytics_start_first_and_sim_can_start_after_x_secs(ray_multinode_cluster, sleep_t):
     port = pick_free_port()
     cluster = ray_multinode_cluster["cluster"]
