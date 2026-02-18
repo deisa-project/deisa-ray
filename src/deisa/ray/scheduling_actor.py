@@ -327,6 +327,7 @@ class NodeActorBase:
         Notes
         -----
         This method manages chunk collection and coordination:
+
         1. Check array is expected
         2. Stores the ref in the per-timestep structure.
         3. When all local chunks have arrived, builds a
