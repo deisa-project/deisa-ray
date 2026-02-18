@@ -13,39 +13,39 @@ class HeadNodeActor:
     """
     Ray remote actor that coordinates array construction from simulation chunks.
 
-    The SimulationHead actor manages the construction of Dask arrays from chunks
-    sent by scheduling actors. It coordinates multiple scheduling actors,
-    tracks array state, and provides arrays to analytics when they are ready.
+    The head actor manages the construction of Dask arrays from chunks sent by
+    scheduling actors. It coordinates multiple scheduling actors, tracks array
+    state, and provides arrays to analytics when they are ready.
 
     Parameters
     ----------
-    arrays_definitions : list[ArrayDefinition]
-        List of array definitions describing the arrays to be created.
-    max_pending_arrays : int, optional
-        Maximum number of arrays that can be being built or waiting to be
-        collected at the same time. Setting this value can prevent the
-        simulation from being many iterations ahead of the analytics.
-        Default is 1_000_000_000.
+    max_simulation_ahead : int, optional
+        Maximum number of timesteps that may be created ahead of the analytics.
+        Defaults to 1.
 
     Attributes
     ----------
     scheduling_actors : dict[str, RayActorHandle]
         Mapping from scheduling actor IDs to their actor handles.
-    new_pending_array_semaphore : asyncio.Semaphore
-        Semaphore used to limit the number of pending arrays.
-    new_array_created : asyncio.Event
-        Event set when a new array timestep is created.
-    arrays : dict[str, DaskArrayData]
-        Mapping from array names to their data structures.
+    new_array_created : dict[str, asyncio.Event]
+        Events used for per-array readiness tracking.
+    max_simulation_ahead : int
+        Configured lookahead to throttle array creation.
+    semaphore_per_array : dict[str, asyncio.Semaphore]
+        Semaphores used to limit in-flight arrays per array name.
     arrays_ready : asyncio.Queue[tuple[str, Timestep, da.Array]]
-        Queue of ready arrays waiting to be collected by analytics.
+        Queue of ready arrays waiting to be consumed by analytics.
+    registered_arrays : dict[str, DaskArrayData]
+        Metadata holders for each registered array.
+    analytics_ready_for_execution : asyncio.Event
+        Event set once analytics are ready to consume arrays.
 
     Notes
     -----
     This is a Ray remote actor that must be created using
-    `SimulationHead.options(**get_head_actor_options()).remote(...)`.
-    The actor coordinates between simulation nodes (via scheduling actors)
-    and analytics that consume the constructed arrays.
+    `HeadNodeActor.options(**get_head_actor_options()).remote(...)`. The actor
+    coordinates between simulation nodes (via scheduling actors) and analytics
+    that consume the constructed arrays.
     """
 
     # TODO: Discuss if max_pending_arrays should be here or in register callback. In that case, what
@@ -54,6 +54,12 @@ class HeadNodeActor:
     def __init__(self, max_simulation_ahead: int = 1) -> None:
         """
         Initialize synchronization primitives and bookkeeping containers.
+
+        Parameters
+        ----------
+        max_simulation_ahead : int, optional
+            How many timesteps may be created ahead of the analytics.
+            Defaults to 1.
 
         Notes
         -----
@@ -77,10 +83,26 @@ class HeadNodeActor:
         self.analytics_ready_for_execution: asyncio.Event = asyncio.Event()
 
     def set_analytics_ready_for_execution(self):
+        """
+        Signal that analytics is ready to receive arrays.
+
+        Notes
+        -----
+        Scheduling actors wait for this event before advertising array chunks,
+        ensuring the analytics has started execution.
+        """
         self.analytics_ready_for_execution.set()
         # self.analytics_ready_for_execution.clear()
 
     async def wait_until_analytics_ready(self):
+        """
+        Await the analytics-ready event.
+
+        Returns
+        -------
+        None
+            Unblocks once ``set_analytics_ready_for_execution`` has been called.
+        """
         await self.analytics_ready_for_execution.wait()
 
     def list_scheduling_actors(self) -> dict[str, RayActorHandle]:
@@ -89,8 +111,8 @@ class HeadNodeActor:
 
         Returns
         -------
-        Dict[RayActorHandle]
-            Dictionary of actor_id to actor handles for all registered scheduling actors.
+        dict[str, RayActorHandle]
+            Mapping from actor IDs to actor handles for all registered scheduling actors.
         """
         return self.scheduling_actors
 

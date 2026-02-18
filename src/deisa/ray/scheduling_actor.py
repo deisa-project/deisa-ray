@@ -101,6 +101,9 @@ class NodeActorBase:
         chunked : bool, optional
             Placeholder for future chunked feedback support. Must remain
             ``False`` today. Default is ``False``.
+        persist : bool
+            Whether the stored value should survive the next ``get`` call.
+            ``True`` retains the value until explicitly deleted.
 
         Notes
         -----
@@ -137,6 +140,11 @@ class NodeActorBase:
         -------
         Any
             Stored value or ``default`` if missing.
+
+        Raises
+        ------
+        NotImplementedError
+            Chunked feedback retrieval is not yet implemented.
         """
         val = self.feedback_non_chunked.get(key, default)
         persist = self.should_persist.get(key, False)
@@ -319,6 +327,7 @@ class NodeActorBase:
         Notes
         -----
         This method manages chunk collection and coordination:
+
         1. Check array is expected
         2. Stores the ref in the per-timestep structure.
         3. When all local chunks have arrived, builds a

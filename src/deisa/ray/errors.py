@@ -17,5 +17,13 @@ class ConfigError(RuntimeError):
 
 
 def _default_exception_handler(e: BaseException):
+    """
+    Print the traceback of an exception to stderr for debugging.
+
+    Parameters
+    ----------
+    e : BaseException
+        Exception to report.
+    """
     traceback.print_exc(file=sys.stderr)
     print(e, file=sys.stderr)

@@ -2,11 +2,10 @@ import asyncio
 from collections import defaultdict
 from dataclasses import dataclass
 import math
-from typing import Any, TypeAlias, Literal
+from typing import Any, TypeAlias, Literal, Callable
 
 import dask.array as da
 from dask.highlevelgraph import HighLevelGraph
-from deisa.core.interface import SupportsSlidingWindow
 import numpy as np
 import ray
 import ray.actor
@@ -16,7 +15,7 @@ from deisa.ray._async_dict import AsyncDict
 
 type DoubleRef = ray.ObjectRef
 type ActorID = str
-# anything used in dask to reprsent a task key (usually its a tuple)
+# anything used in dask to represent a task key (usually it's a tuple)
 type GraphKey = Any
 # GraphValue can be any of: ChunkRef, ScheduledByOtherActor, or anything used in Dask to represent a task value.
 type GraphValue = Any
@@ -146,17 +145,17 @@ class ChunkRef:
 
     Parameters
     ----------
-    actor_id : int
+    ref : ray.ObjectRef
+        Ray ObjectRef that eventually points to the chunk data. This is a
+        ``ref`` of a ``ref`` produced by the patched Dask scheduler.
+    actorid : int
         The ID of the scheduling actor that owns this chunk.
     array_name : str
         The real name of the array, without the timestep suffix.
     timestep : Timestep
         The timestep this chunk belongs to.
-    position : tuple[int, ...]
-        The position of the chunk in the array decomposition.
-    _all_chunks : ray.ObjectRef or None, optional
-        ObjectRef containing all chunks for this timestep. Set for one chunk
-        only to avoid duplication. Default is None.
+    bridge_id : int
+        Identifier of the bridge that produced this chunk.
 
     Notes
     -----
@@ -208,9 +207,9 @@ class DeisaArray:
 
 @dataclass
 class _CallbackConfig:
-    simulation_callback: SupportsSlidingWindow.Callback
+    simulation_callback: Callable
     arrays_description: list[WindowSpec]
-    exception_handler: SupportsSlidingWindow.ExceptionHandler
+    exception_handler: Callable
     when: Literal["AND", "OR"]
 
 
