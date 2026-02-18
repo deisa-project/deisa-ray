@@ -1,0 +1,7 @@
+ray.window\_handler module
+==========================
+
+.. automodule:: ray.window_handler
+   :members:
+   :show-inheritance:
+   :undoc-members:

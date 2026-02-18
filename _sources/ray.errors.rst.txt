@@ -1,0 +1,7 @@
+ray.errors module
+=================
+
+.. automodule:: ray.errors
+   :members:
+   :show-inheritance:
+   :undoc-members:

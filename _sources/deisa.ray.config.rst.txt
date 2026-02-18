@@ -1,7 +1,0 @@
-deisa.ray.config module
-=======================
-
-.. automodule:: deisa.ray.config
-   :members:
-   :show-inheritance:
-   :undoc-members:

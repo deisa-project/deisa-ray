@@ -1,0 +1,658 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../../">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html">
+
+    <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
+        <title>ray.client_builder - deisa-ray documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=d111a655" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f2f2f2;
+  --color-code-foreground: #1e1e1e;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../../index.html"><div class="brand">deisa-ray  documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon no-toc" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../../index.html">
+  
+  <span class="sidebar-brand-text">deisa-ray  documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../quick_start.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../analytics.html">Analytics</a></li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon no-toc" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <h1>Source code for ray.client_builder</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">importlib</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">inspect</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Tuple</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">ray.util.client_connect</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">ray._private.ray_constants</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">RAY_ADDRESS_ENVIRONMENT_VARIABLE</span><span class="p">,</span>
+    <span class="n">RAY_NAMESPACE_ENVIRONMENT_VARIABLE</span><span class="p">,</span>
+    <span class="n">RAY_RUNTIME_ENV_ENVIRONMENT_VARIABLE</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">ray._private.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">check_ray_client_dependencies_installed</span><span class="p">,</span> <span class="n">split_address</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">ray._private.worker</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseContext</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">ray._private.worker</span><span class="w"> </span><span class="kn">import</span> <span class="n">init</span> <span class="k">as</span> <span class="n">ray_driver_init</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">ray.job_config</span><span class="w"> </span><span class="kn">import</span> <span class="n">JobConfig</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">ray.util.annotations</span><span class="w"> </span><span class="kn">import</span> <span class="n">Deprecated</span><span class="p">,</span> <span class="n">PublicAPI</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="n">CLIENT_DOCS_URL</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="s2">&quot;https://docs.ray.io/en/latest/cluster/running-applications/&quot;</span>
+    <span class="s2">&quot;job-submission/ray-client.html&quot;</span>
+<span class="p">)</span>
+
+
+<span class="nd">@dataclass</span>
+<span class="nd">@PublicAPI</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">ClientContext</span><span class="p">(</span><span class="n">BaseContext</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Basic context manager for a ClientBuilder connection.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">dashboard_url</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+    <span class="n">python_version</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">ray_version</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">ray_commit</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">_num_clients</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">_context_to_restore</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ray</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">RayAPIStub</span><span class="p">]</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;ClientContext&quot;</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_swap_context</span><span class="p">()</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">exc</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_disconnect_with_context</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_swap_context</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">disconnect</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_swap_context</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_disconnect_with_context</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_swap_context</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_swap_context</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_context_to_restore</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_context_to_restore</span> <span class="o">=</span> <span class="n">ray</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">ray</span><span class="o">.</span><span class="n">set_context</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_context_to_restore</span>
+            <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_disconnect_with_context</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">force_disconnect</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Disconnect Ray. If it&#39;s a ray client and created with `allow_multiple`,</span>
+<span class="sd">        it will do nothing. For other cases this either disconnects from the</span>
+<span class="sd">        remote Client Server or shuts the current driver down.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">ray</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">ray</span><span class="o">.</span><span class="n">is_connected</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">ray</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">ray</span><span class="o">.</span><span class="n">is_default</span><span class="p">()</span> <span class="ow">or</span> <span class="n">force_disconnect</span><span class="p">:</span>
+                <span class="c1"># This is the only client connection</span>
+                <span class="n">ray</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">client_connect</span><span class="o">.</span><span class="n">disconnect</span><span class="p">()</span>
+        <span class="k">elif</span> <span class="n">ray</span><span class="o">.</span><span class="n">_private</span><span class="o">.</span><span class="n">worker</span><span class="o">.</span><span class="n">global_worker</span><span class="o">.</span><span class="n">node</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># Already disconnected.</span>
+            <span class="k">return</span>
+        <span class="k">elif</span> <span class="n">ray</span><span class="o">.</span><span class="n">_private</span><span class="o">.</span><span class="n">worker</span><span class="o">.</span><span class="n">global_worker</span><span class="o">.</span><span class="n">node</span><span class="o">.</span><span class="n">is_head</span><span class="p">():</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="s2">&quot;The current Ray Cluster is scoped to this process. &quot;</span>
+                <span class="s2">&quot;Disconnecting is not possible as it will shutdown the &quot;</span>
+                <span class="s2">&quot;cluster.&quot;</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># This is only a driver connected to an existing cluster.</span>
+            <span class="n">ray</span><span class="o">.</span><span class="n">shutdown</span><span class="p">()</span>
+
+
+<div class="viewcode-block" id="ClientBuilder">
+<a class="viewcode-back" href="../../ray.html#ray.ClientBuilder">[docs]</a>
+<span class="nd">@Deprecated</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">ClientBuilder</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Builder for a Ray Client connection. This class can be subclassed by</span>
+<span class="sd">    custom builder classes to modify connection behavior to include additional</span>
+<span class="sd">    features or altered semantics. One example is the ``_LocalClientBuilder``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">address</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">check_ray_client_dependencies_installed</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;Ray Client requires pip package `ray[client]`. &quot;</span>
+                <span class="s2">&quot;If you installed the minimal Ray (e.g. `pip install ray`), &quot;</span>
+                <span class="s2">&quot;please reinstall by executing `pip install ray[client]`.&quot;</span>
+            <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">address</span> <span class="o">=</span> <span class="n">address</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_job_config</span> <span class="o">=</span> <span class="n">JobConfig</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_remote_init_kwargs</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="c1"># Whether to allow connections to multiple clusters&quot;</span>
+        <span class="c1"># &quot; (allow_multiple=True).</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_allow_multiple_connections</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_credentials</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_metadata</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="c1"># Set to False if ClientBuilder is being constructed by internal</span>
+        <span class="c1"># methods</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_deprecation_warn_enabled</span> <span class="o">=</span> <span class="kc">True</span>
+
+<div class="viewcode-block" id="ClientBuilder.env">
+<a class="viewcode-back" href="../../ray.html#ray.ClientBuilder.env">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">env</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">env</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="s2">&quot;ClientBuilder&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Set an environment for the session.</span>
+<span class="sd">        Args:</span>
+<span class="sd">            env (Dict[st, Any]): A runtime environment to use for this</span>
+<span class="sd">                connection. See :ref:`runtime-environments` for what values are</span>
+<span class="sd">                accepted in this dict.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_job_config</span><span class="o">.</span><span class="n">set_runtime_env</span><span class="p">(</span><span class="n">env</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span></div>
+
+
+<div class="viewcode-block" id="ClientBuilder.namespace">
+<a class="viewcode-back" href="../../ray.html#ray.ClientBuilder.namespace">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">namespace</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">namespace</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;ClientBuilder&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Sets the namespace for the session.</span>
+<span class="sd">        Args:</span>
+<span class="sd">            namespace: Namespace to use.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_job_config</span><span class="o">.</span><span class="n">set_ray_namespace</span><span class="p">(</span><span class="n">namespace</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span></div>
+
+
+<div class="viewcode-block" id="ClientBuilder.connect">
+<a class="viewcode-back" href="../../ray.html#ray.ClientBuilder.connect">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">connect</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ClientContext</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Begin a connection to the address passed in via ray.client(...).</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            ClientInfo: Dataclass with information about the setting. This</span>
+<span class="sd">                includes the server&#39;s version of Python &amp; Ray as well as the</span>
+<span class="sd">                dashboard_url.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_deprecation_warn_enabled</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_client_deprecation_warn</span><span class="p">()</span>
+        <span class="c1"># Fill runtime env/namespace from environment if not already set.</span>
+        <span class="c1"># Should be done *after* the deprecation warning, since warning will</span>
+        <span class="c1"># check if those values are already set.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_fill_defaults_from_env</span><span class="p">()</span>
+
+        <span class="c1"># If it has already connected to the cluster with allow_multiple=True,</span>
+        <span class="c1"># connect to the default one is not allowed.</span>
+        <span class="c1"># But if it has connected to the default one, connect to other clients</span>
+        <span class="c1"># with allow_multiple=True is allowed</span>
+        <span class="n">default_cli_connected</span> <span class="o">=</span> <span class="n">ray</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">ray</span><span class="o">.</span><span class="n">is_connected</span><span class="p">()</span>
+        <span class="n">has_cli_connected</span> <span class="o">=</span> <span class="n">ray</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">num_connected_contexts</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span>
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_allow_multiple_connections</span>
+            <span class="ow">and</span> <span class="ow">not</span> <span class="n">default_cli_connected</span>
+            <span class="ow">and</span> <span class="n">has_cli_connected</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;The client has already connected to the cluster &quot;</span>
+                <span class="s2">&quot;with allow_multiple=True. Please set allow_multiple=True&quot;</span>
+                <span class="s2">&quot; to proceed&quot;</span>
+            <span class="p">)</span>
+
+        <span class="n">old_ray_cxt</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_allow_multiple_connections</span><span class="p">:</span>
+            <span class="n">old_ray_cxt</span> <span class="o">=</span> <span class="n">ray</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">ray</span><span class="o">.</span><span class="n">set_context</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
+
+        <span class="n">client_info_dict</span> <span class="o">=</span> <span class="n">ray</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">client_connect</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">address</span><span class="p">,</span>
+            <span class="n">job_config</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_job_config</span><span class="p">,</span>
+            <span class="n">_credentials</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_credentials</span><span class="p">,</span>
+            <span class="n">ray_init_kwargs</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_remote_init_kwargs</span><span class="p">,</span>
+            <span class="n">metadata</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_metadata</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">dashboard_url</span> <span class="o">=</span> <span class="n">ray</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">ray</span><span class="o">.</span><span class="n">_get_dashboard_url</span><span class="p">()</span>
+
+        <span class="n">cxt</span> <span class="o">=</span> <span class="n">ClientContext</span><span class="p">(</span>
+            <span class="n">dashboard_url</span><span class="o">=</span><span class="n">dashboard_url</span><span class="p">,</span>
+            <span class="n">python_version</span><span class="o">=</span><span class="n">client_info_dict</span><span class="p">[</span><span class="s2">&quot;python_version&quot;</span><span class="p">],</span>
+            <span class="n">ray_version</span><span class="o">=</span><span class="n">client_info_dict</span><span class="p">[</span><span class="s2">&quot;ray_version&quot;</span><span class="p">],</span>
+            <span class="n">ray_commit</span><span class="o">=</span><span class="n">client_info_dict</span><span class="p">[</span><span class="s2">&quot;ray_commit&quot;</span><span class="p">],</span>
+            <span class="n">_num_clients</span><span class="o">=</span><span class="n">client_info_dict</span><span class="p">[</span><span class="s2">&quot;num_clients&quot;</span><span class="p">],</span>
+            <span class="n">_context_to_restore</span><span class="o">=</span><span class="n">ray</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">ray</span><span class="o">.</span><span class="n">get_context</span><span class="p">(),</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_allow_multiple_connections</span><span class="p">:</span>
+            <span class="n">ray</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">ray</span><span class="o">.</span><span class="n">set_context</span><span class="p">(</span><span class="n">old_ray_cxt</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">cxt</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_fill_defaults_from_env</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># Check environment variables for default values</span>
+        <span class="n">namespace_env_var</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">RAY_NAMESPACE_ENVIRONMENT_VARIABLE</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">namespace_env_var</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_job_config</span><span class="o">.</span><span class="n">ray_namespace</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">namespace</span><span class="p">(</span><span class="n">namespace_env_var</span><span class="p">)</span>
+
+        <span class="n">runtime_env_var</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">RAY_RUNTIME_ENV_ENVIRONMENT_VARIABLE</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">runtime_env_var</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_job_config</span><span class="o">.</span><span class="n">runtime_env</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">runtime_env_var</span><span class="p">))</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_init_args</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;ClientBuilder&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        When a client builder is constructed through ray.init, for example</span>
+<span class="sd">        `ray.init(ray://..., namespace=...)`, all of the</span>
+<span class="sd">        arguments passed into ray.init with non-default values are passed</span>
+<span class="sd">        again into this method. Custom client builders can override this method</span>
+<span class="sd">        to do their own handling/validation of arguments.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Use namespace and runtime_env from ray.init call</span>
+        <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;namespace&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">namespace</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;namespace&quot;</span><span class="p">])</span>
+            <span class="k">del</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;namespace&quot;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;runtime_env&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;runtime_env&quot;</span><span class="p">])</span>
+            <span class="k">del</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;runtime_env&quot;</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;allow_multiple&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">True</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_allow_multiple_connections</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">del</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;allow_multiple&quot;</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="s2">&quot;_credentials&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_credentials</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;_credentials&quot;</span><span class="p">]</span>
+            <span class="k">del</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;_credentials&quot;</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="s2">&quot;_metadata&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_metadata</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;_metadata&quot;</span><span class="p">]</span>
+            <span class="k">del</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;_metadata&quot;</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">kwargs</span><span class="p">:</span>
+            <span class="n">expected_sig</span> <span class="o">=</span> <span class="n">inspect</span><span class="o">.</span><span class="n">signature</span><span class="p">(</span><span class="n">ray_driver_init</span><span class="p">)</span>
+            <span class="n">extra_args</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">kwargs</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span><span class="o">.</span><span class="n">difference</span><span class="p">(</span><span class="n">expected_sig</span><span class="o">.</span><span class="n">parameters</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">extra_args</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                    <span class="s2">&quot;Got unexpected kwargs: </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">extra_args</span><span class="p">))</span>
+                <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_remote_init_kwargs</span> <span class="o">=</span> <span class="n">kwargs</span>
+            <span class="n">unknown</span> <span class="o">=</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="s2">&quot;Passing the following kwargs to ray.init() &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;on the server: </span><span class="si">{</span><span class="n">unknown</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_client_deprecation_warn</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generates a warning for user&#39;s if this ClientBuilder instance was</span>
+<span class="sd">        created directly or through ray.client, instead of relying on</span>
+<span class="sd">        internal methods (ray.init, or auto init)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">namespace</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_job_config</span><span class="o">.</span><span class="n">ray_namespace</span>
+        <span class="n">runtime_env</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_job_config</span><span class="o">.</span><span class="n">runtime_env</span>
+        <span class="n">replacement_args</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">address</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">_LocalClientBuilder</span><span class="p">):</span>
+                <span class="c1"># Address might be set for LocalClientBuilder if ray.client()</span>
+                <span class="c1"># is called while ray_current_cluster is set</span>
+                <span class="c1"># (see _get_builder_from_address). In this case,</span>
+                <span class="c1"># leave off the ray:// so the user attaches the driver directly</span>
+                <span class="n">replacement_args</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">address</span><span class="si">}</span><span class="s1">&quot;&#39;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">replacement_args</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;&quot;ray://</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">address</span><span class="si">}</span><span class="s1">&quot;&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">namespace</span><span class="p">:</span>
+            <span class="n">replacement_args</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;namespace=&quot;</span><span class="si">{</span><span class="n">namespace</span><span class="si">}</span><span class="s1">&quot;&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">runtime_env</span><span class="p">:</span>
+            <span class="c1"># Use a placeholder here, since the real runtime_env would be</span>
+            <span class="c1"># difficult to read if formatted in directly</span>
+            <span class="n">replacement_args</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;runtime_env=&lt;your_runtime_env&gt;&quot;</span><span class="p">)</span>
+        <span class="n">args_str</span> <span class="o">=</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">replacement_args</span><span class="p">)</span>
+        <span class="n">replacement_call</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;ray.init(</span><span class="si">{</span><span class="n">args_str</span><span class="si">}</span><span class="s2">)&quot;</span>
+
+        <span class="c1"># Note: stack level is set to 3 since we want the warning to reach the</span>
+        <span class="c1"># call to ray.client(...).connect(). The intervening frames are</span>
+        <span class="c1"># connect() -&gt; client_deprecation_warn() -&gt; warnings.warn()</span>
+        <span class="c1"># https://docs.python.org/3/library/warnings.html#available-functions</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+            <span class="s2">&quot;Starting a connection through `ray.client` will be deprecated &quot;</span>
+            <span class="s2">&quot;in future ray versions in favor of `ray.init`. See the docs for &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;more details: </span><span class="si">{</span><span class="n">CLIENT_DOCS_URL</span><span class="si">}</span><span class="s2">. You can replace your call to &quot;</span>
+            <span class="s2">&quot;`ray.client().connect()` with the following:</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;      </span><span class="si">{</span><span class="n">replacement_call</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="ne">DeprecationWarning</span><span class="p">,</span>
+            <span class="n">stacklevel</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">_LocalClientBuilder</span><span class="p">(</span><span class="n">ClientBuilder</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">connect</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ClientContext</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Begin a connection to the address passed in via ray.client(...)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_deprecation_warn_enabled</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_client_deprecation_warn</span><span class="p">()</span>
+        <span class="c1"># Fill runtime env/namespace from environment if not already set.</span>
+        <span class="c1"># Should be done *after* the deprecation warning, since warning will</span>
+        <span class="c1"># check if those values are already set.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_fill_defaults_from_env</span><span class="p">()</span>
+
+        <span class="n">connection_dict</span> <span class="o">=</span> <span class="n">ray</span><span class="o">.</span><span class="n">init</span><span class="p">(</span><span class="n">address</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">address</span><span class="p">,</span> <span class="n">job_config</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_job_config</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">ClientContext</span><span class="p">(</span>
+            <span class="n">dashboard_url</span><span class="o">=</span><span class="n">connection_dict</span><span class="p">[</span><span class="s2">&quot;webui_url&quot;</span><span class="p">],</span>
+            <span class="n">python_version</span><span class="o">=</span><span class="s2">&quot;</span><span class="si">{}</span><span class="s2">.</span><span class="si">{}</span><span class="s2">.</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                <span class="n">sys</span><span class="o">.</span><span class="n">version_info</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">sys</span><span class="o">.</span><span class="n">version_info</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">sys</span><span class="o">.</span><span class="n">version_info</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+            <span class="p">),</span>
+            <span class="n">ray_version</span><span class="o">=</span><span class="n">ray</span><span class="o">.</span><span class="n">__version__</span><span class="p">,</span>
+            <span class="n">ray_commit</span><span class="o">=</span><span class="n">ray</span><span class="o">.</span><span class="n">__commit__</span><span class="p">,</span>
+            <span class="n">_num_clients</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+            <span class="n">_context_to_restore</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_split_address</span><span class="p">(</span><span class="n">address</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Splits address into a module string (scheme) and an inner_address.</span>
+
+<span class="sd">    If the scheme is not present, then &quot;ray://&quot; is prepended to the address.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="s2">&quot;://&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">address</span><span class="p">:</span>
+        <span class="n">address</span> <span class="o">=</span> <span class="s2">&quot;ray://&quot;</span> <span class="o">+</span> <span class="n">address</span>
+    <span class="k">return</span> <span class="n">split_address</span><span class="p">(</span><span class="n">address</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_get_builder_from_address</span><span class="p">(</span><span class="n">address</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">ClientBuilder</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">address</span> <span class="o">==</span> <span class="s2">&quot;local&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_LocalClientBuilder</span><span class="p">(</span><span class="s2">&quot;local&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">address</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># NOTE: This is not placed in `Node::get_temp_dir_path`, because</span>
+        <span class="c1"># this file is accessed before the `Node` object is created.</span>
+        <span class="n">address</span> <span class="o">=</span> <span class="n">ray</span><span class="o">.</span><span class="n">_private</span><span class="o">.</span><span class="n">services</span><span class="o">.</span><span class="n">canonicalize_bootstrap_address</span><span class="p">(</span><span class="n">address</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">_LocalClientBuilder</span><span class="p">(</span><span class="n">address</span><span class="p">)</span>
+    <span class="n">module_string</span><span class="p">,</span> <span class="n">inner_address</span> <span class="o">=</span> <span class="n">_split_address</span><span class="p">(</span><span class="n">address</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">module</span> <span class="o">=</span> <span class="n">importlib</span><span class="o">.</span><span class="n">import_module</span><span class="p">(</span><span class="n">module_string</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Module: </span><span class="si">{</span><span class="n">module_string</span><span class="si">}</span><span class="s2"> does not exist.</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;This module was parsed from Address: </span><span class="si">{</span><span class="n">address</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">e</span>
+    <span class="k">assert</span> <span class="s2">&quot;ClientBuilder&quot;</span> <span class="ow">in</span> <span class="nb">dir</span><span class="p">(</span>
+        <span class="n">module</span>
+    <span class="p">),</span> <span class="sa">f</span><span class="s2">&quot;Module: </span><span class="si">{</span><span class="n">module_string</span><span class="si">}</span><span class="s2"> does not have ClientBuilder.&quot;</span>
+    <span class="k">return</span> <span class="n">module</span><span class="o">.</span><span class="n">ClientBuilder</span><span class="p">(</span><span class="n">inner_address</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="client">
+<a class="viewcode-back" href="../../ray.html#ray.client">[docs]</a>
+<span class="nd">@Deprecated</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">client</span><span class="p">(</span>
+    <span class="n">address</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">_deprecation_warn_enabled</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ClientBuilder</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Creates a ClientBuilder based on the provided address. The address can be</span>
+<span class="sd">    of the following forms:</span>
+
+<span class="sd">        * None: Connects to or creates a local cluster and connects to it.</span>
+<span class="sd">        * ``&quot;local&quot;``: Creates a new cluster locally and connects to it.</span>
+<span class="sd">        * ``&quot;IP:Port&quot;``: Connects to a Ray Client Server at the given address.</span>
+<span class="sd">        * ``&quot;module://inner_address&quot;``: load module.ClientBuilder &amp; pass</span>
+<span class="sd">            inner_address</span>
+
+<span class="sd">    The _deprecation_warn_enabled flag enables deprecation warnings, and is</span>
+<span class="sd">    for internal use only. Set it to False to suppress client deprecation</span>
+<span class="sd">    warnings.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">env_address</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">RAY_ADDRESS_ENVIRONMENT_VARIABLE</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">env_address</span> <span class="ow">and</span> <span class="n">address</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Using address (</span><span class="si">{</span><span class="n">env_address</span><span class="si">}</span><span class="s2">) instead of auto-detection &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;because </span><span class="si">{</span><span class="n">RAY_ADDRESS_ENVIRONMENT_VARIABLE</span><span class="si">}</span><span class="s2"> is set.&quot;</span>
+        <span class="p">)</span>
+        <span class="n">address</span> <span class="o">=</span> <span class="n">env_address</span>
+
+    <span class="n">builder</span> <span class="o">=</span> <span class="n">_get_builder_from_address</span><span class="p">(</span><span class="n">address</span><span class="p">)</span>
+    <span class="c1"># Disable client deprecation warn when ray.client is used internally</span>
+    <span class="n">builder</span><span class="o">.</span><span class="n">_deprecation_warn_enabled</span> <span class="o">=</span> <span class="n">_deprecation_warn_enabled</span>
+    <span class="k">return</span> <span class="n">builder</span></div>
+
+</pre></div>
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          
+          
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2025, Andres Bermeo Marinelli
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer no-toc">
+      
+      
+      
+    </aside>
+  </div>
+</div><script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/scripts/furo.js?v=46bd48cc"></script>
+    </body>
+</html>
