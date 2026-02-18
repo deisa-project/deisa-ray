@@ -23,17 +23,43 @@ from deisa.ray.utils import get_head_actor_options
 
 
 def _ray_start_impl() -> None:
+    """
+    Default Ray startup procedure used by :class:`Deisa`.
+
+    Notes
+    -----
+    Initializes Ray only once with minimal logging. Used when the caller
+    does not provide a custom ``ray_start`` hook.
+    """
     if not ray.is_initialized():
         ray.init(address="auto", log_to_driver=False, logging_level=logging.ERROR)
 
 
 class Deisa:
+    """
+    Entry point that orchestrates analytics callbacks on Ray.
+
+    Provides an API for registering sliding window callbacks and executing
+    them as arrays arrive from simulation ranks.
+    """
+
     def __init__(
         self,
         *,
         ray_start: Optional[Callable[[], None]] = None,
         max_simulation_ahead: int = 1,
     ) -> None:
+        """
+        Initialize handler state without touching Ray.
+
+        Parameters
+        ----------
+        ray_start : Callable[[], None], optional
+            Custom callable used to start Ray. Defaults to a built-in helper.
+        max_simulation_ahead : int, optional
+            Number of timesteps the analytics may lag behind the simulation.
+            Defaults to 1.
+        """
         # cheap constructor: no Ray side effects
         config.lock()
         self._experimental_distributed_scheduling_enabled = config.experimental_distributed_scheduling_enabled
@@ -53,14 +79,13 @@ class Deisa:
 
     def _ensure_connected(self) -> None:
         """
-        Ensures that the widow handler has connected to the Ray Cluster.
+        Ensure the handler is connected to Ray and has a head actor ready.
 
-        This function connects to ray, creates a head_actor, and waits until a
-        handshake occurs, which happens when all node actors have connected to
-        the cluster. It also changes the dask on ray scheduler based on whether the
-        user wants to set centralized scheduling or not.
-
-        :param self: Description
+        Notes
+        -----
+        Starts Ray (if needed), configures Dask to use the correct scheduler,
+        creates the head actor, and exchanges configuration so that
+        scheduling actors can register themselves.
         """
         if self._connected:
             return
@@ -85,6 +110,14 @@ class Deisa:
         self._connected = True
 
     def _create_head_actor(self) -> None:
+        """
+        Instantiate the head actor that coordinates array delivery.
+
+        Notes
+        -----
+        Uses :func:`get_head_actor_options` to pin the actor to the Ray head node
+        with a detached lifetime so that analytics can connect later.
+        """
         self.head = HeadNodeActor.options(**get_head_actor_options()).remote(
             max_simulation_ahead=self.max_simulation_ahead
         )
@@ -96,18 +129,24 @@ class Deisa:
         when: Literal["AND", "OR"] = "AND",
     ):
         """
-        Decorator for easy registration
+        Decorator that registers a sliding-window analytics callback.
 
         Parameters
         ----------
-        window_specs: tuple of WindowSpec descriptions
-        exception_handler:
-        when:
+        *window_specs : WindowSpec
+            Array descriptions the callback should receive.
+        exception_handler : Optional[SupportsSlidingWindow.ExceptionHandler], optional
+            Handler invoked when the user callback raises. Defaults to
+            :func:`deisa.ray.errors._default_exception_handler`.
+        when : Literal["AND", "OR"], optional
+            Governs whether all arrays (``"AND"``) or any array (``"OR"``)
+            must be available before the callback runs. Defaults to ``"AND"``.
 
         Returns
         -------
-        returns decorator.
-
+        Callable[[SupportsSlidingWindow.Callback], SupportsSlidingWindow.Callback]
+            Decorator that registers ``simulation_callback`` with the window
+            handler.
         """
 
         def deco(fn):
@@ -127,20 +166,25 @@ class Deisa:
 
         Parameters
         ----------
-        simulation_callback : Callable
+        simulation_callback : SupportsSlidingWindow.Callback
             Function to run for each iteration; receives arrays as kwargs
             and ``timestep``.
         arrays_spec : list[WindowSpec]
             Descriptions of arrays to stream to the callback (with optional
             sliding windows).
             Maximum iterations to execute. Default is a large sentinel.
-        exception_handler : Callable(e: Exception)
-            Exception handler to handle any exception thrown by simulation (like division by zero).
-            Default to print error and go to next iteration.
+        exception_handler : Optional[SupportsSlidingWindow.ExceptionHandler]
+            Exception handler to handle any exception thrown by simulation
+            (like division by zero). Defaults to printing the error and moving on.
         when : Literal['AND', 'OR']
             When callback have multiple arrays, govern when callback should be called.
             `AND`: only call callback if ALL required arrays have been shared for a given timestep.
             `OR`: call callback if ANY array has been shared for a given timestep.
+
+        Returns
+        -------
+        SupportsSlidingWindow.Callback
+            The original callback, allowing decorator-style usage.
         """
         self._ensure_connected()  # connect + handshake before accepting callbacks
         cfg = _CallbackConfig(
@@ -172,6 +216,14 @@ class Deisa:
         raise NotImplementedError("method not yet implemented.")
 
     def generate_queue_per_array(self):
+        """
+        Prepare per-array queues that respect declared window sizes.
+
+        Notes
+        -----
+        Each queue is a :class:`collections.deque` with ``maxlen`` matching the
+        largest window requested for that array.
+        """
         for cb_cfg in self.registered_callbacks:
             description = cb_cfg.arrays_description
             for array_def in description:
@@ -294,6 +346,19 @@ class Deisa:
                     self.has_seen_array[name] = True
 
     def determine_callback_args(self, description_of_arrays_needed) -> dict[str, List[DeisaArray]]:
+        """
+        Build the kwargs passed to a simulation callback.
+
+        Parameters
+        ----------
+        description_of_arrays_needed : Sequence[WindowSpec]
+            Array descriptions requested by the callback.
+
+        Returns
+        -------
+        dict[str, List[DeisaArray]]
+            Mapping from array name to the latest (windowed) list of ``DeisaArray`` instances.
+        """
         callback_args = {}
         for description in description_of_arrays_needed:
             name = description.name
@@ -306,6 +371,22 @@ class Deisa:
         return callback_args
 
     def should_call(self, description_of_arrays_needed, when: Literal["AND", "OR"]) -> bool:
+        """
+        Determine whether a callback should execute for the current state.
+
+        Parameters
+        ----------
+        description_of_arrays_needed : Sequence[WindowSpec]
+            Array descriptions governing the callback.
+        when : Literal["AND", "OR"]
+            Execution mode specifying whether all arrays or any array must have
+            new data.
+
+        Returns
+        -------
+        bool
+            ``True`` when the callback criteria are met.
+        """
         names = [d.name for d in description_of_arrays_needed]
         if when == "AND":
             return all(self.has_new_timestep[n] for n in names)
@@ -315,11 +396,10 @@ class Deisa:
     # TODO add persist
     def set(self, *, key: Hashable, value: Any, chunked: bool = False, persist: bool = False) -> None:
         """
-        Broadcast a feedback value to all node actors.
+        Broadcast a feedback value to all scheduling actors.
 
         Parameters
         ----------
-        persist: whether val should persist
         key : Hashable
             Identifier for the shared value.
         value : Any
@@ -327,6 +407,9 @@ class Deisa:
         chunked : bool, optional
             Placeholder for future distributed-array feedback. Only ``False``
             is supported today. Default is ``False``.
+        persist : bool, optional
+            Whether the value should survive the next retrieval.
+            Defaults to ``False``.
 
         Notes
         -----

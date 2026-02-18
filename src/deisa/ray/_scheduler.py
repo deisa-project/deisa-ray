@@ -177,8 +177,8 @@ def process_keys(keys_needed) -> set:
 
     Returns
     -------
-    list
-        Flattened list of concrete task keys.
+    set
+        Flattened set of concrete task keys.
     """
 
     # Taken directly from ray. Look here:

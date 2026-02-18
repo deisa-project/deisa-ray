@@ -33,16 +33,25 @@ class Bridge:
 
     Parameters
     ----------
+    bridge_id : int
+        Identifier of the MPI rank that owns this bridge instance.
+    arrays_metadata : Mapping[str, Mapping[str, Any]]
+        Metadata describing the array layout managed by this bridge.
+    system_metadata : Mapping[str, Any]
+        Cluster-wide metadata (e.g., world size, master address/port).
+    comm : Comm, optional
+        Custom communication backend to use instead of the default Gloo
+        communicator. If ``None``, ``init_gloo_comm`` runs with ``system_metadata``.
     _node_id : str or None, optional
-        The ID of the node. If None, the ID is taken from the Ray runtime context.
-        Useful for testing with several scheduling actors on a single machine.
-        Default is None.
+        Node identifier used for testing or custom scheduling. Defaults to ``None``.
     scheduling_actor_cls : Type, optional
-        The class to use for creating the scheduling actor. Default is
-        `_RealSchedulingActor`.
+        Class used to materialize the scheduling actor. Defaults to
+        :class:`deisa.ray.scheduling_actor.SchedulingActor`.
     _init_retries : int, optional
-        Number of retry attempts when initializing the scheduling actor.
-        Default is 3.
+        Number of attempts to create and ready the node actor. Defaults to 3.
+    _comm_timeout : int or None, optional
+        Timeout (in seconds) for Gloo rendezvous during communicator
+        initialization. Defaults to 120.
 
     Attributes
     ----------
@@ -116,6 +125,9 @@ class Bridge:
         system_metadata : Mapping[str, Any]
             System metadata such as address of Ray cluster, number of MPI
             ranks, and other general information that describes the system.
+        comm : Comm, optional
+            Communication backend to use. If ``None``, a Gloo communicator
+            configured from ``system_metadata`` is initialized.
         _node_id : str or None, optional
             The ID of the node. If None, the ID is taken from the Ray runtime
             context. Useful for testing with several scheduling actors on a
@@ -126,12 +138,17 @@ class Bridge:
         _init_retries : int, optional
             Number of retry attempts when initializing the scheduling actor.
             Default is 3.
+        _comm_timeout : int or None, optional
+            Timeout in seconds for Gloo rendezvous. Default is 120 when not
+            provided.
 
         Raises
         ------
         RuntimeError
             If the scheduling actor cannot be created or initialized after
             the specified number of retries.
+        ValueError
+            If ``_comm_timeout`` is provided and is not strictly positive.
 
         Notes
         -----
@@ -139,8 +156,6 @@ class Bridge:
         yet. The scheduling actor is created with a detached lifetime and uses
         node affinity scheduling when `_node_id` is None. The first remote call
         to the scheduling actor serves as a readiness check.
-        Other Parameters
-        ----------------
         """
         self.bridge_id = bridge_id
         self._init_retries = _init_retries
@@ -282,6 +297,9 @@ class Bridge:
         store_externally : bool, optional
             If True, the data is stored externally. Not implemented yet.
             Default is False.
+        test_mode : bool, optional
+            Reserved flag for future testing or validation hooks. Currently
+            ignored. Default is False.
 
         Notes
         -----
@@ -291,6 +309,14 @@ class Bridge:
 
         Raises
         ------
+        ContractError
+            When the scheduling node detects a contract violation for the
+            provided chunk.
+
+        Returns
+        -------
+        None
+            Blocks until the node actor processes the chunk.
         """
         try:
             # Setting the owner allows keeping the reference when the simulation script terminates.
@@ -317,8 +343,19 @@ class Bridge:
         store_externally: bool = False,
     ) -> None:
         """
-        Close the bridge by creating a special array that has a special name which signals to the analytics
-        that the simulation has finished and that it should stop.
+        Close the bridge by signaling analytics that the simulation finished.
+
+        Parameters
+        ----------
+        timestep : int
+            The timestep index corresponding to the sentinel chunk.
+        store_externally : bool, optional
+            Reserved for future external storage handling. Default is False.
+
+        Returns
+        -------
+        None
+            Blocks until the sentinel chunk is known by the node actor.
         """
         self.comm.barrier()
         if self.bridge_id == 0:
@@ -421,6 +458,17 @@ class Bridge:
         When ``chunked`` is False, this method simply forwards the request to
         the node actor and returns the result (or ``default`` if not set).
         When ``chunked`` is True, a :class:`NotImplementedError` is raised.
+
+        Returns
+        -------
+        Any | None
+            The value associated with ``name`` or ``default`` if the key is
+            missing.
+
+        Raises
+        ------
+        NotImplementedError
+            Chunked retrieval is not implemented yet.
         """
         if not chunked:
             return ray.get(self.node_actor.get.remote(name, default, chunked))
