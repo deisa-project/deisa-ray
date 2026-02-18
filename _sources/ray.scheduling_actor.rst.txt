@@ -1,7 +1,0 @@
-ray.scheduling\_actor module
-============================
-
-.. automodule:: ray.scheduling_actor
-   :members:
-   :show-inheritance:
-   :undoc-members:

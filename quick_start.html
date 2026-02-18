@@ -3,10 +3,10 @@
   <head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="deisa.ray package" href="deisa.ray.html"><link rel="prev" title="Quick Start" href="quick_start.html">
+<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Analytics" href="analytics.html"><link rel="prev" title="DEISA documentation" href="index.html">
 
     <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
-        <title>Analytics - deisa-ray documentation</title>
+        <title>Quick Start - deisa-ray documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=d111a655" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -192,8 +192,8 @@
 <div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
   <p class="caption" role="heading"><span class="caption-text">Guides</span></p>
 <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="quick_start.html">Quick Start</a></li>
-<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Analytics</a></li>
+<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="analytics.html">Analytics</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -230,7 +230,7 @@
         </a>
         <div class="content-icon-container">
           <div class="view-this-page">
-  <a class="muted-link" href="_sources/analytics.rst.txt" title="View this page">
+  <a class="muted-link" href="_sources/quick_start.rst.txt" title="View this page">
     <svg><use href="#svg-eye"></use></svg>
     <span class="visually-hidden">View this page</span>
   </a>
@@ -248,98 +248,119 @@
           </label>
         </div>
         <article role="main" id="furo-main-content">
-          <section id="analytics">
-<h1>Analytics<a class="headerlink" href="#analytics" title="Link to this heading">¶</a></h1>
-<section id="simple-example">
-<h2>Simple example<a class="headerlink" href="#simple-example" title="Link to this heading">¶</a></h2>
+          <section id="quick-start">
+<h1>Quick Start<a class="headerlink" href="#quick-start" title="Link to this heading">¶</a></h1>
+<p>Deisa-ray (Dask Enabled In Situ Analytics with a Ray backend) lets HPC
+simulations stream data into Python analytics while keeping computation close to
+where the data is produced. Dask builds task graphs from your analysis code, and
+Ray runs those tasks across the cluster. The result is fast, asynchronous
+analytics with minimal network transfer.</p>
+<section id="assumptions-and-model">
+<h2>Assumptions and model<a class="headerlink" href="#assumptions-and-model" title="Link to this heading">¶</a></h2>
+<section id="simulation-side">
+<h3>Simulation side<a class="headerlink" href="#simulation-side" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p>The simulation is distributed (MPI or similar) and iterative.</p></li>
+<li><p>Any rank that will <strong>ever</strong> send data must instantiate a <code class="docutils literal notranslate"><span class="pre">Bridge</span></code>.</p></li>
+<li><p>The total number of participating ranks (<code class="docutils literal notranslate"><span class="pre">world_size</span></code>) is known up front.</p></li>
+<li><p>Each <code class="docutils literal notranslate"><span class="pre">Bridge</span></code> has a unique <code class="docutils literal notranslate"><span class="pre">bridge_id</span></code>, and there is always a bridge with
+<code class="docutils literal notranslate"><span class="pre">bridge_id=0</span></code> (the master bridge).</p></li>
+<li><p>Each bridge describes the arrays it will share via <code class="docutils literal notranslate"><span class="pre">arrays_metadata</span></code>.</p></li>
+<li><p>Sends are ordered by non-decreasing timestep: all sends for timestep <em>i</em>
+happen before any send for timestep <em>j &gt; i</em>.</p></li>
+<li><p>If data is produced on GPU, copy it to CPU before calling <code class="docutils literal notranslate"><span class="pre">Bridge.send</span></code>.</p></li>
+</ul>
+</section>
+<section id="analytics-side">
+<h3>Analytics side<a class="headerlink" href="#analytics-side" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p>Analytics run on a Ray head node. Dask arrays are backed by Ray tasks.</p></li>
+<li><p>You register callbacks with <code class="docutils literal notranslate"><span class="pre">Deisa</span></code> and then execute them.</p></li>
+<li><p>Callback arguments are lists of <code class="docutils literal notranslate"><span class="pre">DeisaArray</span></code> objects, one list per
+<code class="docutils literal notranslate"><span class="pre">WindowSpec</span></code>.</p></li>
+<li><p>The array name in <code class="docutils literal notranslate"><span class="pre">WindowSpec</span></code> must match the bridge metadata name,
+otherwise the callback will not run for that array.</p></li>
+<li><p>The window list is time-ordered and only reflects the timesteps that were
+actually sent by the simulation.</p></li>
+</ul>
+</section>
+</section>
+<section id="cluster-setup-ray">
+<h2>Cluster setup (Ray)<a class="headerlink" href="#cluster-setup-ray" title="Link to this heading">¶</a></h2>
+<p>Start a Ray head node on the analytics host, then join the simulation nodes.
+For example (often launched via Slurm):</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ray<span class="w"> </span>start<span class="w"> </span>--head
+ray<span class="w"> </span>start<span class="w"> </span>--address<span class="w"> </span>&lt;head-node-address&gt;
+</pre></div>
+</div>
+</section>
+<section id="simulation-quick-snippet">
+<h2>Simulation quick snippet<a class="headerlink" href="#simulation-quick-snippet" title="Link to this heading">¶</a></h2>
+<p>The simulation creates one <code class="docutils literal notranslate"><span class="pre">Bridge</span></code> per participating rank and sends chunks.
+The example metadata structure mirrors <code class="docutils literal notranslate"><span class="pre">tests/utils.py</span></code>.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.bridge</span><span class="w"> </span><span class="kn">import</span> <span class="n">Bridge</span>
+
+<span class="n">world_size</span> <span class="o">=</span> <span class="mi">4</span>
+<span class="n">sys_md</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;world_size&quot;</span><span class="p">:</span> <span class="n">world_size</span><span class="p">,</span>
+    <span class="s2">&quot;master_address&quot;</span><span class="p">:</span> <span class="s2">&quot;127.0.0.1&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;master_port&quot;</span><span class="p">:</span> <span class="mi">29500</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="n">arrays_md</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;temperature&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">&quot;chunk_shape&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">),</span>
+        <span class="s2">&quot;nb_chunks_per_dim&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span>
+        <span class="s2">&quot;nb_chunks_of_node&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+        <span class="s2">&quot;dtype&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span>
+        <span class="s2">&quot;chunk_position&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="n">bridge</span> <span class="o">=</span> <span class="n">Bridge</span><span class="p">(</span>
+    <span class="n">bridge_id</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+    <span class="n">arrays_metadata</span><span class="o">=</span><span class="n">arrays_md</span><span class="p">,</span>
+    <span class="n">system_metadata</span><span class="o">=</span><span class="n">sys_md</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">):</span>
+    <span class="n">chunk</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span> <span class="o">*</span> <span class="n">t</span>
+    <span class="n">bridge</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">array_name</span><span class="o">=</span><span class="s2">&quot;temperature&quot;</span><span class="p">,</span> <span class="n">chunk</span><span class="o">=</span><span class="n">chunk</span><span class="p">,</span> <span class="n">timestep</span><span class="o">=</span><span class="n">t</span><span class="p">)</span>
+
+<span class="n">bridge</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">timestep</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="analytics-quick-snippet">
+<h2>Analytics quick snippet<a class="headerlink" href="#analytics-quick-snippet" title="Link to this heading">¶</a></h2>
+<p>Define the analytics callback using Dask operations. <code class="docutils literal notranslate"><span class="pre">DeisaArray.dask</span></code> gives
+access to standard Dask array methods, and <code class="docutils literal notranslate"><span class="pre">DeisaArray.t</span></code> is the timestep.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.window_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">Deisa</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">WindowSpec</span>
 
 <span class="n">deisa</span> <span class="o">=</span> <span class="n">Deisa</span><span class="p">()</span>
 
-<span class="k">def</span><span class="w"> </span><span class="nf">simulation_callback</span><span class="p">(</span><span class="n">array</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">]):</span>
-    <span class="n">x</span> <span class="o">=</span> <span class="n">array</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
-    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Sum:&quot;</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">summary_callback</span><span class="p">(</span><span class="n">temperature_window</span><span class="p">):</span>
+    <span class="n">latest</span> <span class="o">=</span> <span class="n">temperature_window</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">mean_value</span> <span class="o">=</span> <span class="n">latest</span><span class="o">.</span><span class="n">dask</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;t=</span><span class="si">{</span><span class="n">latest</span><span class="o">.</span><span class="n">t</span><span class="si">}</span><span class="s2"> mean=</span><span class="si">{</span><span class="n">mean_value</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
 <span class="n">deisa</span><span class="o">.</span><span class="n">register_callback</span><span class="p">(</span>
-    <span class="n">simulation_callback</span><span class="p">,</span>
-    <span class="p">[</span><span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;array&quot;</span><span class="p">)],</span>
+    <span class="n">summary_callback</span><span class="p">,</span>
+    <span class="p">[</span><span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;temperature&quot;</span><span class="p">,</span> <span class="n">window_size</span><span class="o">=</span><span class="mi">3</span><span class="p">)],</span>
 <span class="p">)</span>
+
 <span class="n">deisa</span><span class="o">.</span><span class="n">execute_callbacks</span><span class="p">()</span>
 </pre></div>
 </div>
 </section>
-<section id="several-arrays">
-<h2>Several arrays<a class="headerlink" href="#several-arrays" title="Link to this heading">¶</a></h2>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.window_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">Deisa</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">WindowSpec</span>
-
-<span class="n">deisa</span> <span class="o">=</span> <span class="n">Deisa</span><span class="p">()</span>
-
-<span class="k">def</span><span class="w"> </span><span class="nf">simulation_callback</span><span class="p">(</span><span class="n">a</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">],</span> <span class="n">b</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">]):</span>
-    <span class="n">r</span> <span class="o">=</span> <span class="p">(</span><span class="n">a</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span> <span class="o">-</span> <span class="n">a</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
-
-<span class="n">deisa</span><span class="o">.</span><span class="n">register_callback</span><span class="p">(</span>
-    <span class="n">simulation_callback</span><span class="p">,</span>
-    <span class="p">[</span><span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;a&quot;</span><span class="p">),</span> <span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;b&quot;</span><span class="p">)]</span>
-<span class="p">)</span>
-<span class="n">deisa</span><span class="o">.</span><span class="n">execute_callbacks</span><span class="p">()</span>
-</pre></div>
-</div>
-</section>
-<section id="sliding-window">
-<h2>Sliding window<a class="headerlink" href="#sliding-window" title="Link to this heading">¶</a></h2>
-<p>If the analysis requires access to several iterations (for example, to compute
-a time derivative), it is possible to use the <code class="docutils literal notranslate"><span class="pre">window_size</span></code> parameter.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.window_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">Deisa</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">WindowSpec</span>
-
-<span class="n">deisa</span> <span class="o">=</span> <span class="n">Deisa</span><span class="p">()</span>
-
-<span class="k">def</span><span class="w"> </span><span class="nf">simulation_callback</span><span class="p">(</span><span class="n">arrays</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">]):</span>
-    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">arrays</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>  <span class="c1"># For the first iteration</span>
-        <span class="k">return</span>
-
-    <span class="n">current_array</span> <span class="o">=</span> <span class="n">arrays</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span>
-    <span class="n">previous_array</span> <span class="o">=</span> <span class="n">arrays</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span>
-
-    <span class="o">...</span>
-
-<span class="n">deisa</span><span class="o">.</span><span class="n">register_callback</span><span class="p">(</span>
-    <span class="n">simulation_callback</span><span class="p">,</span>
-    <span class="p">[</span>
-        <span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;array&quot;</span><span class="p">,</span> <span class="n">window_size</span><span class="o">=</span><span class="mi">2</span><span class="p">),</span>  <span class="c1"># Enable sliding window</span>
-    <span class="p">],</span>
-<span class="p">)</span>
-<span class="n">deisa</span><span class="o">.</span><span class="n">execute_callbacks</span><span class="p">()</span>
-</pre></div>
-</div>
-</section>
-<section id="dask-persist">
-<h2>Dask persist<a class="headerlink" href="#dask-persist" title="Link to this heading">¶</a></h2>
-<p>Dask’s <code class="docutils literal notranslate"><span class="pre">persist</span></code> is supported:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.window_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">Deisa</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">WindowSpec</span>
-
-<span class="n">deisa</span> <span class="o">=</span> <span class="n">Deisa</span><span class="p">()</span>
-
-<span class="k">def</span><span class="w"> </span><span class="nf">simulation_callback</span><span class="p">(</span><span class="n">array</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">]):</span>
-    <span class="n">x</span> <span class="o">=</span> <span class="n">array</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">persist</span><span class="p">()</span>
-
-    <span class="c1"># x is still a Dask array, but the sum is being computed in the background</span>
-    <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">da</span><span class="o">.</span><span class="n">Array</span><span class="p">)</span>
-
-    <span class="n">x_final</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
-    <span class="k">assert</span> <span class="n">x_final</span> <span class="o">==</span> <span class="mi">10</span> <span class="o">*</span> <span class="n">timestep</span>
-
-<span class="n">deisa</span><span class="o">.</span><span class="n">register_callback</span><span class="p">(</span>
-    <span class="n">simulation_callback</span><span class="p">,</span>
-    <span class="p">[</span><span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;array&quot;</span><span class="p">)],</span>
-<span class="p">)</span>
-
-<span class="n">deisa</span><span class="o">.</span><span class="n">execute_callbacks</span><span class="p">()</span>
-</pre></div>
-</div>
+<section id="where-to-go-next">
+<h2>Where to go next<a class="headerlink" href="#where-to-go-next" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="analytics.html"><span class="doc">Analytics</span></a> shows more callback patterns and window usage.</p></li>
+<li><p>The API reference under <code class="docutils literal notranslate"><span class="pre">deisa.ray</span></code> documents the full interface.</p></li>
+</ul>
 </section>
 </section>
 
@@ -348,23 +369,23 @@ a time derivative), it is possible to use the <code class="docutils literal notr
       <footer>
         
         <div class="related-pages">
-          <a class="next-page" href="deisa.ray.html">
+          <a class="next-page" href="analytics.html">
               <div class="page-info">
                 <div class="context">
                   <span>Next</span>
                 </div>
-                <div class="title">deisa.ray package</div>
+                <div class="title">Analytics</div>
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>
-          <a class="prev-page" href="quick_start.html">
+          <a class="prev-page" href="index.html">
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
               <div class="page-info">
                 <div class="context">
                   <span>Previous</span>
                 </div>
                 
-                <div class="title">Quick Start</div>
+                <div class="title">Home</div>
                 
               </div>
             </a>
@@ -398,11 +419,16 @@ a time derivative), it is possible to use the <code class="docutils literal notr
         <div class="toc-tree-container">
           <div class="toc-tree">
             <ul>
-<li><a class="reference internal" href="#">Analytics</a><ul>
-<li><a class="reference internal" href="#simple-example">Simple example</a></li>
-<li><a class="reference internal" href="#several-arrays">Several arrays</a></li>
-<li><a class="reference internal" href="#sliding-window">Sliding window</a></li>
-<li><a class="reference internal" href="#dask-persist">Dask persist</a></li>
+<li><a class="reference internal" href="#">Quick Start</a><ul>
+<li><a class="reference internal" href="#assumptions-and-model">Assumptions and model</a><ul>
+<li><a class="reference internal" href="#simulation-side">Simulation side</a></li>
+<li><a class="reference internal" href="#analytics-side">Analytics side</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#cluster-setup-ray">Cluster setup (Ray)</a></li>
+<li><a class="reference internal" href="#simulation-quick-snippet">Simulation quick snippet</a></li>
+<li><a class="reference internal" href="#analytics-quick-snippet">Analytics quick snippet</a></li>
+<li><a class="reference internal" href="#where-to-go-next">Where to go next</a></li>
 </ul>
 </li>
 </ul>

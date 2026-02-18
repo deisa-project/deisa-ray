@@ -4,4 +4,4 @@ deisa
 .. toctree::
    :maxdepth: 4
 
-   ray
+   deisa

@@ -1,0 +1,787 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../../../">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><link rel="index" title="Index" href="../../../genindex.html"><link rel="search" title="Search" href="../../../search.html">
+
+    <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
+        <title>deisa.ray.bridge - deisa-ray documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=d111a655" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f2f2f2;
+  --color-code-foreground: #1e1e1e;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../../../index.html"><div class="brand">deisa-ray  documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon no-toc" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../../../index.html">
+  
+  <span class="sidebar-brand-text">deisa-ray  documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../../../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../quick_start.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../analytics.html">Analytics</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../deisa.ray.html">deisa.ray package</a><input aria-label="Toggle navigation of deisa.ray package" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.bridge.html">deisa.ray.bridge module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.comm.html">deisa.ray.comm module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.config.html">deisa.ray.config module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.errors.html">deisa.ray.errors module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.head_node.html">deisa.ray.head_node module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.scheduling_actor.html">deisa.ray.scheduling_actor module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.types.html">deisa.ray.types module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.utils.html">deisa.ray.utils module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.validate.html">deisa.ray.validate module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.window_handler.html">deisa.ray.window_handler module</a></li>
+</ul>
+</li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon no-toc" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <h1>Source code for deisa.ray.bridge</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Bridge between MPI ranks and the Ray-based analytics system.</span>
+
+<span class="sd">This module exposes the :class:`Bridge` class used by simulation ranks to</span>
+<span class="sd">register their data chunks and exchange information with analytics running on</span>
+<span class="sd">top of Ray.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">,</span> <span class="n">Optional</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">ray</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">ray.actor</span><span class="w"> </span><span class="kn">import</span> <span class="n">ActorClass</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">ray.util.scheduling_strategies</span><span class="w"> </span><span class="kn">import</span> <span class="n">NodeAffinitySchedulingStrategy</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.scheduling_actor</span><span class="w"> </span><span class="kn">import</span> <span class="n">SchedulingActor</span> <span class="k">as</span> <span class="n">_RealSchedulingActor</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">RayActorHandle</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.errors</span><span class="w"> </span><span class="kn">import</span> <span class="n">ContractError</span><span class="p">,</span> <span class="n">_default_exception_handler</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.comm</span><span class="w"> </span><span class="kn">import</span> <span class="n">Comm</span><span class="p">,</span> <span class="n">init_gloo_comm</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.validate</span><span class="w"> </span><span class="kn">import</span> <span class="n">_validate_arrays_meta</span><span class="p">,</span> <span class="n">_validate_system_meta</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_node_actor_options</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.distributed</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">dist</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="Bridge">
+<a class="viewcode-back" href="../../../deisa.ray.bridge.html#deisa.ray.bridge.Bridge">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Bridge</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Bridge between MPI ranks and Ray cluster for distributed array processing.</span>
+
+<span class="sd">    Each Bridge instance is created by an MPI rank to connect to the Ray cluster</span>
+<span class="sd">    and send data chunks. Each Bridge is responsible for managing a chunk of data</span>
+<span class="sd">    from the decomposed distributed array.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    bridge_id : int</span>
+<span class="sd">        Identifier of the MPI rank that owns this bridge instance.</span>
+<span class="sd">    arrays_metadata : Mapping[str, Mapping[str, Any]]</span>
+<span class="sd">        Metadata describing the array layout managed by this bridge.</span>
+<span class="sd">    system_metadata : Mapping[str, Any]</span>
+<span class="sd">        Cluster-wide metadata (e.g., world size, master address/port).</span>
+<span class="sd">    comm : Comm, optional</span>
+<span class="sd">        Custom communication backend to use instead of the default Gloo</span>
+<span class="sd">        communicator. If ``None``, ``init_gloo_comm`` runs with ``system_metadata``.</span>
+<span class="sd">    _node_id : str or None, optional</span>
+<span class="sd">        Node identifier used for testing or custom scheduling. Defaults to ``None``.</span>
+<span class="sd">    scheduling_actor_cls : Type, optional</span>
+<span class="sd">        Class used to materialize the scheduling actor. Defaults to</span>
+<span class="sd">        :class:`deisa.ray.scheduling_actor.SchedulingActor`.</span>
+<span class="sd">    _init_retries : int, optional</span>
+<span class="sd">        Number of attempts to create and ready the node actor. Defaults to 3.</span>
+<span class="sd">    _comm_timeout : int or None, optional</span>
+<span class="sd">        Timeout (in seconds) for Gloo rendezvous during communicator</span>
+<span class="sd">        initialization. Defaults to 120.</span>
+
+<span class="sd">    Attributes</span>
+<span class="sd">    ----------</span>
+<span class="sd">    node_id : str</span>
+<span class="sd">        The ID of the node this Bridge is associated with.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    The Bridge automatically initializes Ray if it hasn&#39;t been initialized yet.</span>
+<span class="sd">    The scheduling actor is created with a detached lifetime to persist beyond</span>
+<span class="sd">    the Bridge initialization. The actor uses node affinity scheduling to ensure</span>
+<span class="sd">    it runs on the specified node.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    Create a bridge for a simulation rank that owns one array ``temperature``::</span>
+
+<span class="sd">        arrays_metadata = {</span>
+<span class="sd">            &quot;temperature&quot;: {</span>
+<span class="sd">                &quot;chunk_shape&quot;: (10, 10),</span>
+<span class="sd">                &quot;nb_chunks_per_dim&quot;: (4, 4),</span>
+<span class="sd">                &quot;nb_chunks_of_node&quot;: 1,</span>
+<span class="sd">                &quot;dtype&quot;: np.float64,</span>
+<span class="sd">                &quot;chunk_position&quot;: (0, 0),</span>
+<span class="sd">            }</span>
+<span class="sd">        }</span>
+<span class="sd">        system_metadata = {</span>
+<span class="sd">            &quot;nb_ranks&quot;: 4,</span>
+<span class="sd">            &quot;ray_address&quot;: &quot;auto&quot;,</span>
+<span class="sd">        }</span>
+
+<span class="sd">        bridge = Bridge(</span>
+<span class="sd">            id=0,</span>
+<span class="sd">            arrays_metadata=arrays_metadata,</span>
+<span class="sd">            system_metadata=system_metadata</span>
+<span class="sd">        )</span>
+
+<span class="sd">        bridge.send(</span>
+<span class="sd">            array_name=&quot;temperature&quot;,</span>
+<span class="sd">            chunk=np.zeros((10, 10), dtype=np.float64),</span>
+<span class="sd">            timestep=0</span>
+<span class="sd">        )</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># TODO: add exception handler? what should default be? If bridge is not instantiated,</span>
+    <span class="c1"># should sim crash? Keep going?</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">bridge_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">arrays_metadata</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]],</span>
+        <span class="n">system_metadata</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+        <span class="n">comm</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Comm</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">_node_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">scheduling_actor_cls</span><span class="p">:</span> <span class="n">ActorClass</span> <span class="o">=</span> <span class="n">_RealSchedulingActor</span><span class="p">,</span>
+        <span class="n">_init_retries</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span>
+        <span class="n">_comm_timeout</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize the Bridge to connect MPI rank to Ray cluster.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        bridge_id : int</span>
+<span class="sd">            Unique identifier of this Bridge.</span>
+<span class="sd">        arrays_metadata : Mapping[str, Mapping[str, Any]]</span>
+<span class="sd">            Dictionary that describes the arrays being shared by the simulation.</span>
+<span class="sd">            Keys represent the name of the array while the values are</span>
+<span class="sd">            dictionaries that must at least declare the metadata expected by</span>
+<span class="sd">            :meth:`validate_arrays_meta`.</span>
+<span class="sd">        system_metadata : Mapping[str, Any]</span>
+<span class="sd">            System metadata such as address of Ray cluster, number of MPI</span>
+<span class="sd">            ranks, and other general information that describes the system.</span>
+<span class="sd">        comm : Comm, optional</span>
+<span class="sd">            Communication backend to use. If ``None``, a Gloo communicator</span>
+<span class="sd">            configured from ``system_metadata`` is initialized.</span>
+<span class="sd">        _node_id : str or None, optional</span>
+<span class="sd">            The ID of the node. If None, the ID is taken from the Ray runtime</span>
+<span class="sd">            context. Useful for testing with several scheduling actors on a</span>
+<span class="sd">            single machine. Default is None.</span>
+<span class="sd">        scheduling_actor_cls : Type, optional</span>
+<span class="sd">            The class to use for creating the scheduling actor. Default is</span>
+<span class="sd">            `_RealSchedulingActor`.</span>
+<span class="sd">        _init_retries : int, optional</span>
+<span class="sd">            Number of retry attempts when initializing the scheduling actor.</span>
+<span class="sd">            Default is 3.</span>
+<span class="sd">        _comm_timeout : int or None, optional</span>
+<span class="sd">            Timeout in seconds for Gloo rendezvous. Default is 120 when not</span>
+<span class="sd">            provided.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        RuntimeError</span>
+<span class="sd">            If the scheduling actor cannot be created or initialized after</span>
+<span class="sd">            the specified number of retries.</span>
+<span class="sd">        ValueError</span>
+<span class="sd">            If ``_comm_timeout`` is provided and is not strictly positive.</span>
+
+<span class="sd">        Notes</span>
+<span class="sd">        -----</span>
+<span class="sd">        This method automatically initializes Ray if it hasn&#39;t been initialized</span>
+<span class="sd">        yet. The scheduling actor is created with a detached lifetime and uses</span>
+<span class="sd">        node affinity scheduling when `_node_id` is None. The first remote call</span>
+<span class="sd">        to the scheduling actor serves as a readiness check.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bridge_id</span> <span class="o">=</span> <span class="n">bridge_id</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_init_retries</span> <span class="o">=</span> <span class="n">_init_retries</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">arrays_metadata</span> <span class="o">=</span> <span class="n">_validate_arrays_meta</span><span class="p">(</span><span class="n">arrays_metadata</span><span class="p">)</span>
+
+        <span class="c1"># NOTE : Possible error : if two bridges have different first array it will have different</span>
+        <span class="c1"># shape and will be declared twice.</span>
+        <span class="c1"># Possible fix : do it somewhere else (Head or SchedulingActor)</span>
+        <span class="c1"># we add a special array with a name that will signal the end of the simulation</span>
+        <span class="c1"># note we only need the metadata so that it can pass through the entire pipeline correctly and</span>
+        <span class="c1"># in sequential order, so we just replicate the first metadata we have.</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">system_metadata</span> <span class="o">=</span> <span class="n">_validate_system_meta</span><span class="p">(</span><span class="n">system_metadata</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">bridge_id</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">arrays_metadata</span><span class="p">[</span><span class="s2">&quot;__deisa_last_iteration_array&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s2">&quot;chunk_shape&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+                <span class="s2">&quot;nb_chunks_per_dim&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+                <span class="s2">&quot;nb_chunks_of_node&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+                <span class="s2">&quot;dtype&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">int16</span><span class="p">,</span>
+                <span class="s2">&quot;chunk_position&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="p">}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_comm_timeout</span> <span class="o">=</span> <span class="mi">120</span> <span class="k">if</span> <span class="n">_comm_timeout</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="nb">int</span><span class="p">(</span><span class="n">_comm_timeout</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_comm_timeout</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;_comm_timeout must be &gt; 0 seconds, got </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_comm_timeout</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">comm</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">comm</span> <span class="o">=</span> <span class="n">init_gloo_comm</span><span class="p">(</span>
+                    <span class="n">system_metadata</span><span class="p">[</span><span class="s2">&quot;world_size&quot;</span><span class="p">],</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">bridge_id</span><span class="p">,</span>
+                    <span class="n">system_metadata</span><span class="p">[</span><span class="s2">&quot;master_address&quot;</span><span class="p">],</span>
+                    <span class="n">system_metadata</span><span class="p">[</span><span class="s2">&quot;master_port&quot;</span><span class="p">],</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_comm_timeout</span><span class="p">,</span>
+                <span class="p">)</span>
+            <span class="k">except</span> <span class="n">dist</span><span class="o">.</span><span class="n">DistStoreError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">e</span><span class="o">.</span><span class="n">add_note</span><span class="p">(</span>
+                    <span class="s2">&quot;Gloo rendezvous timeout.</span><span class="se">\n</span><span class="s2">&quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;Rank: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">bridge_id</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;Expected world size: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">system_metadata</span><span class="p">[</span><span class="s1">&#39;world_size&#39;</span><span class="p">]</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;Master: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">system_metadata</span><span class="p">[</span><span class="s1">&#39;master_address&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">system_metadata</span><span class="p">[</span><span class="s1">&#39;master_port&#39;</span><span class="p">]</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+                    <span class="s2">&quot;Not all Bridge processes connected before the deadline.</span><span class="se">\n</span><span class="s2">&quot;</span>
+                    <span class="s2">&quot;This usually indicates that one or more Bridge instances crashed, &quot;</span>
+                    <span class="s2">&quot;never started, or are blocked during initialization.&quot;</span>
+                <span class="p">)</span>
+                <span class="k">raise</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">comm</span> <span class="o">=</span> <span class="n">comm</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">ray</span><span class="o">.</span><span class="n">is_initialized</span><span class="p">():</span>
+            <span class="n">ray</span><span class="o">.</span><span class="n">init</span><span class="p">(</span><span class="n">address</span><span class="o">=</span><span class="s2">&quot;auto&quot;</span><span class="p">,</span> <span class="n">log_to_driver</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">logging_level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">ERROR</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">node_id</span> <span class="o">=</span> <span class="n">_node_id</span> <span class="ow">or</span> <span class="n">ray</span><span class="o">.</span><span class="n">get_runtime_context</span><span class="p">()</span><span class="o">.</span><span class="n">get_node_id</span><span class="p">()</span>
+        <span class="n">name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;sched-</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">node_id</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="n">namespace</span> <span class="o">=</span> <span class="s2">&quot;deisa_ray&quot;</span>
+
+        <span class="n">node_actor_options</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">get_node_actor_options</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">namespace</span><span class="p">)</span>
+
+        <span class="c1"># place node actor in the same place as detected node_id</span>
+        <span class="k">if</span> <span class="n">_node_id</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">node_actor_options</span><span class="p">[</span><span class="s2">&quot;scheduling_strategy&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">NodeAffinitySchedulingStrategy</span><span class="p">(</span>
+                <span class="n">node_id</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">node_id</span><span class="p">,</span>
+                <span class="n">soft</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="c1"># create node actor</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_create_node_actor</span><span class="p">(</span><span class="n">scheduling_actor_cls</span><span class="p">,</span> <span class="n">node_actor_options</span><span class="p">)</span>
+        <span class="c1"># exchange meta with node actor</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_exchange_chunks_meta_with_node_actor</span><span class="p">()</span>
+        <span class="c1"># make sure node actor is ready</span>
+        <span class="n">ray</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">node_actor</span><span class="o">.</span><span class="n">ready</span><span class="o">.</span><span class="n">remote</span><span class="p">())</span>
+
+        <span class="c1"># barrier to make sure that all ranks have reached this point</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">comm</span><span class="o">.</span><span class="n">barrier</span><span class="p">()</span>
+
+        <span class="c1"># after this function returns we are sure that</span>
+        <span class="c1"># 1. analytics have started</span>
+        <span class="c1"># 2. head actor is created</span>
+        <span class="c1"># 3. all bridges have connected</span>
+        <span class="c1"># 4. all node actors have been created</span>
+        <span class="c1"># 5. all node actors have received description of arrays_md</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_exchange_chunks_meta_with_node_actor</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Push per-array metadata to the node actor.</span>
+
+<span class="sd">        Notes</span>
+<span class="sd">        -----</span>
+<span class="sd">        This method registers both global chunk layout and the bridge-specific</span>
+<span class="sd">        chunk position for every array described in ``arrays_metadata``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># send metadata of each array chunk (both global and local chunk info) to node actor</span>
+
+        <span class="n">refs</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">array_name</span><span class="p">,</span> <span class="n">meta</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">arrays_metadata</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">refs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">node_actor</span><span class="o">.</span><span class="n">register_chunk_meta</span><span class="o">.</span><span class="n">remote</span><span class="p">(</span>
+                    <span class="c1"># global info of array (same across bridges)</span>
+                    <span class="n">array_name</span><span class="o">=</span><span class="n">array_name</span><span class="p">,</span>
+                    <span class="n">chunk_shape</span><span class="o">=</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;chunk_shape&quot;</span><span class="p">],</span>
+                    <span class="n">nb_chunks_per_dim</span><span class="o">=</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;nb_chunks_per_dim&quot;</span><span class="p">],</span>
+                    <span class="n">nb_chunks_of_node</span><span class="o">=</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;nb_chunks_of_node&quot;</span><span class="p">],</span>
+                    <span class="n">dtype</span><span class="o">=</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;dtype&quot;</span><span class="p">],</span>
+                    <span class="c1"># local info of array specific to bridge</span>
+                    <span class="n">bridge_id</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">bridge_id</span><span class="p">,</span>
+                    <span class="n">chunk_position</span><span class="o">=</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;chunk_position&quot;</span><span class="p">],</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+        <span class="n">ray</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">refs</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Bridge.send">
+<a class="viewcode-back" href="../../../deisa.ray.bridge.html#deisa.ray.bridge.Bridge.send">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">send</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">array_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">chunk</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+        <span class="n">timestep</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">chunked</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">store_externally</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">test_mode</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Make a chunk of data available to the analytics.</span>
+
+<span class="sd">        This method stores the ``chunk`` in Ray&#39;s object store, and</span>
+<span class="sd">        sends a reference to the node actor. The method blocks until the</span>
+<span class="sd">        data is processed by the node actor.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        array_name : str</span>
+<span class="sd">            The name of the array this chunk belongs to.</span>
+<span class="sd">        chunk : numpy.ndarray</span>
+<span class="sd">            The chunk of data to be sent to the analytics.</span>
+<span class="sd">        timestep : int</span>
+<span class="sd">            The timestep index for this chunk of data.</span>
+<span class="sd">        chunked : bool, optional</span>
+<span class="sd">            Whether the chunk was produced by the internal chunking logic.</span>
+<span class="sd">            Currently reserved for future use. Default is True.</span>
+<span class="sd">        store_externally : bool, optional</span>
+<span class="sd">            If True, the data is stored externally. Not implemented yet.</span>
+<span class="sd">            Default is False.</span>
+<span class="sd">        test_mode : bool, optional</span>
+<span class="sd">            Reserved flag for future testing or validation hooks. Currently</span>
+<span class="sd">            ignored. Default is False.</span>
+
+<span class="sd">        Notes</span>
+<span class="sd">        -----</span>
+<span class="sd">        The chunk is stored in Ray&#39;s object store with the node actor as the owner,</span>
+<span class="sd">        ensuring the reference persists even after the simulation script terminates.</span>
+<span class="sd">        This method blocks until the node actor has the chunk.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        ContractError</span>
+<span class="sd">            When the scheduling node detects a contract violation for the</span>
+<span class="sd">            provided chunk.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        None</span>
+<span class="sd">            Blocks until the node actor processes the chunk.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1"># Setting the owner allows keeping the reference when the simulation script terminates.</span>
+            <span class="n">ref</span> <span class="o">=</span> <span class="n">ray</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="n">chunk</span><span class="p">,</span> <span class="n">_owner</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">node_actor</span><span class="p">)</span>
+            <span class="n">future</span><span class="p">:</span> <span class="n">ray</span><span class="o">.</span><span class="n">ObjectRef</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">node_actor</span><span class="o">.</span><span class="n">add_chunk</span><span class="o">.</span><span class="n">remote</span><span class="p">(</span>
+                <span class="n">bridge_id</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">bridge_id</span><span class="p">,</span>
+                <span class="n">array_name</span><span class="o">=</span><span class="n">array_name</span><span class="p">,</span>
+                <span class="n">chunk_ref</span><span class="o">=</span><span class="p">[</span><span class="n">ref</span><span class="p">],</span>
+                <span class="n">timestep</span><span class="o">=</span><span class="n">timestep</span><span class="p">,</span>
+                <span class="n">chunked</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                <span class="n">store_externally</span><span class="o">=</span><span class="n">store_externally</span><span class="p">,</span>
+            <span class="p">)</span>  <span class="c1"># type: ignore</span>
+            <span class="c1"># Wait until the data is processed before returning to the simulation</span>
+            <span class="n">ray</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">future</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">ContractError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">e</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">_default_exception_handler</span><span class="p">(</span><span class="n">e</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Bridge.close">
+<a class="viewcode-back" href="../../../deisa.ray.bridge.html#deisa.ray.bridge.Bridge.close">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">close</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">timestep</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">store_externally</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Close the bridge by signaling analytics that the simulation finished.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        timestep : int</span>
+<span class="sd">            The timestep index corresponding to the sentinel chunk.</span>
+<span class="sd">        store_externally : bool, optional</span>
+<span class="sd">            Reserved for future external storage handling. Default is False.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        None</span>
+<span class="sd">            Blocks until the sentinel chunk is known by the node actor.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">comm</span><span class="o">.</span><span class="n">barrier</span><span class="p">()</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">bridge_id</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">ref</span> <span class="o">=</span> <span class="n">ray</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">_owner</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">node_actor</span><span class="p">)</span>
+                <span class="n">future</span><span class="p">:</span> <span class="n">ray</span><span class="o">.</span><span class="n">ObjectRef</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">node_actor</span><span class="o">.</span><span class="n">add_chunk</span><span class="o">.</span><span class="n">remote</span><span class="p">(</span>
+                    <span class="n">bridge_id</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">bridge_id</span><span class="p">,</span>
+                    <span class="n">array_name</span><span class="o">=</span><span class="s2">&quot;__deisa_last_iteration_array&quot;</span><span class="p">,</span>
+                    <span class="n">chunk_ref</span><span class="o">=</span><span class="p">[</span><span class="n">ref</span><span class="p">],</span>
+                    <span class="n">timestep</span><span class="o">=</span><span class="n">timestep</span><span class="p">,</span>
+                    <span class="n">chunked</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                    <span class="n">store_externally</span><span class="o">=</span><span class="n">store_externally</span><span class="p">,</span>
+                <span class="p">)</span>  <span class="c1"># type: ignore</span>
+                <span class="n">ray</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">future</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">_default_exception_handler</span><span class="p">(</span><span class="n">e</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_create_node_actor</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">node_actor_cls</span><span class="p">:</span> <span class="n">ActorClass</span> <span class="o">=</span> <span class="n">_RealSchedulingActor</span><span class="p">,</span>
+        <span class="n">node_actor_options</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Create (or get) the node actor and register arrays metadata.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        node_actor_cls : Type, optional</span>
+<span class="sd">            Class used to create the node actor. Defaults to</span>
+<span class="sd">            :class:`deisa.ray.scheduling_actor.SchedulingActor`.</span>
+<span class="sd">        node_actor_options : Mapping[str, Any] or None, optional</span>
+<span class="sd">            Options passed to ``node_actor_cls.options(**node_actor_options)``.</span>
+<span class="sd">            If None, :func:`get_node_actor_options` is used with the default</span>
+<span class="sd">            name/namespace derived from the bridge.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        RuntimeError</span>
+<span class="sd">            If the node actor cannot be created or readied after</span>
+<span class="sd">            ``_init_retries`` attempts.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">node_actor_options</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">node_actor_options</span> <span class="o">=</span> <span class="n">get_node_actor_options</span><span class="p">(</span>
+                <span class="n">name</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;sched-</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">node_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="n">namespace</span><span class="o">=</span><span class="s2">&quot;deisa_ray&quot;</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="n">last_err</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_init_retries</span><span class="p">)):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="c1"># first rank to arrive creates, others get same handle (get_if_exists)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">node_actor</span><span class="p">:</span> <span class="n">RayActorHandle</span> <span class="o">=</span> <span class="n">node_actor_cls</span><span class="o">.</span><span class="n">options</span><span class="p">(</span><span class="o">**</span><span class="n">node_actor_options</span><span class="p">)</span><span class="o">.</span><span class="n">remote</span><span class="p">(</span>
+                    <span class="n">actor_id</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">node_id</span>
+                <span class="p">)</span>  <span class="c1"># type: ignore</span>
+                <span class="k">break</span>  <span class="c1"># success</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">last_err</span> <span class="o">=</span> <span class="n">e</span>
+                <span class="c1"># Try to re-create a fresh actor instance (same name will resolve to existing or new one)</span>
+                <span class="k">continue</span>
+        <span class="c1"># `else:` clause belongs to for loop. Only executed if it finishes normally without</span>
+        <span class="c1">#  encountering a `break`.</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to create/ready scheduling actor for node </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">node_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">last_err</span>
+
+    <span class="c1"># TODO feedback needs testing</span>
+<div class="viewcode-block" id="Bridge.get">
+<a class="viewcode-back" href="../../../deisa.ray.bridge.html#deisa.ray.bridge.Bridge.get">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">default</span><span class="p">:</span> <span class="n">Any</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">chunked</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Retrieve information back from Analytics.</span>
+
+<span class="sd">        Used for two cases:</span>
+
+<span class="sd">        1. Retrieve a simple value that is set in the analytics so that the</span>
+<span class="sd">           simulation can react to some event that has been detected. This</span>
+<span class="sd">           case is asynchronous.</span>
+<span class="sd">        2. (Planned) Retrieve a distributed array that has been modified by</span>
+<span class="sd">           the analytics. This case is synchronous and currently not</span>
+<span class="sd">           implemented for ``chunked=True``.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        name : str</span>
+<span class="sd">            The name of the key that is being retrieved from the Analytics.</span>
+<span class="sd">        default : Any, optional</span>
+<span class="sd">            The default value to return if the key has not been set or does</span>
+<span class="sd">            not exist. Default is None.</span>
+<span class="sd">        chunked : bool, optional</span>
+<span class="sd">            Whether the value that is returned is distributed or not. Should</span>
+<span class="sd">            be set to True only if retrieving a distributed array that is</span>
+<span class="sd">            handled by the bridge. Currently not implemented. Default is</span>
+<span class="sd">            False.</span>
+
+<span class="sd">        Notes</span>
+<span class="sd">        -----</span>
+<span class="sd">        When ``chunked`` is False, this method simply forwards the request to</span>
+<span class="sd">        the node actor and returns the result (or ``default`` if not set).</span>
+<span class="sd">        When ``chunked`` is True, a :class:`NotImplementedError` is raised.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        Any | None</span>
+<span class="sd">            The value associated with ``name`` or ``default`` if the key is</span>
+<span class="sd">            missing.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        NotImplementedError</span>
+<span class="sd">            Chunked retrieval is not implemented yet.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">chunked</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">ray</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">node_actor</span><span class="o">.</span><span class="n">get</span><span class="o">.</span><span class="n">remote</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">default</span><span class="p">,</span> <span class="n">chunked</span><span class="p">))</span>
+
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Retrieving chunked arrays via Bridge.get is not implemented yet.&quot;</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_delete</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Delete a feedback key from the node actor if present.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        name : str</span>
+<span class="sd">            Key to remove.</span>
+
+<span class="sd">        Notes</span>
+<span class="sd">        -----</span>
+<span class="sd">        This is currently used internally after :meth:`get` to avoid</span>
+<span class="sd">        repeatedly signaling the same event. Missing keys are silently</span>
+<span class="sd">        ignored.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">node_actor</span><span class="o">.</span><span class="n">delete</span><span class="o">.</span><span class="n">remote</span><span class="p">(</span><span class="n">name</span><span class="p">)</span></div>
+
+</pre></div>
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          
+          
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2025, Andres Bermeo Marinelli
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer no-toc">
+      
+      
+      
+    </aside>
+  </div>
+</div><script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../_static/scripts/furo.js?v=46bd48cc"></script>
+    </body>
+</html>

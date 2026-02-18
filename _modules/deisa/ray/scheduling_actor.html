@@ -1,0 +1,946 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../../../">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><link rel="index" title="Index" href="../../../genindex.html"><link rel="search" title="Search" href="../../../search.html">
+
+    <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
+        <title>deisa.ray.scheduling_actor - deisa-ray documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=d111a655" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f2f2f2;
+  --color-code-foreground: #1e1e1e;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../../../index.html"><div class="brand">deisa-ray  documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon no-toc" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../../../index.html">
+  
+  <span class="sidebar-brand-text">deisa-ray  documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../../../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../quick_start.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../analytics.html">Analytics</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../deisa.ray.html">deisa.ray package</a><input aria-label="Toggle navigation of deisa.ray package" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.bridge.html">deisa.ray.bridge module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.comm.html">deisa.ray.comm module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.config.html">deisa.ray.config module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.errors.html">deisa.ray.errors module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.head_node.html">deisa.ray.head_node module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.scheduling_actor.html">deisa.ray.scheduling_actor module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.types.html">deisa.ray.types module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.utils.html">deisa.ray.utils module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.validate.html">deisa.ray.validate module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../deisa.ray.window_handler.html">deisa.ray.window_handler module</a></li>
+</ul>
+</li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon no-toc" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <h1>Source code for deisa.ray.scheduling_actor</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">pickle</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Hashable</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">ray</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">ray.util.dask</span><span class="w"> </span><span class="kn">import</span> <span class="n">ray_dask_get</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray._async_dict</span><span class="w"> </span><span class="kn">import</span> <span class="n">AsyncDict</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.errors</span><span class="w"> </span><span class="kn">import</span> <span class="n">ContractError</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.types</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">ActorID</span><span class="p">,</span>
+    <span class="n">ArrayPerTimestep</span><span class="p">,</span>
+    <span class="n">ChunkRef</span><span class="p">,</span>
+    <span class="n">GraphInfo</span><span class="p">,</span>
+    <span class="n">GraphKey</span><span class="p">,</span>
+    <span class="n">GraphValue</span><span class="p">,</span>
+    <span class="n">PartialArray</span><span class="p">,</span>
+    <span class="n">RayActorHandle</span><span class="p">,</span>
+    <span class="n">ScheduledByOtherActor</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_ready_actor_with_retry</span>
+
+
+<div class="viewcode-block" id="NodeActorBase">
+<a class="viewcode-back" href="../../../deisa.ray.scheduling_actor.html#deisa.ray.scheduling_actor.NodeActorBase">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">NodeActorBase</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Actor responsible for gathering chunks and exchanging data with analytics.</span>
+
+<span class="sd">    Each node actor is associated with a specific node and is responsible for:</span>
+
+<span class="sd">    - Collecting chunks of arrays sent by simulation nodes (via :class:`Bridge`)</span>
+<span class="sd">    - Registering its owned chunks with the head node</span>
+<span class="sd">    - Providing a small key/value channel (``set``, ``get``, ``delete``) for</span>
+<span class="sd">      non-chunked feedback between analytics and simulation.</span>
+
+<span class="sd">    The :class:`SchedulingActor` subclass adds graph-scheduling behaviour on</span>
+<span class="sd">    top of this base functionality.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    actor_id : int</span>
+<span class="sd">        Unique identifier for this node actor, typically derived from the node</span>
+<span class="sd">        ID.</span>
+
+<span class="sd">    Attributes</span>
+<span class="sd">    ----------</span>
+<span class="sd">    actor_id : int</span>
+<span class="sd">        The unique identifier for this node actor.</span>
+<span class="sd">    actor_handle : RayActorHandle</span>
+<span class="sd">        Handle to this actor instance.</span>
+<span class="sd">    head : RayActorHandle</span>
+<span class="sd">        Handle to the head node (:class:`~deisa.ray.head_node.HeadNodeActor`).</span>
+<span class="sd">    partial_arrays : AsyncDict[str, PartialArray]</span>
+<span class="sd">        Per-array containers that capture metadata and chunk references owned</span>
+<span class="sd">        by this node actor.</span>
+<span class="sd">    feedback_non_chunked : dict</span>
+<span class="sd">        Dictionary for storing non-chunked feedback values shared between</span>
+<span class="sd">        analytics and simulation.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">actor_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">arrays_metadata</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="p">{})</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize the base node actor, register with the head, and prime state.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        actor_id : int</span>
+<span class="sd">            Unique identifier for this node actor (typically the node ID).</span>
+<span class="sd">        arrays_metadata : dict, optional</span>
+<span class="sd">            Reserved for future use; currently unused. Default is ``{}``.</span>
+
+<span class="sd">        Notes</span>
+<span class="sd">        -----</span>
+<span class="sd">        Registers the actor with the head node immediately so it can start</span>
+<span class="sd">        receiving metadata and chunk notifications.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">nb_chunks_of_node</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">actor_id</span> <span class="o">=</span> <span class="n">actor_id</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">actor_handle</span> <span class="o">=</span> <span class="n">ray</span><span class="o">.</span><span class="n">get_runtime_context</span><span class="p">()</span><span class="o">.</span><span class="n">current_actor</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">head</span> <span class="o">=</span> <span class="k">await</span> <span class="n">get_ready_actor_with_retry</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;simulation_head&quot;</span><span class="p">,</span> <span class="n">namespace</span><span class="o">=</span><span class="s2">&quot;deisa_ray&quot;</span><span class="p">)</span>
+        <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">head</span><span class="o">.</span><span class="n">register_scheduling_actor</span><span class="o">.</span><span class="n">remote</span><span class="p">(</span><span class="n">actor_id</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">actor_handle</span><span class="p">)</span>
+
+        <span class="c1"># Keeps track of array metadata AND ref per timestep.</span>
+        <span class="c1"># TODO: I think these two responsabilities could be separated.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">partial_arrays</span><span class="p">:</span> <span class="n">AsyncDict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">PartialArray</span><span class="p">]</span> <span class="o">=</span> <span class="n">AsyncDict</span><span class="p">()</span>
+
+        <span class="c1"># For non-chunked feedback between analytics and simulation</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">feedback_non_chunked</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Hashable</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">should_persist</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Hashable</span><span class="p">,</span> <span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+
+<div class="viewcode-block" id="NodeActorBase.set">
+<a class="viewcode-back" href="../../../deisa.ray.scheduling_actor.html#deisa.ray.scheduling_actor.NodeActorBase.set">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="n">Hashable</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">chunked</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">persist</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Store a feedback value shared between analytics and simulation.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        key : Hashable</span>
+<span class="sd">            Identifier for the feedback value.</span>
+<span class="sd">        value : Any</span>
+<span class="sd">            Value to store.</span>
+<span class="sd">        chunked : bool, optional</span>
+<span class="sd">            Placeholder for future chunked feedback support. Must remain</span>
+<span class="sd">            ``False`` today. Default is ``False``.</span>
+<span class="sd">        persist : bool</span>
+<span class="sd">            Whether the stored value should survive the next ``get`` call.</span>
+<span class="sd">            ``True`` retains the value until explicitly deleted.</span>
+
+<span class="sd">        Notes</span>
+<span class="sd">        -----</span>
+<span class="sd">        The ``*args`` and ``**kwargs`` parameters are accepted for forward</span>
+<span class="sd">        compatibility with future signatures but are currently unused.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">chunked</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">feedback_non_chunked</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">should_persist</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">persist</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># TODO: implement chunked version</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="NodeActorBase.get">
+<a class="viewcode-back" href="../../../deisa.ray.scheduling_actor.html#deisa.ray.scheduling_actor.NodeActorBase.get">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">key</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">chunked</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Retrieve a feedback value previously stored with :meth:`set`.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        key : Hashable</span>
+<span class="sd">            Identifier of the requested value.</span>
+<span class="sd">        default : Any, optional</span>
+<span class="sd">            Value returned when ``key`` is not present. Default is ``None``.</span>
+<span class="sd">        chunked : bool, optional</span>
+<span class="sd">            Placeholder for chunked feedback retrieval. Must remain</span>
+<span class="sd">            ``False`` today. Default is ``False``.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        Any</span>
+<span class="sd">            Stored value or ``default`` if missing.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        NotImplementedError</span>
+<span class="sd">            Chunked feedback retrieval is not yet implemented.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">val</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">feedback_non_chunked</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">default</span><span class="p">)</span>
+        <span class="n">persist</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">should_persist</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">chunked</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">persist</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">delete</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="n">key</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">val</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="NodeActorBase.delete">
+<a class="viewcode-back" href="../../../deisa.ray.scheduling_actor.html#deisa.ray.scheduling_actor.NodeActorBase.delete">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">delete</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="o">*</span><span class="n">args</span><span class="p">,</span>
+        <span class="n">key</span><span class="p">:</span> <span class="n">Hashable</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Delete a feedback value if present.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        key : Hashable</span>
+<span class="sd">            Identifier to remove from the non-chunked feedback store.</span>
+
+<span class="sd">        Notes</span>
+<span class="sd">        -----</span>
+<span class="sd">        Missing keys are ignored to keep the call idempotent.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">feedback_non_chunked</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">should_persist</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_create_or_retrieve_partial_array</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">array_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">nb_chunks_of_node</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PartialArray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the partial-array container for ``array_name``, creating it if missing.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        array_name : str</span>
+<span class="sd">            Name of the array being assembled on this node.</span>
+<span class="sd">        nb_chunks_of_node : int</span>
+<span class="sd">            Number of chunks contributed by this node. Stored on the actor for</span>
+<span class="sd">            later sanity checks when receiving payloads.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        PartialArray</span>
+<span class="sd">            Container tracking metadata and per-timestep chunks.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">array_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">partial_arrays</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">partial_arrays</span><span class="p">[</span><span class="n">array_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">PartialArray</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">nb_chunks_of_node</span><span class="p">[</span><span class="n">array_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">nb_chunks_of_node</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">partial_arrays</span><span class="p">[</span><span class="n">array_name</span><span class="p">]</span>
+
+<div class="viewcode-block" id="NodeActorBase.register_chunk_meta">
+<a class="viewcode-back" href="../../../deisa.ray.scheduling_actor.html#deisa.ray.scheduling_actor.NodeActorBase.register_chunk_meta">[docs]</a>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">register_chunk_meta</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">bridge_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">array_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">chunk_shape</span><span class="p">,</span>
+        <span class="n">nb_chunks_per_dim</span><span class="p">,</span>
+        <span class="n">nb_chunks_of_node</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">dtype</span><span class="p">,</span>
+        <span class="n">chunk_position</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Register chunk metadata contributed by a bridge on this node.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        bridge_id : int</span>
+<span class="sd">            Identifier of the bridge sending the chunk.</span>
+<span class="sd">        array_name : str</span>
+<span class="sd">            Name of the array being populated.</span>
+<span class="sd">        chunk_shape : tuple[int, ...]</span>
+<span class="sd">            Shape of the chunk owned by this bridge.</span>
+<span class="sd">        nb_chunks_per_dim : tuple[int, ...]</span>
+<span class="sd">            Number of chunks per dimension in the global decomposition.</span>
+<span class="sd">        nb_chunks_of_node : int</span>
+<span class="sd">            Number of chunks contributed by this node for the array.</span>
+<span class="sd">        dtype : Any</span>
+<span class="sd">            NumPy dtype of the chunk.</span>
+<span class="sd">        chunk_position : tuple[int, ...]</span>
+<span class="sd">            Position of this chunk in the global grid.</span>
+
+<span class="sd">        Notes</span>
+<span class="sd">        -----</span>
+<span class="sd">        Once all bridges on the node have registered, the node actor forwards</span>
+<span class="sd">        the consolidated metadata to the head actor and toggles the per-array</span>
+<span class="sd">        event so concurrent callers can proceed. Until that point additional</span>
+<span class="sd">        callers block on ``ready_event``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">head</span><span class="o">.</span><span class="n">wait_until_analytics_ready</span><span class="o">.</span><span class="n">remote</span><span class="p">()</span>
+
+        <span class="n">partial_array</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_or_retrieve_partial_array</span><span class="p">(</span><span class="n">array_name</span><span class="p">,</span> <span class="n">nb_chunks_of_node</span><span class="p">)</span>
+
+        <span class="c1"># add metadata for this array</span>
+        <span class="n">partial_array</span><span class="o">.</span><span class="n">chunks_contained_meta</span><span class="o">.</span><span class="n">add</span><span class="p">((</span><span class="n">bridge_id</span><span class="p">,</span> <span class="n">chunk_position</span><span class="p">,</span> <span class="n">chunk_shape</span><span class="p">))</span>
+        <span class="n">partial_array</span><span class="o">.</span><span class="n">bid_to_pos</span><span class="p">[</span><span class="n">bridge_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">chunk_position</span>
+
+        <span class="c1"># Technically, no race conditions should happen since its calls to the same actor method</span>
+        <span class="c1"># happen synchrnously (in ray). Since the method is async, it will run the method one a at</span>
+        <span class="c1"># a time, and give control to async runtime when it encounters await below.</span>
+        <span class="c1"># HOWEVER - with certain implementation of MPI, there have been problems here.</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">partial_array</span><span class="o">.</span><span class="n">chunks_contained_meta</span><span class="p">)</span> <span class="o">==</span> <span class="n">nb_chunks_of_node</span><span class="p">:</span>
+            <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">head</span><span class="o">.</span><span class="n">register_partial_array</span><span class="o">.</span><span class="n">options</span><span class="p">(</span><span class="n">enable_task_events</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">remote</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">actor_id</span><span class="p">,</span>
+                <span class="n">array_name</span><span class="p">,</span>
+                <span class="n">dtype</span><span class="p">,</span>
+                <span class="c1"># TODO I could figure this out from the global size and the chunk shape</span>
+                <span class="n">nb_chunks_per_dim</span><span class="p">,</span>
+                <span class="nb">list</span><span class="p">(</span><span class="n">partial_array</span><span class="o">.</span><span class="n">chunks_contained_meta</span><span class="p">),</span>
+            <span class="p">)</span>
+            <span class="c1"># per array async event</span>
+            <span class="n">partial_array</span><span class="o">.</span><span class="n">ready_event</span><span class="o">.</span><span class="n">set</span><span class="p">()</span>
+            <span class="n">partial_array</span><span class="o">.</span><span class="n">ready_event</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">await</span> <span class="n">partial_array</span><span class="o">.</span><span class="n">ready_event</span><span class="o">.</span><span class="n">wait</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="NodeActorBase.ready">
+<a class="viewcode-back" href="../../../deisa.ray.scheduling_actor.html#deisa.ray.scheduling_actor.NodeActorBase.ready">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">ready</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Check if the node actor is ready.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        None</span>
+<span class="sd">            Always returns None. This method serves as a readiness check</span>
+<span class="sd">            for the actor.</span>
+
+<span class="sd">        Notes</span>
+<span class="sd">        -----</span>
+<span class="sd">        This method can be called to verify that the actor has been</span>
+<span class="sd">        successfully initialized and is ready to receive requests. It is</span>
+<span class="sd">        used by `get_ready_actor_with_retry` to ensure the actor is</span>
+<span class="sd">        operational before returning its handle.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">pass</span></div>
+
+
+    <span class="c1"># TODO: refactor from here</span>
+<div class="viewcode-block" id="NodeActorBase.add_chunk">
+<a class="viewcode-back" href="../../../deisa.ray.scheduling_actor.html#deisa.ray.scheduling_actor.NodeActorBase.add_chunk">[docs]</a>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">add_chunk</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">bridge_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">array_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">chunk_ref</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">ray</span><span class="o">.</span><span class="n">ObjectRef</span><span class="p">],</span>
+        <span class="n">timestep</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">chunked</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="o">*</span><span class="n">args</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Add a chunk of data to this node actor.</span>
+
+<span class="sd">        This method is called by Bridge instances to send chunks of arrays</span>
+<span class="sd">        to this node actor. When all chunks from a node are received, the</span>
+<span class="sd">        actor forwards a position-&gt;double-ref mapping to the head node.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        bridge_id : int</span>
+<span class="sd">            Identifier of the bridge that owns this chunk.</span>
+<span class="sd">        array_name : str</span>
+<span class="sd">            Name of the array receiving the chunk.</span>
+<span class="sd">        chunk_ref : list[ray.ObjectRef]</span>
+<span class="sd">            Single-element list containing the Ray ObjectRef to the chunk</span>
+<span class="sd">            data. The extra list level is kept for Dask compatibility.</span>
+<span class="sd">        timestep : int</span>
+<span class="sd">            Timestep index the chunk belongs to.</span>
+<span class="sd">        chunked : bool, optional</span>
+<span class="sd">            Reserved for future multi-chunk sends. Must remain ``True`` for</span>
+<span class="sd">            the current workflow. Default is ``True``.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        None</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        ContractError</span>
+<span class="sd">            If the array has not been registered via</span>
+<span class="sd">            :meth:`register_chunk_meta` before chunks are added.</span>
+
+<span class="sd">        Notes</span>
+<span class="sd">        -----</span>
+<span class="sd">        This method manages chunk collection and coordination:</span>
+
+<span class="sd">        1. Check array is expected</span>
+<span class="sd">        2. Stores the ref in the per-timestep structure.</span>
+<span class="sd">        3. When all local chunks have arrived, builds a</span>
+<span class="sd">           ``{chunk_position: double_ref}`` mapping and sends it to the head</span>
+<span class="sd">           actor via :meth:`HeadNodeActor.chunks_ready`.</span>
+<span class="sd">        4. Pickles stored refs to drop in-memory handles and free memory.</span>
+<span class="sd">        5. Signals or waits on the per-timestep event so callers block until</span>
+<span class="sd">           the node&#39;s share of chunks for the timestep is complete.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">array_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">partial_arrays</span><span class="p">:</span>
+            <span class="c1"># respect contract at the beginning</span>
+            <span class="k">raise</span> <span class="n">ContractError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;User requested to add chunk for </span><span class="si">{</span><span class="n">array_name</span><span class="si">}</span><span class="s2"> but this array has &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;not been described. Please call register_array(</span><span class="si">{</span><span class="n">array_name</span><span class="si">}</span><span class="s2">) before calling&quot;</span>
+                <span class="s2">&quot;add_chunk().&quot;</span>
+            <span class="p">)</span>
+        <span class="n">partial_array</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">partial_arrays</span><span class="p">[</span><span class="n">array_name</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">timestep</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">partial_array</span><span class="o">.</span><span class="n">per_timestep_arrays</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+            <span class="n">partial_array</span><span class="o">.</span><span class="n">per_timestep_arrays</span><span class="p">[</span><span class="n">timestep</span><span class="p">]</span> <span class="o">=</span> <span class="n">ArrayPerTimestep</span><span class="p">()</span>
+        <span class="n">array_timestep</span> <span class="o">=</span> <span class="n">partial_array</span><span class="o">.</span><span class="n">per_timestep_arrays</span><span class="p">[</span><span class="n">timestep</span><span class="p">]</span>
+
+        <span class="n">chunk_ref</span><span class="p">:</span> <span class="n">ray</span><span class="o">.</span><span class="n">ObjectRef</span> <span class="o">=</span> <span class="n">chunk_ref</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">array_timestep</span><span class="o">.</span><span class="n">local_chunks</span><span class="p">[</span><span class="n">bridge_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">chunk_ref</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">array_timestep</span><span class="o">.</span><span class="n">local_chunks</span><span class="p">)</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">nb_chunks_of_node</span><span class="p">[</span><span class="n">array_name</span><span class="p">]:</span>
+            <span class="n">pos_to_ref</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">tuple</span><span class="p">,</span> <span class="n">ray</span><span class="o">.</span><span class="n">ObjectRef</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+
+            <span class="k">for</span> <span class="n">bridge_id</span><span class="p">,</span> <span class="n">ref</span> <span class="ow">in</span> <span class="n">array_timestep</span><span class="o">.</span><span class="n">local_chunks</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ref</span><span class="p">,</span> <span class="n">ray</span><span class="o">.</span><span class="n">ObjectRef</span><span class="p">)</span>
+
+                <span class="n">pos_to_ref</span><span class="p">[</span><span class="n">partial_array</span><span class="o">.</span><span class="n">bid_to_pos</span><span class="p">[</span><span class="n">bridge_id</span><span class="p">]]</span> <span class="o">=</span> <span class="n">ref</span>
+
+                <span class="n">array_timestep</span><span class="o">.</span><span class="n">local_chunks</span><span class="p">[</span><span class="n">bridge_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">ref</span><span class="p">)</span>
+
+            <span class="c1"># TODO rename</span>
+            <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">head</span><span class="o">.</span><span class="n">chunks_ready</span><span class="o">.</span><span class="n">options</span><span class="p">(</span><span class="n">enable_task_events</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">remote</span><span class="p">(</span>
+                <span class="n">array_name</span><span class="p">,</span> <span class="n">timestep</span><span class="p">,</span> <span class="n">pos_to_ref</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">actor_id</span>
+            <span class="p">)</span>
+
+            <span class="n">array_timestep</span><span class="o">.</span><span class="n">chunks_ready_event</span><span class="o">.</span><span class="n">set</span><span class="p">()</span>
+            <span class="n">array_timestep</span><span class="o">.</span><span class="n">chunks_ready_event</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">await</span> <span class="n">array_timestep</span><span class="o">.</span><span class="n">chunks_ready_event</span><span class="o">.</span><span class="n">wait</span><span class="p">()</span></div>
+</div>
+
+
+
+<span class="nd">@ray</span><span class="o">.</span><span class="n">remote</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">SchedulingActor</span><span class="p">(</span><span class="n">NodeActorBase</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Node actor with additional Dask graph scheduling behaviour.</span>
+
+<span class="sd">    This actor inherits all chunk-collection and feedback mechanisms from</span>
+<span class="sd">    :class:`NodeActorBase` and adds graph scheduling capabilities used by the</span>
+<span class="sd">    custom Dask-on-Ray scheduler. When using a :class:`SchedulingActor`, the</span>
+<span class="sd">    custom scheduler distributes Dask task graphs across multiple actors.</span>
+<span class="sd">    When using a plain :class:`NodeActor`, standard Dask scheduling is used.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    actor_id : int</span>
+<span class="sd">        Unique identifier for this scheduling actor, typically the node ID.</span>
+<span class="sd">    arrays_metadata : dict[str, dict], optional</span>
+<span class="sd">        Currently unused but reserved for future extensions where the actor</span>
+<span class="sd">        may need array-level metadata at construction time.</span>
+
+<span class="sd">    Attributes</span>
+<span class="sd">    ----------</span>
+<span class="sd">    scheduling_actors : dict[ActorID, RayActorHandle]</span>
+<span class="sd">        Mapping of actor IDs to scheduling actor handles, populated lazily</span>
+<span class="sd">        on first scheduling request.</span>
+<span class="sd">    graph_infos : AsyncDict[int, GraphInfo]</span>
+<span class="sd">        Dictionary mapping graph IDs to their :class:`GraphInfo` objects,</span>
+<span class="sd">        which track graph scheduling state and results.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">actor_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">arrays_metadata</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="p">{})</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize a scheduling actor with shared node functionality.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        actor_id : int</span>
+<span class="sd">            Unique identifier for this scheduling actor (node ID).</span>
+<span class="sd">        arrays_metadata : dict, optional</span>
+<span class="sd">            Reserved for future extensions requiring array metadata at</span>
+<span class="sd">            construction time. Default is ``{}``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Delegate initialization to NodeActorBase, which sets up head node</span>
+        <span class="c1"># registration, arrays, and feedback mechanisms.</span>
+        <span class="k">await</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">actor_id</span><span class="o">=</span><span class="n">actor_id</span><span class="p">,</span> <span class="n">arrays_metadata</span><span class="o">=</span><span class="n">arrays_metadata</span><span class="p">)</span>
+
+        <span class="c1"># Scheduling-specific state (not needed for plain NodeActor)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">scheduling_actors</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">ActorID</span><span class="p">,</span> <span class="n">RayActorHandle</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">graph_infos</span><span class="p">:</span> <span class="n">AsyncDict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">GraphInfo</span><span class="p">]</span> <span class="o">=</span> <span class="n">AsyncDict</span><span class="p">()</span>
+
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">schedule_graph</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">graph_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">graph</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">GraphKey</span><span class="p">,</span> <span class="n">GraphValue</span><span class="p">],</span>
+        <span class="n">initial_refs</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">GraphKey</span><span class="p">,</span> <span class="n">ray</span><span class="o">.</span><span class="n">ObjectRef</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Schedule a Dask task graph for execution.</span>
+
+<span class="sd">        This method processes a Dask task graph, replacing placeholders</span>
+<span class="sd">        (ChunkRef and ScheduledByOtherActor) with actual ObjectRefs, and</span>
+<span class="sd">        schedules the graph for execution using Ray&#39;s Dask scheduler.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        graph_id : int</span>
+<span class="sd">            Unique identifier for this graph. Used to track the graph state</span>
+<span class="sd">            and retrieve results later.</span>
+<span class="sd">        graph : dict</span>
+<span class="sd">            The Dask task graph dictionary. Keys are task identifiers, and</span>
+<span class="sd">            values may be:</span>
+<span class="sd">            - Regular Dask tasks</span>
+<span class="sd">            - ChunkRef objects (replaced with actual chunk ObjectRefs)</span>
+<span class="sd">            - ScheduledByOtherActor objects (replaced with remote calls to</span>
+<span class="sd">              other actors)</span>
+<span class="sd">        initial_refs : dict[GraphKey, ray.ObjectRef] or None, optional</span>
+<span class="sd">            Optional mapping of keys to pre-seeded *double* ObjectRefs. These</span>
+<span class="sd">            refs are injected into the :class:`GraphInfo` before scheduling</span>
+<span class="sd">            completes, which can be useful for tests or bootstrapping</span>
+<span class="sd">            cross-actor dependencies. Default is ``None``.</span>
+
+<span class="sd">        Notes</span>
+<span class="sd">        -----</span>
+<span class="sd">        This method performs the following operations:</span>
+<span class="sd">        1. Retrieves the list of all scheduling actors (if not already cached)</span>
+<span class="sd">        2. Creates a GraphInfo object to track this graph&#39;s state</span>
+<span class="sd">        3. Optionally pre-populates GraphInfo with seeded references</span>
+<span class="sd">        4. Processes the task graph:</span>
+<span class="sd">           - Replaces ScheduledByOtherActor with remote calls to other actors</span>
+<span class="sd">           - Replaces ChunkRef with actual chunk ObjectRefs from local storage</span>
+<span class="sd">           - Converts pickled chunk references back to ObjectRefs</span>
+<span class="sd">        5. Schedules the graph using remote_ray_dask_get</span>
+<span class="sd">        6. Stores the resulting *double* ObjectRefs in GraphInfo</span>
+<span class="sd">        7. Sets the scheduled_event to signal completion for dependents</span>
+
+<span class="sd">        The method handles cross-actor dependencies by delegating tasks to</span>
+<span class="sd">        the appropriate scheduling actors. Chunk references are retrieved</span>
+<span class="sd">        asynchronously from the local chunks storage.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># TODO: I tried moving this in init above, but tests fail, not sure why</span>
+        <span class="c1"># Find the scheduling actors (lazy initialization)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">scheduling_actors</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">scheduling_actors</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">head</span><span class="o">.</span><span class="n">list_scheduling_actors</span><span class="o">.</span><span class="n">options</span><span class="p">(</span><span class="n">enable_task_events</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">remote</span><span class="p">()</span>
+
+        <span class="c1"># Create and store graph info for tracking this graph&#39;s execution</span>
+        <span class="n">info</span> <span class="o">=</span> <span class="n">GraphInfo</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">graph_infos</span><span class="p">[</span><span class="n">graph_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">info</span>
+
+        <span class="k">if</span> <span class="n">initial_refs</span><span class="p">:</span>
+            <span class="n">info</span><span class="o">.</span><span class="n">refs</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">initial_refs</span><span class="p">)</span>
+
+        <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">substitute_graph_values_with_refs</span><span class="p">(</span><span class="n">graph_id</span><span class="p">,</span> <span class="n">graph</span><span class="p">)</span>
+
+        <span class="c1"># we need to get result of all these keys to resolve task graph</span>
+        <span class="n">keys_needed</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">graph</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+
+        <span class="c1"># NOTE: How does the line below finish?</span>
+        <span class="c1"># Since remote_ray_dask_get returns refs, this function immediately returns and we can proceed with populating the info</span>
+        <span class="c1"># graph and setting the event. Once the event is set, the get_value rpcs, can resolve (later).</span>
+
+        <span class="c1"># NOTE: remote_ray_dask_get.remote() -&gt; ref, we do `await ref` which returns the result</span>
+        <span class="c1"># of the function, which is a tuple of doubleRef to results (per key). The reason its a double ref</span>
+        <span class="c1"># is that patched_dask_task_wrapper calls itself remotely. So:</span>
+        <span class="c1"># patched_dask_task_wrapper(doubleRef) returns patched_dask_task_wrapper.remote(singleRef)</span>
+        <span class="c1"># but the second time its called as a remote function, it returns a value.</span>
+        <span class="c1"># so, the function returns a ref -&gt; result. But, since we set ray_persist, we get a ref to the output of the function.        # function. Therefore, we get a ref -&gt; ref -&gt; result.</span>
+        <span class="c1"># Incindentally, this is why, removing ray_persist = True from remote_ray_dask_get makes everything fail (because we then</span>
+        <span class="c1"># get a tuple of single refs instead of double). We need double refs to keep the entire graph consistent.</span>
+        <span class="c1"># doubleRefs_of_results: tuple[DoubleRef] = await remote_ray_dask_get.remote(graph, keys_needed)</span>
+        <span class="n">refs_to_results</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">ray</span><span class="o">.</span><span class="n">ObjectRef</span><span class="p">]</span> <span class="o">=</span> <span class="n">ray_dask_get</span><span class="p">(</span><span class="n">graph</span><span class="p">,</span> <span class="n">keys_needed</span><span class="p">,</span> <span class="n">ray_persist</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="c1"># store the refs in a dictionary so other actors can retrieve them</span>
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">ref</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">keys_needed</span><span class="p">,</span> <span class="n">refs_to_results</span><span class="p">):</span>
+            <span class="n">info</span><span class="o">.</span><span class="n">refs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">ref</span>
+
+        <span class="n">info</span><span class="o">.</span><span class="n">scheduled_event</span><span class="o">.</span><span class="n">set</span><span class="p">()</span>
+
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">substitute_graph_values_with_refs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">graph_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">graph</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">GraphKey</span><span class="p">,</span> <span class="n">GraphValue</span><span class="p">]):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Replace placeholders in a graph with concrete Ray ObjectRefs.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        graph_id : int</span>
+<span class="sd">            Identifier of the graph being processed.</span>
+<span class="sd">        graph : dict[GraphKey, GraphValue]</span>
+<span class="sd">            Task graph that may contain :class:`ChunkRef` or</span>
+<span class="sd">            :class:`ScheduledByOtherActor` placeholders.</span>
+
+<span class="sd">        Notes</span>
+<span class="sd">        -----</span>
+<span class="sd">        The provided ``graph`` is mutated in place.</span>
+<span class="sd">        - ``ScheduledByOtherActor`` entries are rewritten to remote calls</span>
+<span class="sd">          to the owning scheduling actor.</span>
+<span class="sd">        - (not used for now) ``ChunkRef`` entries are replaced with the pickled or direct</span>
+<span class="sd">          ObjectRefs stored locally for the relevant timestep/position.</span>
+<span class="sd">        - When a stored ref is still in-memory, it is pickled to ensure</span>
+<span class="sd">          ownership transfer and memory release after scheduling.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">graph</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="c1"># Adapt external keys</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="n">ScheduledByOtherActor</span><span class="p">):</span>
+                <span class="n">actor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">scheduling_actors</span><span class="p">[</span><span class="n">val</span><span class="o">.</span><span class="n">actor_id</span><span class="p">]</span>
+                <span class="n">graph</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">actor</span><span class="o">.</span><span class="n">get_value</span><span class="o">.</span><span class="n">options</span><span class="p">(</span><span class="n">enable_task_events</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">remote</span><span class="p">(</span><span class="n">graph_id</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span>
+
+            <span class="c1"># Replace the false chunks by the real ObjectRefs</span>
+            <span class="c1"># TODO we never enter this condition due to new dask version</span>
+            <span class="c1"># so for now prepare iteration (in the future) will not work.</span>
+            <span class="c1"># FOR FUTURE WHOEVER: if trying to enable prepare iteration stuff, you need to make sure</span>
+            <span class="c1"># that the function enters the if below somehow, because the awaits are made so that</span>
+            <span class="c1"># the actor will wait until the refs are created and the leaf nodes will therefore exist.</span>
+            <span class="c1"># only then, can the tasks proceed. However, the graph itself is already created.</span>
+
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="n">ChunkRef</span><span class="p">):</span>
+                <span class="k">assert</span> <span class="n">val</span><span class="o">.</span><span class="n">actorid</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">actor_id</span>
+
+                <span class="n">array</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">partial_arrays</span><span class="o">.</span><span class="n">wait_for_key</span><span class="p">(</span><span class="n">val</span><span class="o">.</span><span class="n">array_name</span><span class="p">)</span>
+
+                <span class="n">array_timestep</span> <span class="o">=</span> <span class="k">await</span> <span class="n">array</span><span class="o">.</span><span class="n">per_timestep_arrays</span><span class="o">.</span><span class="n">wait_for_key</span><span class="p">(</span><span class="n">val</span><span class="o">.</span><span class="n">timestep</span><span class="p">)</span>
+
+                <span class="c1"># should be pickled ref of ref</span>
+                <span class="n">ref</span> <span class="o">=</span> <span class="k">await</span> <span class="n">array_timestep</span><span class="o">.</span><span class="n">local_chunks</span><span class="o">.</span><span class="n">wait_for_key</span><span class="p">(</span><span class="n">val</span><span class="o">.</span><span class="n">bridge_id</span><span class="p">)</span>
+
+                <span class="c1"># This may not be the case depending on the asyncio scheduling order</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ref</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">):</span>
+                    <span class="n">ref</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">ref</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="c1"># To free the memory automatically</span>
+                    <span class="n">ref</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">pickle</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">ref</span><span class="p">))</span>
+
+                <span class="c1"># replace ChunkRef by actual ref (still ref of ref)</span>
+                <span class="n">graph</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">ref</span>
+
+    <span class="c1"># this function does a 1 level unpacking of a ref of ref among other things.</span>
+    <span class="c1"># TODO rename this function to something better. It is called by other scheduling actors to retrieve</span>
+    <span class="c1"># a ref for a dask task that this actor posseses (is supposed to deal with). It does three things</span>
+    <span class="c1"># 1. waits for the graph to be created (look at method above)</span>
+    <span class="c1"># 2. waits for the scheduled_event to be set</span>
+    <span class="c1"># 3. retrieves the ref corresponding to the required key from a dictionary. Since this is a ref</span>
+    <span class="c1"># it awaits it to unpack one level and return the value to the task.</span>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">get_value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">graph_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Get the result value for a specific key from a scheduled graph.</span>
+
+<span class="sd">        This method retrieves the Ray ObjectRef for a task key from a</span>
+<span class="sd">        previously scheduled graph. It waits for the graph to be scheduled</span>
+<span class="sd">        before returning the reference.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        graph_id : int</span>
+<span class="sd">            The identifier of the graph containing the key.</span>
+<span class="sd">        key : str</span>
+<span class="sd">            The task key to retrieve from the graph.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        ray.ObjectRef</span>
+<span class="sd">            Ray object reference to the result of the task with the given key.</span>
+
+<span class="sd">        Notes</span>
+<span class="sd">        -----</span>
+<span class="sd">        This method is called by other scheduling actors when they need to</span>
+<span class="sd">        retrieve values from graphs scheduled by this actor. It waits for</span>
+<span class="sd">        the graph to be fully scheduled (via scheduled_event) before returning</span>
+<span class="sd">        the ObjectRef. Only one level of the double reference is unwrapped to</span>
+<span class="sd">        avoid blocking other actors, keeping cross-actor dependencies</span>
+<span class="sd">        non-blocking in distributed Dask computations.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">graph_info</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">graph_infos</span><span class="o">.</span><span class="n">wait_for_key</span><span class="p">(</span><span class="n">graph_id</span><span class="p">)</span>
+        <span class="k">await</span> <span class="n">graph_info</span><span class="o">.</span><span class="n">scheduled_event</span><span class="o">.</span><span class="n">wait</span><span class="p">()</span>
+        <span class="n">ref</span> <span class="o">=</span> <span class="n">graph_info</span><span class="o">.</span><span class="n">refs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+
+        <span class="k">async</span> <span class="k">with</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">timeout</span><span class="p">(</span><span class="mf">10.0</span><span class="p">):</span>
+            <span class="c1"># For tomorrow: I understood this - the await is similar to a ray.get() so it unpacks the ref once.</span>
+            <span class="c1"># therefore, at the end all the refs are refs of refs (same leve). Then the patches dask task wrapper</span>
+            <span class="c1"># is called and works the same way for all tasks (calls itself).</span>
+            <span class="c1"># Because of this, I also think I understand why we need a ref of ref: if you work directly with a ref of</span>
+            <span class="c1"># data, then Actor1 could need a key from Actor2, and Actor2 a key from Actor1. Both call ray.get(refOwnedByOtherActor)</span>
+            <span class="c1"># and the cluster deadlocks. To fix this, I need to make it non-blocking. How can I do this? By making it a remote call.</span>
+            <span class="c1"># However, to make the entire graph &quot;coherent&quot;, I need to make leaf nodes refs of refs as well. Then it all becomes</span>
+            <span class="c1"># cohesive.</span>
+            <span class="c1"># I am missing why we need the pickling and how memory is released.</span>
+            <span class="k">return</span> <span class="k">await</span> <span class="n">ref</span>
+
+
+<span class="nd">@ray</span><span class="o">.</span><span class="n">remote</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">NodeActor</span><span class="p">(</span><span class="n">NodeActorBase</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Actor responsible for gathering chunks and exchanging data with analytics.</span>
+
+<span class="sd">    This is a Ray actor. Shared logic is implemented in :class:`NodeActorBase`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">actor_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">arrays_metadata</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="p">{})</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize a plain node actor (without scheduling responsibilities).</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        actor_id : int</span>
+<span class="sd">            Unique identifier for the node actor.</span>
+<span class="sd">        arrays_metadata : dict, optional</span>
+<span class="sd">            Reserved for future metadata consumption. Default is ``{}``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Initialise the shared base part</span>
+        <span class="k">await</span> <span class="n">NodeActorBase</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">actor_id</span><span class="o">=</span><span class="n">actor_id</span><span class="p">,</span> <span class="n">arrays_metadata</span><span class="o">=</span><span class="n">arrays_metadata</span><span class="p">)</span>
+        <span class="c1"># Optionally: NodeActor-specific init here</span>
+</pre></div>
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          
+          
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2025, Andres Bermeo Marinelli
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer no-toc">
+      
+      
+      
+    </aside>
+  </div>
+</div><script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../_static/scripts/furo.js?v=46bd48cc"></script>
+    </body>
+</html>

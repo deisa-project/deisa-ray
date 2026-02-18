@@ -3,10 +3,10 @@
   <head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="deisa.ray package" href="deisa.ray.html"><link rel="prev" title="Quick Start" href="quick_start.html">
+<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="deisa.ray.errors module" href="deisa.ray.errors.html"><link rel="prev" title="deisa.ray.comm module" href="deisa.ray.comm.html">
 
     <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
-        <title>Analytics - deisa-ray documentation</title>
+        <title>deisa.ray.config module - deisa-ray documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=d111a655" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -191,16 +191,16 @@
 </form>
 <div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
   <p class="caption" role="heading"><span class="caption-text">Guides</span></p>
-<ul class="current">
+<ul>
 <li class="toctree-l1"><a class="reference internal" href="quick_start.html">Quick Start</a></li>
-<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Analytics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="analytics.html">Analytics</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
-<ul>
-<li class="toctree-l1 has-children"><a class="reference internal" href="deisa.ray.html">deisa.ray package</a><input aria-label="Toggle navigation of deisa.ray package" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<ul class="current">
+<li class="toctree-l1 current has-children"><a class="reference internal" href="deisa.ray.html">deisa.ray package</a><input aria-label="Toggle navigation of deisa.ray package" checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.bridge.html">deisa.ray.bridge module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.comm.html">deisa.ray.comm module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="deisa.ray.config.html">deisa.ray.config module</a></li>
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">deisa.ray.config module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.errors.html">deisa.ray.errors module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.head_node.html">deisa.ray.head_node module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.scheduling_actor.html">deisa.ray.scheduling_actor module</a></li>
@@ -230,7 +230,7 @@
         </a>
         <div class="content-icon-container">
           <div class="view-this-page">
-  <a class="muted-link" href="_sources/analytics.rst.txt" title="View this page">
+  <a class="muted-link" href="_sources/deisa.ray.config.rst.txt" title="View this page">
     <svg><use href="#svg-eye"></use></svg>
     <span class="visually-hidden">View this page</span>
   </a>
@@ -248,99 +248,76 @@
           </label>
         </div>
         <article role="main" id="furo-main-content">
-          <section id="analytics">
-<h1>Analytics<a class="headerlink" href="#analytics" title="Link to this heading">¶</a></h1>
-<section id="simple-example">
-<h2>Simple example<a class="headerlink" href="#simple-example" title="Link to this heading">¶</a></h2>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.window_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">Deisa</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">WindowSpec</span>
-
-<span class="n">deisa</span> <span class="o">=</span> <span class="n">Deisa</span><span class="p">()</span>
-
-<span class="k">def</span><span class="w"> </span><span class="nf">simulation_callback</span><span class="p">(</span><span class="n">array</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">]):</span>
-    <span class="n">x</span> <span class="o">=</span> <span class="n">array</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
-    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Sum:&quot;</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
-
-<span class="n">deisa</span><span class="o">.</span><span class="n">register_callback</span><span class="p">(</span>
-    <span class="n">simulation_callback</span><span class="p">,</span>
-    <span class="p">[</span><span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;array&quot;</span><span class="p">)],</span>
-<span class="p">)</span>
-<span class="n">deisa</span><span class="o">.</span><span class="n">execute_callbacks</span><span class="p">()</span>
+          <section id="module-deisa.ray.config">
+<span id="deisa-ray-config-module"></span><h1>deisa.ray.config module<a class="headerlink" href="#module-deisa.ray.config" title="Link to this heading">¶</a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="deisa.ray.config.Config">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">deisa.ray.config.</span></span><span class="sig-name descname"><span class="pre">Config</span></span><a class="reference internal" href="_modules/deisa/ray/config.html#Config"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#deisa.ray.config.Config" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Process-wide configuration for the deisa library.</p>
+<p>Mutable until locked. Instantiating Deisa() locks configuration to prevent
+mid-run behavior changes.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="deisa.ray.config.Config.enable_experimental_distributed_scheduling">
+<span class="sig-name descname"><span class="pre">enable_experimental_distributed_scheduling</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">enabled</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/deisa/ray/config.html#Config.enable_experimental_distributed_scheduling"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#deisa.ray.config.Config.enable_experimental_distributed_scheduling" title="Link to this definition">¶</a></dt>
+<dd><p>Enable/disable experimental distributed scheduling.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>enabled</strong> (<em>bool</em><em>, </em><em>optional</em>) – Desired state of the flag. Defaults to <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><a class="reference internal" href="deisa.ray.errors.html#deisa.ray.errors.ConfigError" title="deisa.ray.errors.ConfigError"><strong>ConfigError</strong></a> – If configuration has already been locked by instantiating <code class="docutils literal notranslate"><span class="pre">Deisa</span></code>.</p></li>
+<li><p><strong>TypeError</strong> – If <code class="docutils literal notranslate"><span class="pre">enabled</span></code> is not a boolean.</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">deisa</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">enable_experimental_distributed_scheduling</span><span class="p">()</span>      <span class="c1"># enable</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">deisa</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">enable_experimental_distributed_scheduling</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span> <span class="c1"># disable</span>
 </pre></div>
 </div>
-</section>
-<section id="several-arrays">
-<h2>Several arrays<a class="headerlink" href="#several-arrays" title="Link to this heading">¶</a></h2>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.window_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">Deisa</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">WindowSpec</span>
+</dd></dl>
 
-<span class="n">deisa</span> <span class="o">=</span> <span class="n">Deisa</span><span class="p">()</span>
+<dl class="py property">
+<dt class="sig sig-object py" id="deisa.ray.config.Config.experimental_distributed_scheduling_enabled">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">experimental_distributed_scheduling_enabled</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></span><a class="headerlink" href="#deisa.ray.config.Config.experimental_distributed_scheduling_enabled" title="Link to this definition">¶</a></dt>
+<dd><p>Read-only accessor for the experimental distributed scheduling flag.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="docutils literal notranslate"><span class="pre">True</span></code> when distributed scheduling is enabled, <code class="docutils literal notranslate"><span class="pre">False</span></code> otherwise.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
 
-<span class="k">def</span><span class="w"> </span><span class="nf">simulation_callback</span><span class="p">(</span><span class="n">a</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">],</span> <span class="n">b</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">]):</span>
-    <span class="n">r</span> <span class="o">=</span> <span class="p">(</span><span class="n">a</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span> <span class="o">-</span> <span class="n">a</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
+<dl class="py method">
+<dt class="sig sig-object py" id="deisa.ray.config.Config.is_locked">
+<span class="sig-name descname"><span class="pre">is_locked</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="_modules/deisa/ray/config.html#Config.is_locked"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#deisa.ray.config.Config.is_locked" title="Link to this definition">¶</a></dt>
+<dd><p>Report whether the configuration has been locked.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if <a class="reference internal" href="#deisa.ray.config.Config.lock" title="deisa.ray.config.Config.lock"><code class="xref py py-meth docutils literal notranslate"><span class="pre">lock()</span></code></a> has been called, otherwise <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
 
-<span class="n">deisa</span><span class="o">.</span><span class="n">register_callback</span><span class="p">(</span>
-    <span class="n">simulation_callback</span><span class="p">,</span>
-    <span class="p">[</span><span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;a&quot;</span><span class="p">),</span> <span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;b&quot;</span><span class="p">)]</span>
-<span class="p">)</span>
-<span class="n">deisa</span><span class="o">.</span><span class="n">execute_callbacks</span><span class="p">()</span>
-</pre></div>
-</div>
-</section>
-<section id="sliding-window">
-<h2>Sliding window<a class="headerlink" href="#sliding-window" title="Link to this heading">¶</a></h2>
-<p>If the analysis requires access to several iterations (for example, to compute
-a time derivative), it is possible to use the <code class="docutils literal notranslate"><span class="pre">window_size</span></code> parameter.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.window_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">Deisa</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">WindowSpec</span>
+<dl class="py method">
+<dt class="sig sig-object py" id="deisa.ray.config.Config.lock">
+<span class="sig-name descname"><span class="pre">lock</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/deisa/ray/config.html#Config.lock"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#deisa.ray.config.Config.lock" title="Link to this definition">¶</a></dt>
+<dd><p>Make configuration immutable for the remainder of the process.</p>
+<p class="rubric">Notes</p>
+<p>Called automatically when <code class="docutils literal notranslate"><span class="pre">Deisa()</span></code> is instantiated. Further
+mutation attempts will raise <code class="xref py py-class docutils literal notranslate"><span class="pre">ConfigError</span></code>.</p>
+</dd></dl>
 
-<span class="n">deisa</span> <span class="o">=</span> <span class="n">Deisa</span><span class="p">()</span>
+</dd></dl>
 
-<span class="k">def</span><span class="w"> </span><span class="nf">simulation_callback</span><span class="p">(</span><span class="n">arrays</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">]):</span>
-    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">arrays</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>  <span class="c1"># For the first iteration</span>
-        <span class="k">return</span>
-
-    <span class="n">current_array</span> <span class="o">=</span> <span class="n">arrays</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span>
-    <span class="n">previous_array</span> <span class="o">=</span> <span class="n">arrays</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span>
-
-    <span class="o">...</span>
-
-<span class="n">deisa</span><span class="o">.</span><span class="n">register_callback</span><span class="p">(</span>
-    <span class="n">simulation_callback</span><span class="p">,</span>
-    <span class="p">[</span>
-        <span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;array&quot;</span><span class="p">,</span> <span class="n">window_size</span><span class="o">=</span><span class="mi">2</span><span class="p">),</span>  <span class="c1"># Enable sliding window</span>
-    <span class="p">],</span>
-<span class="p">)</span>
-<span class="n">deisa</span><span class="o">.</span><span class="n">execute_callbacks</span><span class="p">()</span>
-</pre></div>
-</div>
-</section>
-<section id="dask-persist">
-<h2>Dask persist<a class="headerlink" href="#dask-persist" title="Link to this heading">¶</a></h2>
-<p>Dask’s <code class="docutils literal notranslate"><span class="pre">persist</span></code> is supported:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.window_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">Deisa</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">WindowSpec</span>
-
-<span class="n">deisa</span> <span class="o">=</span> <span class="n">Deisa</span><span class="p">()</span>
-
-<span class="k">def</span><span class="w"> </span><span class="nf">simulation_callback</span><span class="p">(</span><span class="n">array</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">]):</span>
-    <span class="n">x</span> <span class="o">=</span> <span class="n">array</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">persist</span><span class="p">()</span>
-
-    <span class="c1"># x is still a Dask array, but the sum is being computed in the background</span>
-    <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">da</span><span class="o">.</span><span class="n">Array</span><span class="p">)</span>
-
-    <span class="n">x_final</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
-    <span class="k">assert</span> <span class="n">x_final</span> <span class="o">==</span> <span class="mi">10</span> <span class="o">*</span> <span class="n">timestep</span>
-
-<span class="n">deisa</span><span class="o">.</span><span class="n">register_callback</span><span class="p">(</span>
-    <span class="n">simulation_callback</span><span class="p">,</span>
-    <span class="p">[</span><span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;array&quot;</span><span class="p">)],</span>
-<span class="p">)</span>
-
-<span class="n">deisa</span><span class="o">.</span><span class="n">execute_callbacks</span><span class="p">()</span>
-</pre></div>
-</div>
-</section>
 </section>
 
         </article>
@@ -348,23 +325,23 @@ a time derivative), it is possible to use the <code class="docutils literal notr
       <footer>
         
         <div class="related-pages">
-          <a class="next-page" href="deisa.ray.html">
+          <a class="next-page" href="deisa.ray.errors.html">
               <div class="page-info">
                 <div class="context">
                   <span>Next</span>
                 </div>
-                <div class="title">deisa.ray package</div>
+                <div class="title">deisa.ray.errors module</div>
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>
-          <a class="prev-page" href="quick_start.html">
+          <a class="prev-page" href="deisa.ray.comm.html">
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
               <div class="page-info">
                 <div class="context">
                   <span>Previous</span>
                 </div>
                 
-                <div class="title">Quick Start</div>
+                <div class="title">deisa.ray.comm module</div>
                 
               </div>
             </a>
@@ -398,11 +375,14 @@ a time derivative), it is possible to use the <code class="docutils literal notr
         <div class="toc-tree-container">
           <div class="toc-tree">
             <ul>
-<li><a class="reference internal" href="#">Analytics</a><ul>
-<li><a class="reference internal" href="#simple-example">Simple example</a></li>
-<li><a class="reference internal" href="#several-arrays">Several arrays</a></li>
-<li><a class="reference internal" href="#sliding-window">Sliding window</a></li>
-<li><a class="reference internal" href="#dask-persist">Dask persist</a></li>
+<li><a class="reference internal" href="#">deisa.ray.config module</a><ul>
+<li><a class="reference internal" href="#deisa.ray.config.Config"><code class="docutils literal notranslate"><span class="pre">Config</span></code></a><ul>
+<li><a class="reference internal" href="#deisa.ray.config.Config.enable_experimental_distributed_scheduling"><code class="docutils literal notranslate"><span class="pre">Config.enable_experimental_distributed_scheduling()</span></code></a></li>
+<li><a class="reference internal" href="#deisa.ray.config.Config.experimental_distributed_scheduling_enabled"><code class="docutils literal notranslate"><span class="pre">Config.experimental_distributed_scheduling_enabled</span></code></a></li>
+<li><a class="reference internal" href="#deisa.ray.config.Config.is_locked"><code class="docutils literal notranslate"><span class="pre">Config.is_locked()</span></code></a></li>
+<li><a class="reference internal" href="#deisa.ray.config.Config.lock"><code class="docutils literal notranslate"><span class="pre">Config.lock()</span></code></a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>

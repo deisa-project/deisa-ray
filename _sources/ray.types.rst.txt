@@ -1,7 +1,0 @@
-ray.types module
-================
-
-.. automodule:: ray.types
-   :members:
-   :show-inheritance:
-   :undoc-members:

@@ -3,10 +3,10 @@
   <head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="deisa.ray package" href="deisa.ray.html"><link rel="prev" title="Quick Start" href="quick_start.html">
+<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html">
 
     <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
-        <title>Analytics - deisa-ray documentation</title>
+        <title>deisa package - deisa-ray documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=d111a655" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -191,9 +191,9 @@
 </form>
 <div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
   <p class="caption" role="heading"><span class="caption-text">Guides</span></p>
-<ul class="current">
+<ul>
 <li class="toctree-l1"><a class="reference internal" href="quick_start.html">Quick Start</a></li>
-<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Analytics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="analytics.html">Analytics</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -230,7 +230,7 @@
         </a>
         <div class="content-icon-container">
           <div class="view-this-page">
-  <a class="muted-link" href="_sources/analytics.rst.txt" title="View this page">
+  <a class="muted-link" href="_sources/deisa.rst.txt" title="View this page">
     <svg><use href="#svg-eye"></use></svg>
     <span class="visually-hidden">View this page</span>
   </a>
@@ -248,98 +248,79 @@
           </label>
         </div>
         <article role="main" id="furo-main-content">
-          <section id="analytics">
-<h1>Analytics<a class="headerlink" href="#analytics" title="Link to this heading">¶</a></h1>
-<section id="simple-example">
-<h2>Simple example<a class="headerlink" href="#simple-example" title="Link to this heading">¶</a></h2>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.window_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">Deisa</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">WindowSpec</span>
-
-<span class="n">deisa</span> <span class="o">=</span> <span class="n">Deisa</span><span class="p">()</span>
-
-<span class="k">def</span><span class="w"> </span><span class="nf">simulation_callback</span><span class="p">(</span><span class="n">array</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">]):</span>
-    <span class="n">x</span> <span class="o">=</span> <span class="n">array</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
-    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Sum:&quot;</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
-
-<span class="n">deisa</span><span class="o">.</span><span class="n">register_callback</span><span class="p">(</span>
-    <span class="n">simulation_callback</span><span class="p">,</span>
-    <span class="p">[</span><span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;array&quot;</span><span class="p">)],</span>
-<span class="p">)</span>
-<span class="n">deisa</span><span class="o">.</span><span class="n">execute_callbacks</span><span class="p">()</span>
-</pre></div>
+          <section id="deisa-package">
+<h1>deisa package<a class="headerlink" href="#deisa-package" title="Link to this heading">¶</a></h1>
+<section id="subpackages">
+<h2>Subpackages<a class="headerlink" href="#subpackages" title="Link to this heading">¶</a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="deisa.ray.html">deisa.ray package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.html#submodules">Submodules</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.bridge.html">deisa.ray.bridge module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.bridge.html#deisa.ray.bridge.Bridge"><code class="docutils literal notranslate"><span class="pre">Bridge</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.comm.html">deisa.ray.comm module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.comm.html#deisa.ray.comm.Comm"><code class="docutils literal notranslate"><span class="pre">Comm</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.comm.html#deisa.ray.comm.MPICommAdapter"><code class="docutils literal notranslate"><span class="pre">MPICommAdapter</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.comm.html#deisa.ray.comm.NoOpComm"><code class="docutils literal notranslate"><span class="pre">NoOpComm</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.comm.html#deisa.ray.comm.TorchDistComm"><code class="docutils literal notranslate"><span class="pre">TorchDistComm</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.comm.html#deisa.ray.comm.init_gloo_comm"><code class="docutils literal notranslate"><span class="pre">init_gloo_comm()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.config.html">deisa.ray.config module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.config.html#deisa.ray.config.Config"><code class="docutils literal notranslate"><span class="pre">Config</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.errors.html">deisa.ray.errors module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.errors.html#deisa.ray.errors.ConfigError"><code class="docutils literal notranslate"><span class="pre">ConfigError</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.errors.html#deisa.ray.errors.ContractError"><code class="docutils literal notranslate"><span class="pre">ContractError</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.head_node.html">deisa.ray.head_node module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.scheduling_actor.html">deisa.ray.scheduling_actor module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.scheduling_actor.html#deisa.ray.scheduling_actor.NodeActorBase"><code class="docutils literal notranslate"><span class="pre">NodeActorBase</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.types.html">deisa.ray.types module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.ActorID"><code class="docutils literal notranslate"><span class="pre">ActorID</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.ArrayPerTimestep"><code class="docutils literal notranslate"><span class="pre">ArrayPerTimestep</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.ChunkRef"><code class="docutils literal notranslate"><span class="pre">ChunkRef</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.DaskArrayData"><code class="docutils literal notranslate"><span class="pre">DaskArrayData</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.DeisaArray"><code class="docutils literal notranslate"><span class="pre">DeisaArray</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.DoubleRef"><code class="docutils literal notranslate"><span class="pre">DoubleRef</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.GraphInfo"><code class="docutils literal notranslate"><span class="pre">GraphInfo</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.GraphKey"><code class="docutils literal notranslate"><span class="pre">GraphKey</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.GraphValue"><code class="docutils literal notranslate"><span class="pre">GraphValue</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.PartialArray"><code class="docutils literal notranslate"><span class="pre">PartialArray</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.ScheduledByOtherActor"><code class="docutils literal notranslate"><span class="pre">ScheduledByOtherActor</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.types.html#deisa.ray.types.WindowSpec"><code class="docutils literal notranslate"><span class="pre">WindowSpec</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.utils.html">deisa.ray.utils module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.utils.html#deisa.ray.utils.get_head_actor_options"><code class="docutils literal notranslate"><span class="pre">get_head_actor_options()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.utils.html#deisa.ray.utils.get_head_node_id"><code class="docutils literal notranslate"><span class="pre">get_head_node_id()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.utils.html#deisa.ray.utils.get_node_actor_options"><code class="docutils literal notranslate"><span class="pre">get_node_actor_options()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.utils.html#deisa.ray.utils.get_ready_actor_with_retry"><code class="docutils literal notranslate"><span class="pre">get_ready_actor_with_retry()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.utils.html#deisa.ray.utils.get_system_metadata"><code class="docutils literal notranslate"><span class="pre">get_system_metadata()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.utils.html#deisa.ray.utils.log"><code class="docutils literal notranslate"><span class="pre">log()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.validate.html">deisa.ray.validate module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="deisa.ray.window_handler.html">deisa.ray.window_handler module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="deisa.ray.window_handler.html#deisa.ray.window_handler.Deisa"><code class="docutils literal notranslate"><span class="pre">Deisa</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.html#module-deisa.ray">Module contents</a></li>
+</ul>
+</li>
+</ul>
 </div>
 </section>
-<section id="several-arrays">
-<h2>Several arrays<a class="headerlink" href="#several-arrays" title="Link to this heading">¶</a></h2>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.window_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">Deisa</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">WindowSpec</span>
-
-<span class="n">deisa</span> <span class="o">=</span> <span class="n">Deisa</span><span class="p">()</span>
-
-<span class="k">def</span><span class="w"> </span><span class="nf">simulation_callback</span><span class="p">(</span><span class="n">a</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">],</span> <span class="n">b</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">]):</span>
-    <span class="n">r</span> <span class="o">=</span> <span class="p">(</span><span class="n">a</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span> <span class="o">-</span> <span class="n">a</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
-
-<span class="n">deisa</span><span class="o">.</span><span class="n">register_callback</span><span class="p">(</span>
-    <span class="n">simulation_callback</span><span class="p">,</span>
-    <span class="p">[</span><span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;a&quot;</span><span class="p">),</span> <span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;b&quot;</span><span class="p">)]</span>
-<span class="p">)</span>
-<span class="n">deisa</span><span class="o">.</span><span class="n">execute_callbacks</span><span class="p">()</span>
-</pre></div>
-</div>
-</section>
-<section id="sliding-window">
-<h2>Sliding window<a class="headerlink" href="#sliding-window" title="Link to this heading">¶</a></h2>
-<p>If the analysis requires access to several iterations (for example, to compute
-a time derivative), it is possible to use the <code class="docutils literal notranslate"><span class="pre">window_size</span></code> parameter.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.window_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">Deisa</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">WindowSpec</span>
-
-<span class="n">deisa</span> <span class="o">=</span> <span class="n">Deisa</span><span class="p">()</span>
-
-<span class="k">def</span><span class="w"> </span><span class="nf">simulation_callback</span><span class="p">(</span><span class="n">arrays</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">]):</span>
-    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">arrays</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>  <span class="c1"># For the first iteration</span>
-        <span class="k">return</span>
-
-    <span class="n">current_array</span> <span class="o">=</span> <span class="n">arrays</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span>
-    <span class="n">previous_array</span> <span class="o">=</span> <span class="n">arrays</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span>
-
-    <span class="o">...</span>
-
-<span class="n">deisa</span><span class="o">.</span><span class="n">register_callback</span><span class="p">(</span>
-    <span class="n">simulation_callback</span><span class="p">,</span>
-    <span class="p">[</span>
-        <span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;array&quot;</span><span class="p">,</span> <span class="n">window_size</span><span class="o">=</span><span class="mi">2</span><span class="p">),</span>  <span class="c1"># Enable sliding window</span>
-    <span class="p">],</span>
-<span class="p">)</span>
-<span class="n">deisa</span><span class="o">.</span><span class="n">execute_callbacks</span><span class="p">()</span>
-</pre></div>
-</div>
-</section>
-<section id="dask-persist">
-<h2>Dask persist<a class="headerlink" href="#dask-persist" title="Link to this heading">¶</a></h2>
-<p>Dask’s <code class="docutils literal notranslate"><span class="pre">persist</span></code> is supported:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.window_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">Deisa</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">WindowSpec</span>
-
-<span class="n">deisa</span> <span class="o">=</span> <span class="n">Deisa</span><span class="p">()</span>
-
-<span class="k">def</span><span class="w"> </span><span class="nf">simulation_callback</span><span class="p">(</span><span class="n">array</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">]):</span>
-    <span class="n">x</span> <span class="o">=</span> <span class="n">array</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">persist</span><span class="p">()</span>
-
-    <span class="c1"># x is still a Dask array, but the sum is being computed in the background</span>
-    <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">da</span><span class="o">.</span><span class="n">Array</span><span class="p">)</span>
-
-    <span class="n">x_final</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
-    <span class="k">assert</span> <span class="n">x_final</span> <span class="o">==</span> <span class="mi">10</span> <span class="o">*</span> <span class="n">timestep</span>
-
-<span class="n">deisa</span><span class="o">.</span><span class="n">register_callback</span><span class="p">(</span>
-    <span class="n">simulation_callback</span><span class="p">,</span>
-    <span class="p">[</span><span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;array&quot;</span><span class="p">)],</span>
-<span class="p">)</span>
-
-<span class="n">deisa</span><span class="o">.</span><span class="n">execute_callbacks</span><span class="p">()</span>
-</pre></div>
-</div>
+<section id="module-deisa">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-deisa" title="Link to this heading">¶</a></h2>
 </section>
 </section>
 
@@ -348,26 +329,8 @@ a time derivative), it is possible to use the <code class="docutils literal notr
       <footer>
         
         <div class="related-pages">
-          <a class="next-page" href="deisa.ray.html">
-              <div class="page-info">
-                <div class="context">
-                  <span>Next</span>
-                </div>
-                <div class="title">deisa.ray package</div>
-              </div>
-              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
-            </a>
-          <a class="prev-page" href="quick_start.html">
-              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
-              <div class="page-info">
-                <div class="context">
-                  <span>Previous</span>
-                </div>
-                
-                <div class="title">Quick Start</div>
-                
-              </div>
-            </a>
+          
+          
         </div>
         <div class="bottom-of-page">
           <div class="left-details">
@@ -398,11 +361,9 @@ a time derivative), it is possible to use the <code class="docutils literal notr
         <div class="toc-tree-container">
           <div class="toc-tree">
             <ul>
-<li><a class="reference internal" href="#">Analytics</a><ul>
-<li><a class="reference internal" href="#simple-example">Simple example</a></li>
-<li><a class="reference internal" href="#several-arrays">Several arrays</a></li>
-<li><a class="reference internal" href="#sliding-window">Sliding window</a></li>
-<li><a class="reference internal" href="#dask-persist">Dask persist</a></li>
+<li><a class="reference internal" href="#">deisa package</a><ul>
+<li><a class="reference internal" href="#subpackages">Subpackages</a></li>
+<li><a class="reference internal" href="#module-deisa">Module contents</a></li>
 </ul>
 </li>
 </ul>

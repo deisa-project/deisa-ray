@@ -3,10 +3,10 @@
   <head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="deisa.ray package" href="deisa.ray.html"><link rel="prev" title="Quick Start" href="quick_start.html">
+<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="deisa.ray.validate module" href="deisa.ray.validate.html"><link rel="prev" title="deisa.ray.types module" href="deisa.ray.types.html">
 
     <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
-        <title>Analytics - deisa-ray documentation</title>
+        <title>deisa.ray.utils module - deisa-ray documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=d111a655" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -191,13 +191,13 @@
 </form>
 <div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
   <p class="caption" role="heading"><span class="caption-text">Guides</span></p>
-<ul class="current">
+<ul>
 <li class="toctree-l1"><a class="reference internal" href="quick_start.html">Quick Start</a></li>
-<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Analytics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="analytics.html">Analytics</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
-<ul>
-<li class="toctree-l1 has-children"><a class="reference internal" href="deisa.ray.html">deisa.ray package</a><input aria-label="Toggle navigation of deisa.ray package" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<ul class="current">
+<li class="toctree-l1 current has-children"><a class="reference internal" href="deisa.ray.html">deisa.ray package</a><input aria-label="Toggle navigation of deisa.ray package" checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.bridge.html">deisa.ray.bridge module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.comm.html">deisa.ray.comm module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.config.html">deisa.ray.config module</a></li>
@@ -205,7 +205,7 @@
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.head_node.html">deisa.ray.head_node module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.scheduling_actor.html">deisa.ray.scheduling_actor module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.types.html">deisa.ray.types module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="deisa.ray.utils.html">deisa.ray.utils module</a></li>
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">deisa.ray.utils module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.validate.html">deisa.ray.validate module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="deisa.ray.window_handler.html">deisa.ray.window_handler module</a></li>
 </ul>
@@ -230,7 +230,7 @@
         </a>
         <div class="content-icon-container">
           <div class="view-this-page">
-  <a class="muted-link" href="_sources/analytics.rst.txt" title="View this page">
+  <a class="muted-link" href="_sources/deisa.ray.utils.rst.txt" title="View this page">
     <svg><use href="#svg-eye"></use></svg>
     <span class="visually-hidden">View this page</span>
   </a>
@@ -248,99 +248,138 @@
           </label>
         </div>
         <article role="main" id="furo-main-content">
-          <section id="analytics">
-<h1>Analytics<a class="headerlink" href="#analytics" title="Link to this heading">¶</a></h1>
-<section id="simple-example">
-<h2>Simple example<a class="headerlink" href="#simple-example" title="Link to this heading">¶</a></h2>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.window_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">Deisa</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">WindowSpec</span>
+          <section id="module-deisa.ray.utils">
+<span id="deisa-ray-utils-module"></span><h1>deisa.ray.utils module<a class="headerlink" href="#module-deisa.ray.utils" title="Link to this heading">¶</a></h1>
+<dl class="py function">
+<dt class="sig sig-object py" id="deisa.ray.utils.get_head_actor_options">
+<span class="sig-prename descclassname"><span class="pre">deisa.ray.utils.</span></span><span class="sig-name descname"><span class="pre">get_head_actor_options</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/deisa/ray/utils.html#get_head_actor_options"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#deisa.ray.utils.get_head_actor_options" title="Link to this definition">¶</a></dt>
+<dd><p>Return the options that should be used to start the head actor.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Dictionary of Ray actor options including:
+- name: “simulation_head”
+- namespace: “deisa_ray”
+- scheduling_strategy: NodeAffinitySchedulingStrategy for the head node
+- max_concurrency: Very high value to prevent blocking
+- lifetime: “detached” to persist beyond function scope
+- enable_task_events: False for performance</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>dict</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>The head actor is scheduled on the head node with a detached lifetime
+to ensure it persists. High concurrency is set to prevent the actor
+from being blocked when gathering many references.</p>
+</dd></dl>
 
-<span class="n">deisa</span> <span class="o">=</span> <span class="n">Deisa</span><span class="p">()</span>
+<dl class="py function">
+<dt class="sig sig-object py" id="deisa.ray.utils.get_head_node_id">
+<span class="sig-prename descclassname"><span class="pre">deisa.ray.utils.</span></span><span class="sig-name descname"><span class="pre">get_head_node_id</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="_modules/deisa/ray/utils.html#get_head_node_id"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#deisa.ray.utils.get_head_node_id" title="Link to this definition">¶</a></dt>
+<dd><p>Get the node ID of the Ray cluster head node.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The node ID of the head node.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>str</p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>AssertionError</strong> – If there is not exactly one head node in the cluster.</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>This function queries Ray’s state API to find the head node. It assumes
+there is exactly one head node in the cluster.</p>
+</dd></dl>
 
-<span class="k">def</span><span class="w"> </span><span class="nf">simulation_callback</span><span class="p">(</span><span class="n">array</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">]):</span>
-    <span class="n">x</span> <span class="o">=</span> <span class="n">array</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
-    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Sum:&quot;</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
+<dl class="py function">
+<dt class="sig sig-object py" id="deisa.ray.utils.get_node_actor_options">
+<span class="sig-prename descclassname"><span class="pre">deisa.ray.utils.</span></span><span class="sig-name descname"><span class="pre">get_node_actor_options</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">namespace</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/deisa/ray/utils.html#get_node_actor_options"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#deisa.ray.utils.get_node_actor_options" title="Link to this definition">¶</a></dt>
+<dd><p>Return Ray options used to create (or get) a node scheduling actor.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>name</strong> (<em>str</em>) – Actor name to use for the node actor.</p></li>
+<li><p><strong>namespace</strong> (<em>str</em>) – Ray namespace where the actor will live.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Dictionary of options to be passed to <code class="docutils literal notranslate"><span class="pre">SchedulingActor.options</span></code>.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>dict</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>The options use <code class="docutils literal notranslate"><span class="pre">get_if_exists=True</span></code> to avoid race conditions when
+several bridges on the same node attempt to create the same actor.
+The actor is configured with:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">lifetime='detached'</span></code> so it survives the creating task</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">num_cpus=0</span></code> so it does not reserve CPU resources</p></li>
+<li><p>a very large <code class="docutils literal notranslate"><span class="pre">max_concurrency</span></code> because the actor is async-only
+and used mainly as a coordination point.</p></li>
+</ul>
+</dd></dl>
 
-<span class="n">deisa</span><span class="o">.</span><span class="n">register_callback</span><span class="p">(</span>
-    <span class="n">simulation_callback</span><span class="p">,</span>
-    <span class="p">[</span><span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;array&quot;</span><span class="p">)],</span>
-<span class="p">)</span>
-<span class="n">deisa</span><span class="o">.</span><span class="n">execute_callbacks</span><span class="p">()</span>
-</pre></div>
-</div>
-</section>
-<section id="several-arrays">
-<h2>Several arrays<a class="headerlink" href="#several-arrays" title="Link to this heading">¶</a></h2>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.window_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">Deisa</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">WindowSpec</span>
+<dl class="py function">
+<dt class="sig sig-object py" id="deisa.ray.utils.get_ready_actor_with_retry">
+<span class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">deisa.ray.utils.</span></span><span class="sig-name descname"><span class="pre">get_ready_actor_with_retry</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">namespace</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">deadline_s</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">180</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/deisa/ray/utils.html#get_ready_actor_with_retry"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#deisa.ray.utils.get_ready_actor_with_retry" title="Link to this definition">¶</a></dt>
+<dd><p>Get a Ray actor by name with retry logic and readiness check.</p>
+<p>This function attempts to retrieve a Ray actor by name and namespace,
+checking that it is ready before returning. It implements exponential
+backoff retry logic with a deadline.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>name</strong> (<em>str</em>) – The name of the actor to retrieve.</p></li>
+<li><p><strong>namespace</strong> (<em>str</em>) – The namespace of the actor.</p></li>
+<li><p><strong>deadline_s</strong> (<em>float</em><em>, </em><em>optional</em>) – Maximum time in seconds to wait for the actor to become available.
+Default is 180.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The handle to the ready actor.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>RayActorHandle</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>TimeoutError</strong> – If the actor is not found or not ready within the deadline.</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>The function uses exponential backoff with jitter for retries. The delay
+starts at 0.2 seconds and increases by a factor of 1.5 up to a maximum
+of 5.0 seconds. A small random jitter (0-0.1 seconds) is added to avoid
+thundering herd problems.</p>
+</dd></dl>
 
-<span class="n">deisa</span> <span class="o">=</span> <span class="n">Deisa</span><span class="p">()</span>
+<dl class="py function">
+<dt class="sig sig-object py" id="deisa.ray.utils.get_system_metadata">
+<span class="sig-prename descclassname"><span class="pre">deisa.ray.utils.</span></span><span class="sig-name descname"><span class="pre">get_system_metadata</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Dict</span></span></span><a class="reference internal" href="_modules/deisa/ray/utils.html#get_system_metadata"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#deisa.ray.utils.get_system_metadata" title="Link to this definition">¶</a></dt>
+<dd><p>Return system-level metadata placeholder.</p>
+<p class="rubric">Notes</p>
+<p>Currently returns an empty dictionary; the hook exists to keep backward
+compatibility with callers expecting environment metadata.</p>
+</dd></dl>
 
-<span class="k">def</span><span class="w"> </span><span class="nf">simulation_callback</span><span class="p">(</span><span class="n">a</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">],</span> <span class="n">b</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">]):</span>
-    <span class="n">r</span> <span class="o">=</span> <span class="p">(</span><span class="n">a</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span> <span class="o">-</span> <span class="n">a</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
+<dl class="py function">
+<dt class="sig sig-object py" id="deisa.ray.utils.log">
+<span class="sig-prename descclassname"><span class="pre">deisa.ray.utils.</span></span><span class="sig-name descname"><span class="pre">log</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">message</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">debug_logs_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/deisa/ray/utils.html#log"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#deisa.ray.utils.log" title="Link to this definition">¶</a></dt>
+<dd><p>Append a timestamped debug message to <code class="docutils literal notranslate"><span class="pre">debug_logs_path</span></code> if provided.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>message</strong> (<em>str</em>) – Text to append.</p></li>
+<li><p><strong>debug_logs_path</strong> (<em>str</em><em> or </em><em>None</em>) – Destination file path. If <code class="docutils literal notranslate"><span class="pre">None</span></code> logging is skipped.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
 
-<span class="n">deisa</span><span class="o">.</span><span class="n">register_callback</span><span class="p">(</span>
-    <span class="n">simulation_callback</span><span class="p">,</span>
-    <span class="p">[</span><span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;a&quot;</span><span class="p">),</span> <span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;b&quot;</span><span class="p">)]</span>
-<span class="p">)</span>
-<span class="n">deisa</span><span class="o">.</span><span class="n">execute_callbacks</span><span class="p">()</span>
-</pre></div>
-</div>
-</section>
-<section id="sliding-window">
-<h2>Sliding window<a class="headerlink" href="#sliding-window" title="Link to this heading">¶</a></h2>
-<p>If the analysis requires access to several iterations (for example, to compute
-a time derivative), it is possible to use the <code class="docutils literal notranslate"><span class="pre">window_size</span></code> parameter.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.window_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">Deisa</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">WindowSpec</span>
-
-<span class="n">deisa</span> <span class="o">=</span> <span class="n">Deisa</span><span class="p">()</span>
-
-<span class="k">def</span><span class="w"> </span><span class="nf">simulation_callback</span><span class="p">(</span><span class="n">arrays</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">]):</span>
-    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">arrays</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>  <span class="c1"># For the first iteration</span>
-        <span class="k">return</span>
-
-    <span class="n">current_array</span> <span class="o">=</span> <span class="n">arrays</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span>
-    <span class="n">previous_array</span> <span class="o">=</span> <span class="n">arrays</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span>
-
-    <span class="o">...</span>
-
-<span class="n">deisa</span><span class="o">.</span><span class="n">register_callback</span><span class="p">(</span>
-    <span class="n">simulation_callback</span><span class="p">,</span>
-    <span class="p">[</span>
-        <span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;array&quot;</span><span class="p">,</span> <span class="n">window_size</span><span class="o">=</span><span class="mi">2</span><span class="p">),</span>  <span class="c1"># Enable sliding window</span>
-    <span class="p">],</span>
-<span class="p">)</span>
-<span class="n">deisa</span><span class="o">.</span><span class="n">execute_callbacks</span><span class="p">()</span>
-</pre></div>
-</div>
-</section>
-<section id="dask-persist">
-<h2>Dask persist<a class="headerlink" href="#dask-persist" title="Link to this heading">¶</a></h2>
-<p>Dask’s <code class="docutils literal notranslate"><span class="pre">persist</span></code> is supported:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.window_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">Deisa</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">WindowSpec</span>
-
-<span class="n">deisa</span> <span class="o">=</span> <span class="n">Deisa</span><span class="p">()</span>
-
-<span class="k">def</span><span class="w"> </span><span class="nf">simulation_callback</span><span class="p">(</span><span class="n">array</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">]):</span>
-    <span class="n">x</span> <span class="o">=</span> <span class="n">array</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">persist</span><span class="p">()</span>
-
-    <span class="c1"># x is still a Dask array, but the sum is being computed in the background</span>
-    <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">da</span><span class="o">.</span><span class="n">Array</span><span class="p">)</span>
-
-    <span class="n">x_final</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
-    <span class="k">assert</span> <span class="n">x_final</span> <span class="o">==</span> <span class="mi">10</span> <span class="o">*</span> <span class="n">timestep</span>
-
-<span class="n">deisa</span><span class="o">.</span><span class="n">register_callback</span><span class="p">(</span>
-    <span class="n">simulation_callback</span><span class="p">,</span>
-    <span class="p">[</span><span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;array&quot;</span><span class="p">)],</span>
-<span class="p">)</span>
-
-<span class="n">deisa</span><span class="o">.</span><span class="n">execute_callbacks</span><span class="p">()</span>
-</pre></div>
-</div>
-</section>
 </section>
 
         </article>
@@ -348,23 +387,23 @@ a time derivative), it is possible to use the <code class="docutils literal notr
       <footer>
         
         <div class="related-pages">
-          <a class="next-page" href="deisa.ray.html">
+          <a class="next-page" href="deisa.ray.validate.html">
               <div class="page-info">
                 <div class="context">
                   <span>Next</span>
                 </div>
-                <div class="title">deisa.ray package</div>
+                <div class="title">deisa.ray.validate module</div>
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>
-          <a class="prev-page" href="quick_start.html">
+          <a class="prev-page" href="deisa.ray.types.html">
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
               <div class="page-info">
                 <div class="context">
                   <span>Previous</span>
                 </div>
                 
-                <div class="title">Quick Start</div>
+                <div class="title">deisa.ray.types module</div>
                 
               </div>
             </a>
@@ -398,11 +437,13 @@ a time derivative), it is possible to use the <code class="docutils literal notr
         <div class="toc-tree-container">
           <div class="toc-tree">
             <ul>
-<li><a class="reference internal" href="#">Analytics</a><ul>
-<li><a class="reference internal" href="#simple-example">Simple example</a></li>
-<li><a class="reference internal" href="#several-arrays">Several arrays</a></li>
-<li><a class="reference internal" href="#sliding-window">Sliding window</a></li>
-<li><a class="reference internal" href="#dask-persist">Dask persist</a></li>
+<li><a class="reference internal" href="#">deisa.ray.utils module</a><ul>
+<li><a class="reference internal" href="#deisa.ray.utils.get_head_actor_options"><code class="docutils literal notranslate"><span class="pre">get_head_actor_options()</span></code></a></li>
+<li><a class="reference internal" href="#deisa.ray.utils.get_head_node_id"><code class="docutils literal notranslate"><span class="pre">get_head_node_id()</span></code></a></li>
+<li><a class="reference internal" href="#deisa.ray.utils.get_node_actor_options"><code class="docutils literal notranslate"><span class="pre">get_node_actor_options()</span></code></a></li>
+<li><a class="reference internal" href="#deisa.ray.utils.get_ready_actor_with_retry"><code class="docutils literal notranslate"><span class="pre">get_ready_actor_with_retry()</span></code></a></li>
+<li><a class="reference internal" href="#deisa.ray.utils.get_system_metadata"><code class="docutils literal notranslate"><span class="pre">get_system_metadata()</span></code></a></li>
+<li><a class="reference internal" href="#deisa.ray.utils.log"><code class="docutils literal notranslate"><span class="pre">log()</span></code></a></li>
 </ul>
 </li>
 </ul>

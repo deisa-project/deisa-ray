@@ -14,6 +14,7 @@ This documentation includes:
    :maxdepth: 2
    :caption: Guides
 
+   quick_start
    analytics
 
 
