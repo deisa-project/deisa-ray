@@ -4,7 +4,6 @@ import logging
 from typing import Any, Callable, Hashable, List, Optional, Literal
 
 import dask
-from deisa.core.interface import SupportsSlidingWindow
 import ray
 from ray.util.dask import ray_dask_get
 
@@ -125,7 +124,7 @@ class Deisa:
     def callback(
         self,
         *window_specs,
-        exception_handler: Optional[SupportsSlidingWindow.ExceptionHandler] = None,
+        exception_handler: Optional[Callable] = None,
         when: Literal["AND", "OR"] = "AND",
     ):
         """
@@ -135,7 +134,7 @@ class Deisa:
         ----------
         *window_specs : WindowSpec
             Array descriptions the callback should receive.
-        exception_handler : Optional[SupportsSlidingWindow.ExceptionHandler], optional
+        exception_handler : Optional[Callable], optional
             Handler invoked when the user callback raises. Defaults to
             :func:`deisa.ray.errors._default_exception_handler`.
         when : Literal["AND", "OR"], optional
@@ -144,7 +143,7 @@ class Deisa:
 
         Returns
         -------
-        Callable[[SupportsSlidingWindow.Callback], SupportsSlidingWindow.Callback]
+        Callable
             Decorator that registers ``simulation_callback`` with the window
             handler.
         """
@@ -156,24 +155,24 @@ class Deisa:
 
     def register_callback(
         self,
-        simulation_callback: SupportsSlidingWindow.Callback,
+        simulation_callback: Callable,
         arrays_spec: list[WindowSpec],
-        exception_handler: Optional[SupportsSlidingWindow.ExceptionHandler] = None,
+        exception_handler: Optional[Callable] = None,
         when: Literal["AND", "OR"] = "AND",
-    ) -> SupportsSlidingWindow.Callback:
+    ) -> Callable:
         """
         Register the analytics callback and array descriptions.
 
         Parameters
         ----------
-        simulation_callback : SupportsSlidingWindow.Callback
+        simulation_callback : Callable
             Function to run for each iteration; receives arrays as kwargs
             and ``timestep``.
         arrays_spec : list[WindowSpec]
             Descriptions of arrays to stream to the callback (with optional
             sliding windows).
             Maximum iterations to execute. Default is a large sentinel.
-        exception_handler : Optional[SupportsSlidingWindow.ExceptionHandler]
+        exception_handler : Optional[Callable]
             Exception handler to handle any exception thrown by simulation
             (like division by zero). Defaults to printing the error and moving on.
         when : Literal['AND', 'OR']
@@ -183,7 +182,7 @@ class Deisa:
 
         Returns
         -------
-        SupportsSlidingWindow.Callback
+        Callable
             The original callback, allowing decorator-style usage.
         """
         self._ensure_connected()  # connect + handshake before accepting callbacks

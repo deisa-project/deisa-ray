@@ -2,11 +2,10 @@ import asyncio
 from collections import defaultdict
 from dataclasses import dataclass
 import math
-from typing import Any, TypeAlias, Literal
+from typing import Any, TypeAlias, Literal, Callable
 
 import dask.array as da
 from dask.highlevelgraph import HighLevelGraph
-from deisa.core.interface import SupportsSlidingWindow
 import numpy as np
 import ray
 import ray.actor
@@ -16,7 +15,7 @@ from deisa.ray._async_dict import AsyncDict
 
 type DoubleRef = ray.ObjectRef
 type ActorID = str
-# anything used in dask to reprsent a task key (usually its a tuple)
+# anything used in dask to represent a task key (usually it's a tuple)
 type GraphKey = Any
 # GraphValue can be any of: ChunkRef, ScheduledByOtherActor, or anything used in Dask to represent a task value.
 type GraphValue = Any
@@ -208,9 +207,9 @@ class DeisaArray:
 
 @dataclass
 class _CallbackConfig:
-    simulation_callback: SupportsSlidingWindow.Callback
+    simulation_callback: Callable
     arrays_description: list[WindowSpec]
-    exception_handler: SupportsSlidingWindow.ExceptionHandler
+    exception_handler: Callable
     when: Literal["AND", "OR"]
 
 
