@@ -2,15 +2,12 @@
 name = "deisa-ray"
 version = "0.0.5"
 description = "In Situ Analytics with Ray backend"
-authors = [{ name = "Adrien Vannson", email = "adrien.vannson@protonmail.com" }]
 requires-python = ">=3.12"
 readme = "README.md"
 dependencies = [
     "dask[dataframe]==2025.5.0",
     "ray[default]==2.48.0",
     "numpy",
-    "deisa-core>=0.2.0",
-    "distributed==2025.5.0",
     "torch>=2.10.0",
 ]
 
