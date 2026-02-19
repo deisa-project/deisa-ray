@@ -16,7 +16,7 @@ jobs:
 
     environment:
       name: pypi
-      url: https://pypi.org/p/doreisa
+      url: https://pypi.org/p/deisa-ray
 
     steps:
       - uses: actions/checkout@v4
