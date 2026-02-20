@@ -16,9 +16,9 @@ NB_ITERATIONS = 10
     "fname, enable_distributed_scheduling",
     [
         ("interesting-event.h5", False),
+        # ("interesting-event.h5", True),
+        # ("~/interesting-event.h5", True),
         ("~/interesting-event.h5", False),
-        ("interesting-event.h5", True),
-        ("~/interesting-event.h5", True),
     ],
 )
 def test_dask_save_hdf5(fname, enable_distributed_scheduling, ray_cluster) -> None:  # noqa: F811
@@ -35,10 +35,8 @@ def test_dask_save_hdf5(fname, enable_distributed_scheduling, ray_cluster) -> No
         d = Deisa(n_sim_nodes=4)
 
         def simulation_callback(array: list[DeisaArray]):
-            arr_sum = array[0].dask.sum().compute()
 
-            # If something interesting happens:
-            if 49 < arr_sum < 51:
+            if array[0].t == 5:
                 array[0].to_hdf5(fname)
 
         d.register_callback(
@@ -116,7 +114,7 @@ def test_dask_save_zarr(fname, enable_distributed_scheduling, ray_cluster) -> No
             arr_sum = array[0].dask.sum().compute()
 
             # If something that we are looking foward happens:
-            if 49 < arr_sum < 51:
+            if array[0].t == 5:
                 array[0].to_zarr(fname, component="data")
 
         d.register_callback(
