@@ -1,7 +1,7 @@
 import dask.array as da
 import ray
 from deisa.ray.types import DeisaArray
-from tests.utils import ray_cluster, simple_worker, wait_for_head_node  # noqa: F401
+from tests.utils import ray_cluster, simple_worker, wait_for_head_node, pick_free_port  # noqa: F401
 import pytest
 
 import numpy as np
@@ -16,8 +16,8 @@ NB_ITERATIONS = 10
     "fname, enable_distributed_scheduling",
     [
         ("interesting-event.h5", False),
-        # ("interesting-event.h5", True),
-        # ("~/interesting-event.h5", True),
+        ("interesting-event.h5", True),
+        ("~/interesting-event.h5", True),
         ("~/interesting-event.h5", False),
     ],
 )
@@ -32,10 +32,9 @@ def test_dask_save_hdf5(fname, enable_distributed_scheduling, ray_cluster) -> No
 
         deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
 
-        d = Deisa(n_sim_nodes=4)
+        d = Deisa()
 
         def simulation_callback(array: list[DeisaArray]):
-
             if array[0].t == 5:
                 array[0].to_hdf5(fname)
 
@@ -57,6 +56,7 @@ def test_dask_save_hdf5(fname, enable_distributed_scheduling, ray_cluster) -> No
     # Save using relative path
     head_ref = head_script.remote(fname, enable_distributed_scheduling)
     wait_for_head_node()
+    port = pick_free_port()
 
     worker_refs = []
     for rank in range(4):
@@ -69,6 +69,8 @@ def test_dask_save_hdf5(fname, enable_distributed_scheduling, ray_cluster) -> No
                 chunk_size=(1, 1),
                 nb_iterations=NB_ITERATIONS,
                 node_id=f"node_{rank}",
+                nb_nodes=4,
+                port=port,
             )
         )
 
@@ -108,11 +110,9 @@ def test_dask_save_zarr(fname, enable_distributed_scheduling, ray_cluster) -> No
 
         deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
 
-        d = Deisa(n_sim_nodes=4)
+        d = Deisa()
 
         def simulation_callback(array: list[DeisaArray]):
-            arr_sum = array[0].dask.sum().compute()
-
             # If something that we are looking foward happens:
             if array[0].t == 5:
                 array[0].to_zarr(fname, component="data")
@@ -131,6 +131,7 @@ def test_dask_save_zarr(fname, enable_distributed_scheduling, ray_cluster) -> No
 
     head_ref = head_script.remote(fname, enable_distributed_scheduling)
     wait_for_head_node()
+    port = pick_free_port()
 
     worker_refs = []
     for rank in range(4):
@@ -143,6 +144,8 @@ def test_dask_save_zarr(fname, enable_distributed_scheduling, ray_cluster) -> No
                 chunk_size=(1, 1),
                 nb_iterations=NB_ITERATIONS,
                 node_id=f"node_{rank}",
+                nb_nodes=4,
+                port=port,
             )
         )
 
