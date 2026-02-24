@@ -318,7 +318,6 @@ class DeisaArray:
             """
 
             layout = h5py.VirtualLayout(shape=data_shape, dtype=data_dtype)
-            print(chunk_shape, data_shape)
 
             for block_id in np.ndindex(nb_chunks_per_dim):
 
@@ -334,10 +333,17 @@ class DeisaArray:
 
         full_path = pathlib.Path(fname).expanduser().resolve()
 
+        delayed_grid = self.dask.to_delayed()
+
+        writing_tasks = []
+        for block_id in np.ndindex(delayed_grid.shape):
+            chunk = delayed_grid[block_id]
+
+            writing_tasks.append(dask.delayed(save_chunk)(chunk, fname=str(full_path), block_id=block_id))
+
         create_vds(full_path, self.dask.chunksize, self.dask.shape, self.dask.numblocks, self.dask.dtype)
 
-        writing_tasks = self.dask.map_blocks(save_chunk, fname=full_path, dtype=self.dask.dtype)
-        writing_tasks.compute()
+        dask.compute(*writing_tasks)
 
 
 @dataclass
