@@ -225,8 +225,6 @@ class DeisaArray:
         https://docs.dask.org/en/latest/generated/dask.array.to_zarr.html#dask.array.to_zarr
         """
 
-        import zarr
-
         full_path = pathlib.Path(fname).expanduser().resolve()
         da.to_zarr(self.dask.persist(), full_path, component=component, compute=True)
 
@@ -274,9 +272,7 @@ class DeisaArray:
 
             return parents / new_name
 
-        def save_chunk(
-            chunk: np.ndarray, fname: str, block_id: tuple[int, ...] | None = None
-        ) -> None:
+        def save_chunk(chunk: np.ndarray, fname: str, block_id: tuple[int, ...] | None = None) -> None:
             """
             Save one chunk to a individual hdf5 file.
 
@@ -292,13 +288,15 @@ class DeisaArray:
 
             filename = chunk_fname(fname, block_id)
 
-
             with h5py.File(filename, "w") as f:
                 f.create_dataset("data", data=chunk)
 
-
         def create_vds(
-                fname: str, chunk_shape: tuple[int, ...], data_shape: tuple[int, ...], nb_chunks_per_dim : tuple[int, ...], data_dtype: np.dtype,
+            fname: str,
+            chunk_shape: tuple[int, ...],
+            data_shape: tuple[int, ...],
+            nb_chunks_per_dim: tuple[int, ...],
+            data_dtype: np.dtype,
         ) -> None:
             """
             Creates a VDS aggregating all chunk files.
@@ -320,7 +318,6 @@ class DeisaArray:
             layout = h5py.VirtualLayout(shape=data_shape, dtype=data_dtype)
 
             for block_id in np.ndindex(nb_chunks_per_dim):
-
                 name = chunk_fname(fname, block_id)
                 vsource = h5py.VirtualSource(name, "data", shape=chunk_shape)
 
