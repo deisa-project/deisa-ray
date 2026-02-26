@@ -1,6 +1,6 @@
 [project]
 name = "deisa-ray"
-version = "0.0.6"
+version = "0.0.7"
 description = "In Situ Analytics with Ray backend"
 requires-python = ">=3.12"
 readme = "README.md"
