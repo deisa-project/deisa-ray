@@ -207,26 +207,30 @@ class DeisaArray:
     dask: da.Array
     t: int
 
-    def to_zarr(self, fname: str, component: str) -> None:
+    def to_zarr(
+        self, url, component=None, storage_options=None, region=None, compute=True, return_stored=False, mode="a"
+    ) -> None:
         """
         Save data using the zarr storage format
 
-        Parameters
-        ----------
-        fname : str
-            The name of the zarr storage where the data will be stored.
-
-        component : str
-            Component to save in zarr storage
-
         Notes
         -----
-        This method is a simple wrapper to `dask.to_zarr`.
+        This method is a simple wrapper to `dask.to_zarr`. To more details about parameters see:
+
         https://docs.dask.org/en/latest/generated/dask.array.to_zarr.html#dask.array.to_zarr
         """
 
-        full_path = pathlib.Path(fname).expanduser().resolve()
-        da.to_zarr(self.dask.persist(), full_path, component=component, compute=True)
+        full_path = pathlib.Path(url).expanduser().resolve()
+        return da.to_zarr(
+            self.dask.persist(),
+            full_path,
+            component=component,
+            storage_options=storage_options,
+            region=region,
+            compute=compute,
+            return_stored=return_stored,
+            mode=mode,
+        )
 
     def to_hdf5(self, fname: str, dataset: str) -> None:
         """
