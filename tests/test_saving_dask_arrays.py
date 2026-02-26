@@ -90,6 +90,7 @@ def test_dask_save_hdf5(fname, enable_distributed_scheduling, ray_cluster) -> No
         os.system(f"rm -f {save_dir}/*.h5 {save_dir}/.*h5")
 
 
+
 @pytest.mark.parametrize(
     "fname, enable_distributed_scheduling",
     [
@@ -97,7 +98,83 @@ def test_dask_save_hdf5(fname, enable_distributed_scheduling, ray_cluster) -> No
         ("interesting-event.h5", True),
     ],
 )
-def test_dask_save_several_hdf5(fname, enable_distributed_scheduling, ray_cluster) -> None:  # noqa: F811
+def test_dask_save_several_timesteps_hdf5(fname, enable_distributed_scheduling, ray_cluster) -> None:  # noqa: F811
+    @ray.remote(max_retries=0)
+    def head_script(fname, enable_distributed_scheduling) -> None:
+        """The head node checks that the values are correct"""
+        from deisa.ray.window_handler import Deisa
+        from deisa.ray.types import WindowSpec
+
+        import deisa.ray as deisa
+
+        deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
+
+        d = Deisa()
+
+        def simulation_callback(array: list[DeisaArray]):
+
+                array[0].to_hdf5(fname, str(array[0].t))
+
+        d.register_callback(
+            simulation_callback,
+            [WindowSpec("array")],
+        )
+        d.execute_callbacks()
+
+    import h5py
+
+    # Check in the correct place.
+    full_name = pathlib.Path(fname).expanduser().resolve()
+
+    if os.path.exists(full_name):
+        save_dir = full_name.parent
+        os.system(f"rm -f {save_dir}/*.h5 {save_dir}/.*h5")
+
+    # Save using relative path
+    head_ref = head_script.remote(fname, enable_distributed_scheduling)
+    wait_for_head_node()
+    port = pick_free_port()
+
+    worker_refs = []
+    for rank in range(4):
+        worker_refs.append(
+            simple_worker.remote(
+                rank=rank,
+                position=(rank // 2, rank % 2),
+                chunks_per_dim=(2, 2),
+                nb_chunks_of_node=1,
+                chunk_size=(1, 1),
+                nb_iterations=NB_ITERATIONS,
+                node_id=f"node_{rank}",
+                nb_nodes=4,
+                port=port,
+            )
+        )
+
+    ray.get([head_ref] + worker_refs)
+
+    for i in range(NB_ITERATIONS):
+
+        x = h5py.File(full_name)[str(i)]
+        data = da.from_array(x, chunks=2)
+
+        arr = i * np.array([[1, 2], [3, 4]])
+        assert (data.compute() == arr).all()
+
+
+    if os.path.exists(full_name):
+        save_dir = full_name.parent
+        os.system(f"rm -f {save_dir}/*.h5 {save_dir}/.*h5")
+
+
+@pytest.mark.parametrize(
+    "fname, enable_distributed_scheduling",
+    [
+        ("interesting-event.h5", False),
+        ("interesting-event.h5", True),
+    ],
+)
+def test_dask_save_several_arrays_hdf5(fname, enable_distributed_scheduling, ray_cluster) -> None:  # noqa: F811
     @ray.remote(max_retries=0)
     def head_script(fname, enable_distributed_scheduling) -> None:
         """The head node checks that the values are correct"""
@@ -170,6 +247,7 @@ def test_dask_save_several_hdf5(fname, enable_distributed_scheduling, ray_cluste
     if os.path.exists(full_name):
         save_dir = full_name.parent
         os.system(f"rm -f {save_dir}/*.h5 {save_dir}/.*h5")
+
 
 
 @pytest.mark.parametrize(
