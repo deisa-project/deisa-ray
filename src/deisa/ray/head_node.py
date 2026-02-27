@@ -73,7 +73,7 @@ class HeadNodeActor:
         self.scheduling_actors: dict[str, RayActorHandle] = {}
 
         # TODO: document what this event signals and update documentation
-        self.new_array_created: dict[str, asyncio.Event] = {}
+        self.new_array_created: dict[str, asyncio.Lock] = {}
         self.max_simulation_ahead = max_simulation_ahead
         self.semaphore_per_array = {}
 
@@ -171,8 +171,8 @@ class HeadNodeActor:
 
         if array_name not in self.registered_arrays:
             self.registered_arrays[array_name] = DaskArrayData(array_name)
-            self.semaphore_per_array[array_name] = asyncio.Semaphore(self.max_simulation_ahead + 1)
-            self.new_array_created[array_name] = asyncio.Event()
+            self.semaphore_per_array[array_name] = asyncio.Semaphore(self.max_simulation_ahead)
+            self.new_array_created[array_name] = asyncio.Lock()
 
         array = self.registered_arrays[array_name]
         # TODO no checks done for when all nodeactors have called this
@@ -232,67 +232,34 @@ class HeadNodeActor:
         """
         array = self.registered_arrays[array_name]
         semaphore = self.semaphore_per_array[array_name]
-        created_event = self.new_array_created[array_name]
+        lock = self.new_array_created[array_name]
 
-        # Ensure the timestep entry exists
-        while timestep not in array.chunk_refs:
-            try_to_create_timestep_task = asyncio.create_task(semaphore.acquire())
-            wait_for_another_to_create_task = asyncio.create_task(created_event.wait())
-
-            done, pending = await asyncio.wait(
-                {try_to_create_timestep_task, wait_for_another_to_create_task},
-                return_when=asyncio.FIRST_COMPLETED,
-            )
-
-            for task in pending:
-                task.cancel()
-
-            if try_to_create_timestep_task in done:
-                if timestep in array.chunk_refs:
-                    # NOTE : cannot happen since that in the stalling case,
-                    # one of the scheduling actor dont add his chunks
-                    # -> is_ready is always false
-                    # -> nothing is put in the queue, get_next_array() never executed
-                    # -> semaphore never released
-                    # -> so try_to_create_timestep_task cant finish and wait_for_another_to_create_task keep waiting -> stall forever
-                    #
-                    # Another actor created the entry while we were waiting
-                    semaphore.release()
-                else:
-                    array.chunk_refs[timestep] = []
-                    created_event.set()
-                    # NOTE : If the first scheduling actor that create the timestep
-                    # clear the event before one of the others scheduling actors create
-                    # the asyncio task that wait on it it will wait forever
-                    #
-                    created_event.clear()
-                    #
-                # NOTE : possible solution :
-                # - release semaphore at different place
-                # - clear the event later ?
-
-        # Collect chunk refs and store them in Ray
         chunks = list(pos_to_ref.values())
         ref_to_list_of_chunks = ray.put(chunks)
+        async with lock:
+            if timestep not in array.chunk_refs:
+                semaphore.acquire()
+                array.chunk_refs[timestep] = []
 
-        # ray.get(ref_to_list_of_chunks) -> [ref_of_ref_chunk_i, ref_ref_chunk_i+1, ...] (belonging to actor that owns it)
-        # so I unpack it and give this ray ref.
-        is_ready = array.add_chunk_ref(ref_to_list_of_chunks, timestep, pos_to_ref)
+            # Collect chunk refs and store them in Ray
+            # ray.get(ref_to_list_of_chunks) -> [ref_of_ref_chunk_i, ref_ref_chunk_i+1, ...] (belonging to actor that owns it)
+            # so I unpack it and give this ray ref.
+            is_ready = array.add_chunk_ref(ref_to_list_of_chunks, timestep, pos_to_ref)
 
-        if is_ready:
-            self.arrays_ready.put_nowait(
-                (
-                    array_name,
-                    timestep,
-                    array.get_full_array(
-                        timestep, distributing_scheduling_enabled=self._experimental_distributed_scheduling_enabled
-                    ),
+            if is_ready:
+                self.arrays_ready.put_nowait(
+                    (
+                        array_name,
+                        timestep,
+                        array.get_full_array(
+                            timestep, distributing_scheduling_enabled=self._experimental_distributed_scheduling_enabled
+                        ),
+                    )
                 )
-            )
-            # TODO for now, only used when doing distributed scheduling, but in theory could be
-            # used with centralized scheduling too
-            if self._experimental_distributed_scheduling_enabled:
-                array.fully_defined.set()
+                # TODO for now, only used when doing distributed scheduling, but in theory could be
+                # used with centralized scheduling too
+                if self._experimental_distributed_scheduling_enabled:
+                    array.fully_defined.set()
 
     def ready(self):
         """
