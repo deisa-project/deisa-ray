@@ -1,5 +1,4 @@
 import asyncio
-from time import sleep
 
 import dask.array as da
 import numpy as np
