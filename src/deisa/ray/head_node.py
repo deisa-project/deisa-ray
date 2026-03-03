@@ -1,4 +1,5 @@
 import asyncio
+from time import sleep
 
 import dask.array as da
 import numpy as np
@@ -233,33 +234,55 @@ class HeadNodeActor:
         array = self.registered_arrays[array_name]
         semaphore = self.semaphore_per_array[array_name]
         lock = self.new_array_created[array_name]
+        creator = False
+        future = None
+
+        async with lock:
+            entry = array.chunk_refs.get(timestep)
+            if entry is None:
+                # Timestep not yet created, become creator here
+                future = asyncio.get_event_loop().create_future()
+                array.chunk_refs[timestep] = future  # placeholder reservation
+                creator = True
+            elif isinstance(entry, asyncio.Future):
+                # not creator we will wait on the future
+                future = entry
+
+        if creator:
+            await semaphore.acquire()
+            async with lock:
+                array.chunk_refs[timestep] = []
+                future.set_result(True)
+        elif future is not None:  # we wait the creation of the timestep here
+            await future
+        # NOTE : If future is None -> necesseraly means that the timestep is created and ready
+        # `future` is determined by `entry` and `entry` can be :
+        #   -> None => we are the creator and create the future and timestep
+        #   -> future => enter in ` await future`
+        #   -> [] => timestep created, can add chunk_refs
 
         chunks = list(pos_to_ref.values())
         ref_to_list_of_chunks = ray.put(chunks)
-        async with lock:
-            if timestep not in array.chunk_refs:
-                semaphore.acquire()
-                array.chunk_refs[timestep] = []
 
-            # Collect chunk refs and store them in Ray
-            # ray.get(ref_to_list_of_chunks) -> [ref_of_ref_chunk_i, ref_ref_chunk_i+1, ...] (belonging to actor that owns it)
-            # so I unpack it and give this ray ref.
-            is_ready = array.add_chunk_ref(ref_to_list_of_chunks, timestep, pos_to_ref)
+        # Collect chunk refs and store them in Ray
+        # ray.get(ref_to_list_of_chunks) -> [ref_of_ref_chunk_i, ref_ref_chunk_i+1, ...] (belonging to actor that owns it)
+        # so I unpack it and give this ray ref.
+        is_ready = array.add_chunk_ref(ref_to_list_of_chunks, timestep, pos_to_ref)
 
-            if is_ready:
-                self.arrays_ready.put_nowait(
-                    (
-                        array_name,
-                        timestep,
-                        array.get_full_array(
-                            timestep, distributing_scheduling_enabled=self._experimental_distributed_scheduling_enabled
-                        ),
-                    )
+        if is_ready:
+            self.arrays_ready.put_nowait(
+                (
+                    array_name,
+                    timestep,
+                    array.get_full_array(
+                        timestep, distributing_scheduling_enabled=self._experimental_distributed_scheduling_enabled
+                    ),
                 )
-                # TODO for now, only used when doing distributed scheduling, but in theory could be
-                # used with centralized scheduling too
-                if self._experimental_distributed_scheduling_enabled:
-                    array.fully_defined.set()
+            )
+            # TODO for now, only used when doing distributed scheduling, but in theory could be
+            # used with centralized scheduling too
+            if self._experimental_distributed_scheduling_enabled:
+                array.fully_defined.set()
 
     def ready(self):
         """
