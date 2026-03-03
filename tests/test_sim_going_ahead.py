@@ -21,8 +21,6 @@ def head_script(enable_distributed_scheduling, nb_nodes) -> None:
 
     def simulation_callback(array: list[DeisaArray]):
         if array[0].t == 0:
-            # NOTE : With the way the current version of deisa handle sim go ahead,
-            # sim can send 2 iterations before getting stuck waiting for analytics
             time.sleep(10)
         x = array[0].dask.sum().compute()
         assert x == 10 * array[0].t
