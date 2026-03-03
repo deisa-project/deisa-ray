@@ -11,7 +11,6 @@ import os
 
 NB_ITERATIONS = 10
 
-
 @pytest.mark.parametrize(
     "fname, enable_distributed_scheduling",
     [
@@ -323,4 +322,83 @@ def test_dask_save_zarr(fname, enable_distributed_scheduling, ray_cluster) -> No
         shutil.rmtree(full_path)
 
 
-# TODO use also NetCDF
+@pytest.mark.parametrize(
+    "fname, enable_distributed_scheduling",
+    [
+        ("interesting-event.nc", False),
+        ("interesting-event.nc", True),
+    ],
+)
+def test_dask_save_netcdf_xarray(fname, enable_distributed_scheduling, ray_cluster) -> None:  # noqa: F811
+    @ray.remote(max_retries=0)
+    def head_script(fname, enable_distributed_scheduling) -> None:
+        """The head node checks that the values are correct"""
+        from deisa.ray.window_handler import Deisa
+        from deisa.ray.types import WindowSpec
+
+        import deisa.ray as deisa
+        import xarray as xr
+
+        deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
+
+        d = Deisa()
+        def simulation_callback(array: list[DeisaArray]):
+
+            if array[0].t == 5:
+                xarray_da = xr.DataArray(
+                    array[0].dask,
+                    dims=["x", "y"],
+                    name="data"
+                ).compute()
+
+                xarray_da.to_netcdf(fname)
+
+        d.register_callback(
+            simulation_callback,
+            [WindowSpec("array")],
+        )
+        d.execute_callbacks()
+
+
+    import xarray as xr
+
+    # Check in the correct place.
+    full_name = pathlib.Path(fname).expanduser().resolve()
+
+    if os.path.exists(full_name):
+        save_dir = full_name.parent
+        os.system(f"rm -f {fname}" )
+
+    # Save using relative path
+    head_ref = head_script.remote(fname, enable_distributed_scheduling)
+    wait_for_head_node()
+    port = pick_free_port()
+
+    worker_refs = []
+    for rank in range(4):
+        worker_refs.append(
+            simple_worker.remote(
+                rank=rank,
+                position=(rank // 2, rank % 2),
+                chunks_per_dim=(2, 2),
+                nb_chunks_of_node=1,
+                chunk_size=(1, 1),
+                nb_iterations=NB_ITERATIONS,
+                node_id=f"node_{rank}",
+                nb_nodes=4,
+                port=port,
+            )
+        )
+
+    ray.get([head_ref] + worker_refs)
+
+    data = xr.open_dataarray(fname)
+
+    arr = 5 * np.array([[1, 2], [3, 4]])
+    assert (data.compute() == arr).all()
+
+    assert data.dims == ("x", "y")
+
+    if os.path.exists(full_name):
+        save_dir = full_name.parent
+        os.system(f"rm -f {fname}" )
