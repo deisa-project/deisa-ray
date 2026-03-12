@@ -43,6 +43,7 @@ def ray_multinode_cluster():
         "address": cluster.address,
     }
 
+    dask.config.set(scheduler=None)
     ray.shutdown()
     cluster.shutdown()
 
