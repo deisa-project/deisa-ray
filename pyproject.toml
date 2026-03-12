@@ -9,8 +9,6 @@ dependencies = [
     "ray[default]==2.48.0",
     "numpy",
     "torch>=2.10.0",
-    "h5py>=3.15.1",
-    "zarr>=3.1.5",
 ]
 
 [build-system]
@@ -33,6 +31,11 @@ dev = [
     "sphinx>=8.2.3",
     "sphinx-autobuild>=2025.8.25",
     "furo>=2025.9.25",
+    "h5py>=3.15.1",
+    "zarr>=3.1.5",
+    "xarray",
+    "h5netcdf",
+
 ]
 
 [tool.ruff]
