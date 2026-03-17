@@ -20,5 +20,8 @@ class StubSchedulingActor:
         # No-op; we don't test add_chunk here
         return True
 
+    def add_chunk(self, *args, **kwargs):
+        pass
+
     def ready(self):
         pass
