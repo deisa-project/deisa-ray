@@ -4,12 +4,13 @@ import concurrent.futures
 import ray
 import pytest
 import numpy as np
+import torch.distributed as dist
 
 from ray.util.state import list_actors
 from deisa.ray.types import RayActorHandle
 from tests.stubs import StubSchedulingActor
 from deisa.ray.bridge import Bridge
-from deisa.ray.comm import NoOpComm
+from deisa.ray.comm import MPICommAdapter, NoOpComm, TorchDistComm
 from tests.utils import pick_free_port
 
 
@@ -50,6 +51,76 @@ def test_init(ray_cluster):
     assert c.node_id == fake_node_id
     assert isinstance(c.node_actor, RayActorHandle)
     assert isinstance(c, Bridge)
+
+
+def test_init_with_default_gloo_comm(ray_cluster):
+    fake_node_id = "FAKE-NODE-GLOO"
+    port = pick_free_port()
+    sys_md = {"world_size": 1, "master_address": "127.0.0.1", "master_port": port}
+
+    if dist.is_initialized():
+        dist.destroy_process_group()
+
+    try:
+        c = Bridge(
+            bridge_id=0,
+            arrays_metadata=arrays_md,
+            system_metadata=sys_md,
+            _node_id=fake_node_id,
+            scheduling_actor_cls=StubSchedulingActor,
+        )
+        assert isinstance(c.comm, TorchDistComm)
+        assert c.comm.rank == 0
+        assert c.comm.world_size == 1
+    finally:
+        if dist.is_initialized():
+            dist.destroy_process_group()
+
+
+def test_init_requires_system_metadata_for_default_gloo(ray_cluster):
+    fake_node_id = "FAKE-NODE-MISSING-SYS-MD"
+
+    with pytest.raises(ValueError, match="system_metadata is required when comm is None"):
+        Bridge(
+            bridge_id=0,
+            arrays_metadata=arrays_md,
+            system_metadata=None,
+            _node_id=fake_node_id,
+            scheduling_actor_cls=StubSchedulingActor,
+        )
+
+
+def test_init_with_mpi_comm_adapter(ray_cluster):
+    class FakeMPIComm:
+        def __init__(self):
+            self.barrier_calls = 0
+
+        def Get_rank(self):
+            return 0
+
+        def Get_size(self):
+            return 1
+
+        def Barrier(self):
+            self.barrier_calls += 1
+
+    fake_node_id = "FAKE-NODE-MPI"
+    fake_mpi_comm = FakeMPIComm()
+    mpi_comm = MPICommAdapter(fake_mpi_comm)
+
+    c = Bridge(
+        bridge_id=0,
+        arrays_metadata=arrays_md,
+        system_metadata=None,
+        _node_id=fake_node_id,
+        comm=mpi_comm,
+        scheduling_actor_cls=StubSchedulingActor,
+    )
+
+    assert c.comm is mpi_comm
+    assert c.comm.rank == 0
+    assert c.comm.world_size == 1
+    assert fake_mpi_comm.barrier_calls == 1
 
 
 def test_init_normalizes_list_chunk_metadata(ray_cluster):

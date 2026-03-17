@@ -37,8 +37,10 @@ class Bridge:
         Identifier of the MPI rank that owns this bridge instance.
     arrays_metadata : Mapping[str, Mapping[str, Any]]
         Metadata describing the array layout managed by this bridge.
-    system_metadata : Mapping[str, Any]
-        Cluster-wide metadata (e.g., world size, master address/port).
+    system_metadata : Mapping[str, Any] or None
+        Cluster-wide metadata (e.g., world size, master address/port). This is
+        required only when ``comm`` is ``None`` and Bridge must initialize the
+        default Gloo communicator.
     comm : Comm, optional
         Custom communication backend to use instead of the default Gloo
         communicator. If ``None``, ``init_gloo_comm`` runs with ``system_metadata``.
@@ -102,7 +104,7 @@ class Bridge:
         self,
         bridge_id: int,
         arrays_metadata: Mapping[str, Mapping[str, Any]],
-        system_metadata: Mapping[str, Any],
+        system_metadata: Mapping[str, Any] | None = None,
         comm: Optional[Comm] = None,
         *,
         _node_id: str | None = None,
@@ -122,9 +124,11 @@ class Bridge:
             Keys represent the name of the array while the values are
             dictionaries that must at least declare the metadata expected by
             :meth:`validate_arrays_meta`.
-        system_metadata : Mapping[str, Any]
+        system_metadata : Mapping[str, Any] or None, optional
             System metadata such as address of Ray cluster, number of MPI
             ranks, and other general information that describes the system.
+            This is required only when ``comm`` is ``None`` and Bridge must
+            initialize the default Gloo communicator.
         comm : Comm, optional
             Communication backend to use. If ``None``, a Gloo communicator
             configured from ``system_metadata`` is initialized.
@@ -148,6 +152,8 @@ class Bridge:
             If the scheduling actor cannot be created or initialized after
             the specified number of retries.
         ValueError
+            If ``system_metadata`` is omitted while ``comm`` is ``None``.
+        ValueError
             If ``_comm_timeout`` is provided and is not strictly positive.
 
         Notes
@@ -169,7 +175,7 @@ class Bridge:
         # note we only need the metadata so that it can pass through the entire pipeline correctly and
         # in sequential order, so we just replicate the first metadata we have.
 
-        self.system_metadata = _validate_system_meta(system_metadata)
+        self.system_metadata = _validate_system_meta(system_metadata) if system_metadata is not None else None
         if self.bridge_id == 0:
             self.arrays_metadata["__deisa_last_iteration_array"] = {
                 "chunk_shape": (1, 1),
@@ -183,12 +189,14 @@ class Bridge:
             raise ValueError(f"_comm_timeout must be > 0 seconds, got {self._comm_timeout}")
 
         if comm is None:
+            if self.system_metadata is None:
+                raise ValueError("system_metadata is required when comm is None")
             try:
                 comm = init_gloo_comm(
-                    system_metadata["world_size"],
+                    self.system_metadata["world_size"],
                     self.bridge_id,
-                    system_metadata["master_address"],
-                    system_metadata["master_port"],
+                    self.system_metadata["master_address"],
+                    self.system_metadata["master_port"],
                     self._comm_timeout,
                 )
             except dist.DistStoreError as e:
@@ -202,6 +210,8 @@ class Bridge:
                     "never started, or are blocked during initialization."
                 )
                 raise
+        elif self.system_metadata is None:
+            logger.debug("Bridge %s initialized with custom communicator and no system_metadata", self.bridge_id)
 
         self.comm = comm
 
