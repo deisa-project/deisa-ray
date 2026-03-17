@@ -26,6 +26,9 @@ jobs:
           python-version: "3.12"
           enable-cache: true
 
+      - name: Install MPI
+        run: sudo apt-get update && sudo apt-get install -y openmpi-bin libopenmpi-dev
+
       - name: Install dependencies
         run: uv sync --locked --all-extras --all-groups
 
@@ -47,9 +50,11 @@ jobs:
           python-version: "3.13"
           enable-cache: true
 
+      - name: Install MPI
+        run: sudo apt-get update && sudo apt-get install -y openmpi-bin libopenmpi-dev
+
       - name: Install dependencies
         run: uv sync --locked --all-extras --all-groups
 
       - name: Execute the tests
         run: uv run pytest -vv .
-
