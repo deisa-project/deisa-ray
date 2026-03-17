@@ -52,6 +52,64 @@ def test_init(ray_cluster):
     assert isinstance(c, Bridge)
 
 
+def test_init_normalizes_list_chunk_metadata(ray_cluster):
+    fake_node_id = "FAKE-NODE-LIST-META"
+    port = pick_free_port()
+    sys_md = {"world_size": 1, "master_address": "127.0.0.1", "master_port": port}
+    list_arrays_md = {
+        "array": {
+            "chunk_shape": [1, 1],
+            "nb_chunks_per_dim": [1, 1],
+            "nb_chunks_of_node": 1,
+            "dtype": np.int32,
+            "chunk_position": [0, 0],
+        }
+    }
+
+    c = Bridge(
+        bridge_id=0,
+        arrays_metadata=list_arrays_md,
+        system_metadata=sys_md,
+        _node_id=fake_node_id,
+        comm=NoOpComm(0, 1),
+        scheduling_actor_cls=StubSchedulingActor,
+    )
+
+    assert c.arrays_metadata["array"]["chunk_shape"] == (1, 1)
+    assert c.arrays_metadata["array"]["nb_chunks_per_dim"] == (1, 1)
+    assert c.arrays_metadata["array"]["chunk_position"] == (0, 0)
+
+
+def test_init_normalizes_ndarray_chunk_metadata(ray_cluster):
+    fake_node_id = "FAKE-NODE-NDARRAY-META"
+    port = pick_free_port()
+    sys_md = {"world_size": 1, "master_address": "127.0.0.1", "master_port": port}
+    ndarray_arrays_md = {
+        "array": {
+            "chunk_shape": np.array([1, 1], dtype=np.int64),
+            "nb_chunks_per_dim": np.array([1, 1], dtype=np.int64),
+            "nb_chunks_of_node": np.array(1, dtype=np.int64),
+            "dtype": np.int32,
+            "chunk_position": np.array([0, 0], dtype=np.int64),
+        }
+    }
+
+    c = Bridge(
+        bridge_id=0,
+        arrays_metadata=ndarray_arrays_md,
+        system_metadata=sys_md,
+        _node_id=fake_node_id,
+        comm=NoOpComm(0, 1),
+        scheduling_actor_cls=StubSchedulingActor,
+    )
+
+    assert c.arrays_metadata["array"]["chunk_shape"] == (1, 1)
+    assert c.arrays_metadata["array"]["nb_chunks_per_dim"] == (1, 1)
+    assert c.arrays_metadata["array"]["nb_chunks_of_node"] == 1
+    assert isinstance(c.arrays_metadata["array"]["nb_chunks_of_node"], int)
+    assert c.arrays_metadata["array"]["chunk_position"] == (0, 0)
+
+
 @pytest.mark.parametrize("nb_nodes", [1, 2, 4])
 def test_init_race_free(nb_nodes, ray_cluster):
     # IMPORTANT: torch.distributed cannot be initialized from multiple threads in one process.
