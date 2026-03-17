@@ -110,6 +110,26 @@ def test_init_normalizes_ndarray_chunk_metadata(ray_cluster):
     assert c.arrays_metadata["array"]["chunk_position"] == (0, 0)
 
 
+def test_close_returns_timestep_and_logs(ray_cluster, caplog):
+    fake_node_id = "FAKE-NODE-CLOSE"
+    port = pick_free_port()
+    sys_md = {"world_size": 1, "master_address": "127.0.0.1", "master_port": port}
+    c = Bridge(
+        bridge_id=0,
+        arrays_metadata=arrays_md,
+        system_metadata=sys_md,
+        _node_id=fake_node_id,
+        comm=NoOpComm(0, 1),
+        scheduling_actor_cls=StubSchedulingActor,
+    )
+
+    with caplog.at_level("INFO", logger="deisa.ray.bridge"):
+        last_timestep = c.close(timestep=7)
+
+    assert last_timestep == 7
+    assert "Bridge 0 closed at timestep 7" in caplog.text
+
+
 @pytest.mark.parametrize("nb_nodes", [1, 2, 4])
 def test_init_race_free(nb_nodes, ray_cluster):
     # IMPORTANT: torch.distributed cannot be initialized from multiple threads in one process.

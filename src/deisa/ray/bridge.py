@@ -341,7 +341,7 @@ class Bridge:
         *,
         timestep: int,
         store_externally: bool = False,
-    ) -> None:
+    ) -> int:
         """
         Close the bridge by signaling analytics that the simulation finished.
 
@@ -354,8 +354,8 @@ class Bridge:
 
         Returns
         -------
-        None
-            Blocks until the sentinel chunk is known by the node actor.
+        int
+            The final timestep after the sentinel chunk is known by the node actor.
         """
         self.comm.barrier()
         if self.bridge_id == 0:
@@ -370,8 +370,10 @@ class Bridge:
                     store_externally=store_externally,
                 )  # type: ignore
                 ray.get(future)
+                logger.info("Bridge %s closed at timestep %s", self.bridge_id, timestep)
             except Exception as e:
                 _default_exception_handler(e)
+        return timestep
 
     def _create_node_actor(
         self,
