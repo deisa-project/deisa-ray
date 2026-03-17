@@ -35,6 +35,7 @@ dev = [
     "zarr>=3.1.5",
     "xarray",
     "h5netcdf",
+    "mpi4py",
 
 ]
 
