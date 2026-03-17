@@ -37,9 +37,7 @@ def _normalize_int_sequence(value: Any, *, field_name: str, array_name: str) -> 
     if isinstance(value, (tuple, list)):
         return tuple(value)
 
-    raise TypeError(
-        f"arrays_metadata['{array_name}']['{field_name}'] must be a sequence of ints, got {value!r}"
-    )
+    raise TypeError(f"arrays_metadata['{array_name}']['{field_name}'] must be a sequence of ints, got {value!r}")
 
 
 def _validate_system_meta(system_meta: Mapping[str, Any]) -> dict[str, Any]:
@@ -120,14 +118,17 @@ def _validate_single_array_metadata(
     # nb_chunks_of_node: positive int
     try:
         nb_chunks_of_node = int(meta["nb_chunks_of_node"])
-        assert nb_chunks_of_node > 0
-    except:
+    except (TypeError, ValueError):
+        raise TypeError(
+            f"arrays_metadata['{name}']['nb_chunks_of_node'] must be a positive int, "
+            f"got {type(meta['nb_chunks_of_node']).__name__}"
+        )
+    if nb_chunks_of_node <= 0:
         raise TypeError(
             f"arrays_metadata['{name}']['nb_chunks_of_node'] must be a positive int, "
             f"got {type(meta['nb_chunks_of_node']).__name__}"
         )
     normalized_meta["nb_chunks_of_node"] = nb_chunks_of_node
-
 
     # chunk_position: sequence of ints of same length as chunk_shape
     chunk_position = _normalize_int_sequence(
