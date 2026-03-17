@@ -11,6 +11,7 @@ import os
 
 NB_ITERATIONS = 10
 
+
 @pytest.mark.parametrize(
     "fname, enable_distributed_scheduling",
     [
@@ -52,8 +53,9 @@ def test_dask_save_hdf5(fname, enable_distributed_scheduling, ray_cluster) -> No
         save_dir = full_name.parent
         os.system(f"rm -f {save_dir}/*.h5 {save_dir}/.*h5")
 
-    # Save using relative path
-    head_ref = head_script.remote(fname, enable_distributed_scheduling)
+    # Resolve on the driver so the Ray task writes to the same absolute path
+    # that this test later reads, regardless of task working directory.
+    head_ref = head_script.remote(str(full_name), enable_distributed_scheduling)
     wait_for_head_node()
     port = pick_free_port()
 
@@ -89,7 +91,6 @@ def test_dask_save_hdf5(fname, enable_distributed_scheduling, ray_cluster) -> No
         os.system(f"rm -f {save_dir}/*.h5 {save_dir}/.*h5")
 
 
-
 @pytest.mark.parametrize(
     "fname, enable_distributed_scheduling",
     [
@@ -111,8 +112,7 @@ def test_dask_save_several_timesteps_hdf5(fname, enable_distributed_scheduling, 
         d = Deisa()
 
         def simulation_callback(array: list[DeisaArray]):
-
-                array[0].to_hdf5(fname, str(array[0].t))
+            array[0].to_hdf5(fname, str(array[0].t))
 
         d.register_callback(
             simulation_callback,
@@ -129,8 +129,9 @@ def test_dask_save_several_timesteps_hdf5(fname, enable_distributed_scheduling, 
         save_dir = full_name.parent
         os.system(f"rm -f {save_dir}/*.h5 {save_dir}/.*h5")
 
-    # Save using relative path
-    head_ref = head_script.remote(fname, enable_distributed_scheduling)
+    # Resolve on the driver so the Ray task writes to the same absolute path
+    # that this test later reads, regardless of task working directory.
+    head_ref = head_script.remote(str(full_name), enable_distributed_scheduling)
     wait_for_head_node()
     port = pick_free_port()
 
@@ -153,13 +154,11 @@ def test_dask_save_several_timesteps_hdf5(fname, enable_distributed_scheduling, 
     ray.get([head_ref] + worker_refs)
 
     for i in range(NB_ITERATIONS):
-
         x = h5py.File(full_name)[str(i)]
         data = da.from_array(x, chunks=2)
 
         arr = i * np.array([[1, 2], [3, 4]])
         assert (data.compute() == arr).all()
-
 
     if os.path.exists(full_name):
         save_dir = full_name.parent
@@ -205,8 +204,9 @@ def test_dask_save_several_arrays_hdf5(fname, enable_distributed_scheduling, ray
         save_dir = full_name.parent
         os.system(f"rm -f {save_dir}/*.h5 {save_dir}/.*h5")
 
-    # Save using relative path
-    head_ref = head_script.remote(fname, enable_distributed_scheduling)
+    # Resolve on the driver so the Ray task writes to the same absolute path
+    # that this test later reads, regardless of task working directory.
+    head_ref = head_script.remote(str(full_name), enable_distributed_scheduling)
     wait_for_head_node()
     port = pick_free_port()
 
@@ -248,7 +248,6 @@ def test_dask_save_several_arrays_hdf5(fname, enable_distributed_scheduling, ray
         os.system(f"rm -f {save_dir}/*.h5 {save_dir}/.*h5")
 
 
-
 @pytest.mark.parametrize(
     "fname, enable_distributed_scheduling",
     [
@@ -288,7 +287,9 @@ def test_dask_save_zarr(fname, enable_distributed_scheduling, ray_cluster) -> No
     if os.path.exists(full_path):
         shutil.rmtree(full_path)
 
-    head_ref = head_script.remote(fname, enable_distributed_scheduling)
+    # Resolve on the driver so the Ray task writes to the same absolute path
+    # that this test later reads, regardless of task working directory.
+    head_ref = head_script.remote(str(full_path), enable_distributed_scheduling)
     wait_for_head_node()
     port = pick_free_port()
 
@@ -342,14 +343,10 @@ def test_dask_save_netcdf_xarray(fname, enable_distributed_scheduling, ray_clust
         deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
 
         d = Deisa()
-        def simulation_callback(array: list[DeisaArray]):
 
+        def simulation_callback(array: list[DeisaArray]):
             if array[0].t == 5:
-                xarray_da = xr.DataArray(
-                    array[0].dask,
-                    dims=["x", "y"],
-                    name="data"
-                ).compute()
+                xarray_da = xr.DataArray(array[0].dask, dims=["x", "y"], name="data").compute()
 
                 xarray_da.to_netcdf(fname)
 
@@ -359,18 +356,17 @@ def test_dask_save_netcdf_xarray(fname, enable_distributed_scheduling, ray_clust
         )
         d.execute_callbacks()
 
-
     import xarray as xr
 
     # Check in the correct place.
     full_name = pathlib.Path(fname).expanduser().resolve()
 
     if os.path.exists(full_name):
-        save_dir = full_name.parent
-        os.system(f"rm -f {fname}" )
+        os.system(f"rm -f {full_name}")
 
-    # Save using relative path
-    head_ref = head_script.remote(fname, enable_distributed_scheduling)
+    # Resolve on the driver so the Ray task writes to the same absolute path
+    # that this test later reads, regardless of task working directory.
+    head_ref = head_script.remote(str(full_name), enable_distributed_scheduling)
     wait_for_head_node()
     port = pick_free_port()
 
@@ -392,7 +388,7 @@ def test_dask_save_netcdf_xarray(fname, enable_distributed_scheduling, ray_clust
 
     ray.get([head_ref] + worker_refs)
 
-    data = xr.open_dataarray(fname)
+    data = xr.open_dataarray(full_name)
 
     arr = 5 * np.array([[1, 2], [3, 4]])
     assert (data.compute() == arr).all()
@@ -400,5 +396,4 @@ def test_dask_save_netcdf_xarray(fname, enable_distributed_scheduling, ray_clust
     assert data.dims == ("x", "y")
 
     if os.path.exists(full_name):
-        save_dir = full_name.parent
-        os.system(f"rm -f {fname}" )
+        os.system(f"rm -f {full_name}")
