@@ -90,6 +90,20 @@ def test_init_requires_system_metadata_for_default_gloo(ray_cluster):
         )
 
 
+def test_init_raises_when_comm_and_system_metadata_are_none(ray_cluster):
+    fake_node_id = "FAKE-NODE-NO-COMM-NO-SYS-MD"
+
+    with pytest.raises(ValueError, match="system_metadata is required when comm is None"):
+        Bridge(
+            bridge_id=0,
+            arrays_metadata=arrays_md,
+            system_metadata=None,
+            comm=None,
+            _node_id=fake_node_id,
+            scheduling_actor_cls=StubSchedulingActor,
+        )
+
+
 def test_init_with_mpi_comm_adapter(ray_cluster):
     class FakeMPIComm:
         def __init__(self):
@@ -121,6 +135,26 @@ def test_init_with_mpi_comm_adapter(ray_cluster):
     assert c.comm.rank == 0
     assert c.comm.world_size == 1
     assert fake_mpi_comm.barrier_calls == 1
+
+
+def test_init_with_raw_mpi_comm(ray_cluster):
+    pytest.importorskip("mpi4py")
+    from mpi4py import MPI
+
+    fake_node_id = "FAKE-NODE-RAW-MPI"
+
+    c = Bridge(
+        bridge_id=0,
+        arrays_metadata=arrays_md,
+        system_metadata=None,
+        _node_id=fake_node_id,
+        comm=MPI.COMM_SELF,
+        scheduling_actor_cls=StubSchedulingActor,
+    )
+
+    assert isinstance(c.comm, MPICommAdapter)
+    assert c.comm.rank == 0
+    assert c.comm.world_size == 1
 
 
 def test_init_normalizes_list_chunk_metadata(ray_cluster):

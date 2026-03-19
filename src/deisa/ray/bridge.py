@@ -15,7 +15,7 @@ from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 from deisa.ray.scheduling_actor import SchedulingActor as _RealSchedulingActor
 from deisa.ray.types import RayActorHandle
 from deisa.ray.errors import ContractError, _default_exception_handler
-from deisa.ray.comm import Comm, init_gloo_comm
+from deisa.ray.comm import Comm, init_gloo_comm, normalize_comm
 from deisa.ray.validate import _validate_arrays_meta, _validate_system_meta
 from deisa.ray.utils import get_node_actor_options
 import torch.distributed as dist
@@ -41,9 +41,11 @@ class Bridge:
         Cluster-wide metadata (e.g., world size, master address/port). This is
         required only when ``comm`` is ``None`` and Bridge must initialize the
         default Gloo communicator.
-    comm : Comm, optional
+    comm : Comm or mpi4py.MPI.Comm, optional
         Custom communication backend to use instead of the default Gloo
-        communicator. If ``None``, ``init_gloo_comm`` runs with ``system_metadata``.
+        communicator. Raw ``mpi4py`` communicators are wrapped in
+        :class:`deisa.ray.comm.MPICommAdapter`. If ``None``,
+        ``init_gloo_comm`` runs with ``system_metadata``.
     _node_id : str or None, optional
         Node identifier used for testing or custom scheduling. Defaults to ``None``.
     scheduling_actor_cls : Type, optional
@@ -105,7 +107,7 @@ class Bridge:
         bridge_id: int,
         arrays_metadata: Mapping[str, Mapping[str, Any]],
         system_metadata: Mapping[str, Any] | None = None,
-        comm: Optional[Comm] = None,
+        comm: Any = None,
         *,
         _node_id: str | None = None,
         scheduling_actor_cls: ActorClass = _RealSchedulingActor,
@@ -129,9 +131,11 @@ class Bridge:
             ranks, and other general information that describes the system.
             This is required only when ``comm`` is ``None`` and Bridge must
             initialize the default Gloo communicator.
-        comm : Comm, optional
-            Communication backend to use. If ``None``, a Gloo communicator
-            configured from ``system_metadata`` is initialized.
+        comm : Comm or mpi4py.MPI.Comm, optional
+            Communication backend to use. Raw ``mpi4py`` communicators are
+            wrapped in :class:`deisa.ray.comm.MPICommAdapter`. If ``None``, a
+            Gloo communicator configured from ``system_metadata`` is
+            initialized.
         _node_id : str or None, optional
             The ID of the node. If None, the ID is taken from the Ray runtime
             context. Useful for testing with several scheduling actors on a
@@ -167,6 +171,7 @@ class Bridge:
         self._init_retries = _init_retries
 
         self.arrays_metadata = _validate_arrays_meta(arrays_metadata)
+        comm = normalize_comm(comm)
 
         # NOTE : Possible error : if two bridges have different first array it will have different
         # shape and will be declared twice.
