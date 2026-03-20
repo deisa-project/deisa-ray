@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import logging
+import sys
+import traceback
 
 import numpy as np
 import ray
@@ -70,4 +72,17 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception:
+        rank = "unknown"
+        try:
+            from mpi4py import MPI
+
+            rank = MPI.COMM_WORLD.Get_rank()
+        except Exception:
+            pass
+
+        print(f"mpi_full_workflow_runner failed on rank {rank}", file=sys.stderr, flush=True)
+        traceback.print_exc(file=sys.stderr)
+        raise
