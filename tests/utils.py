@@ -19,7 +19,7 @@ def pick_free_port():
 def ray_cluster():
     """Start a Ray cluster for this test"""
     ray.init()
-    yield
+    yield ray.get_runtime_context().gcs_address
     ray.shutdown()
 
 

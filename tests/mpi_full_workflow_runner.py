@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import logging
+import os
+import sys
+import traceback
 
 import numpy as np
 import ray
@@ -10,7 +13,7 @@ from deisa.ray.bridge import Bridge
 NB_ITERATIONS = 5
 
 
-@ray.remote(max_retries=0)
+@ray.remote(num_cpus=0, max_retries=0)
 def head_script() -> None:
     from deisa.ray.types import DeisaArray, WindowSpec
     from deisa.ray.window_handler import Deisa
@@ -31,9 +34,10 @@ def main() -> None:
     mpi_comm = MPI.COMM_WORLD
     rank = mpi_comm.Get_rank()
     world_size = mpi_comm.Get_size()
+    ray_address = os.environ.get("DEISA_RAY_ADDRESS", "auto")
 
     if not ray.is_initialized():
-        ray.init(address="auto", log_to_driver=False, logging_level=logging.ERROR)
+        ray.init(address=ray_address, log_to_driver=False, logging_level=logging.ERROR)
 
     head_ref = head_script.remote() if rank == 0 else None
 
@@ -70,4 +74,17 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception:
+        rank = "unknown"
+        try:
+            from mpi4py import MPI
+
+            rank = MPI.COMM_WORLD.Get_rank()
+        except Exception:
+            pass
+
+        print(f"mpi_full_workflow_runner failed on rank {rank}", file=sys.stderr, flush=True)
+        traceback.print_exc(file=sys.stderr)
+        raise

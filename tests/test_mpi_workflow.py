@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import os
 import pathlib
+import shlex
 import shutil
 import subprocess
 import sys
@@ -8,6 +10,36 @@ import sys
 import pytest
 
 from tests.utils import ray_cluster  # noqa: F401
+
+
+def _build_mpi_command(launcher: str, runner: pathlib.Path) -> list[str]:
+    """
+    Build the MPI launcher command for the workflow runner.
+
+    Parameters
+    ----------
+    launcher : str
+        Absolute path to the MPI launcher executable.
+    runner : pathlib.Path
+        Path to the Python workflow runner script.
+
+    Returns
+    -------
+    list[str]
+        Command line used to launch the MPI workflow test.
+
+    Notes
+    -----
+    OpenMPI may reject `-n 4` on constrained CI runners unless
+    ``--oversubscribe`` is passed explicitly.
+    """
+    command = [launcher]
+
+    if pathlib.Path(launcher).name in {"mpirun", "mpiexec"}:
+        command.append("--oversubscribe")
+
+    command.extend(["-n", "4", sys.executable, str(runner)])
+    return command
 
 
 @pytest.mark.skipif(
@@ -21,12 +53,33 @@ def test_deisa_ray_with_mpi_comm(ray_cluster) -> None:  # noqa: F811
     assert launcher is not None
 
     runner = pathlib.Path(__file__).with_name("mpi_full_workflow_runner.py")
+    command = _build_mpi_command(launcher, runner)
+    cwd = pathlib.Path(__file__).resolve().parents[1]
+    env = os.environ.copy()
+    env["DEISA_RAY_ADDRESS"] = str(ray_cluster)
+    env["PYTHONUNBUFFERED"] = "1"
+    env["PYTHONFAULTHANDLER"] = "1"
     result = subprocess.run(
-        [launcher, "-n", "4", sys.executable, str(runner)],
-        cwd=pathlib.Path(__file__).resolve().parents[1],
+        command,
+        cwd=cwd,
+        env=env,
         capture_output=True,
         text=True,
         check=False,
     )
 
-    assert result.returncode == 0, result.stderr or result.stdout
+    stdout = result.stdout.strip() or "<empty>"
+    stderr = result.stderr.strip() or "<empty>"
+    diagnostic = "\n".join(
+        [
+            "MPI workflow command failed",
+            f"command: {shlex.join(command)}",
+            f"cwd: {cwd}",
+            f"returncode: {result.returncode}",
+            f"DEISA_RAY_ADDRESS: {env['DEISA_RAY_ADDRESS']}",
+            f"stdout:\n{stdout}",
+            f"stderr:\n{stderr}",
+        ]
+    )
+
+    assert result.returncode == 0, diagnostic
