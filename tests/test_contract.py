@@ -5,8 +5,18 @@ import numpy as np
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 from ray.cluster_utils import Cluster
 from deisa.ray.types import DeisaArray
-from torch.distributed import DistStoreError
+import torch.distributed as dist
 from tests.utils import pick_free_port
+
+
+DIST_TIMEOUT_ERRORS = tuple(
+    err
+    for err in (
+        getattr(dist, "DistStoreError", None),
+        getattr(dist, "DistNetworkError", None),
+    )
+    if err is not None
+)
 
 
 @pytest.fixture
@@ -214,7 +224,7 @@ def test_analytics_start_first_and_sim_can_start_after_x_secs(ray_multinode_clus
 
 
 def test_sim_raise_if_not_enough_bridges_connect(ray_multinode_cluster):
-    with pytest.raises(DistStoreError):
+    with pytest.raises(DIST_TIMEOUT_ERRORS):
         port = pick_free_port()
         cluster = ray_multinode_cluster["cluster"]
         head_node_id = None

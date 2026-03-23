@@ -22,6 +22,15 @@ import torch.distributed as dist
 
 logger = logging.getLogger(__name__)
 
+_GLOO_RENDEZVOUS_ERRORS = tuple(
+    err
+    for err in (
+        getattr(dist, "DistStoreError", None),
+        getattr(dist, "DistNetworkError", None),
+    )
+    if err is not None
+)
+
 
 class Bridge:
     """
@@ -204,7 +213,7 @@ class Bridge:
                     self.system_metadata["master_port"],
                     self._comm_timeout,
                 )
-            except dist.DistStoreError as e:
+            except _GLOO_RENDEZVOUS_ERRORS as e:
                 e.add_note(
                     "Gloo rendezvous timeout.\n"
                     f"Rank: {self.bridge_id}\n"
