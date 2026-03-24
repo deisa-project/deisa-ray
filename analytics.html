@@ -3,7 +3,7 @@
   <head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="deisa.ray package" href="deisa.ray.html"><link rel="prev" title="Quick Start" href="quick_start.html">
+<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Tips" href="tips.html"><link rel="prev" title="Quick Start" href="quick_start.html">
 
     <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
         <title>Analytics - deisa-ray documentation</title>
@@ -194,22 +194,7 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="quick_start.html">Quick Start</a></li>
 <li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Analytics</a></li>
-</ul>
-<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
-<ul>
-<li class="toctree-l1 has-children"><a class="reference internal" href="deisa.ray.html">deisa.ray package</a><input aria-label="Toggle navigation of deisa.ray package" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
-<li class="toctree-l2"><a class="reference internal" href="deisa.ray.bridge.html">deisa.ray.bridge module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="deisa.ray.comm.html">deisa.ray.comm module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="deisa.ray.config.html">deisa.ray.config module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="deisa.ray.errors.html">deisa.ray.errors module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="deisa.ray.head_node.html">deisa.ray.head_node module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="deisa.ray.scheduling_actor.html">deisa.ray.scheduling_actor module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="deisa.ray.types.html">deisa.ray.types module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="deisa.ray.utils.html">deisa.ray.utils module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="deisa.ray.validate.html">deisa.ray.validate module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="deisa.ray.window_handler.html">deisa.ray.window_handler module</a></li>
-</ul>
-</li>
+<li class="toctree-l1"><a class="reference internal" href="tips.html">Tips</a></li>
 </ul>
 
 </div>
@@ -253,37 +238,31 @@
 <section id="simple-example">
 <h2>Simple example<a class="headerlink" href="#simple-example" title="Link to this heading">¶</a></h2>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.window_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">Deisa</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">WindowSpec</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">DeisaArray</span><span class="p">,</span> <span class="n">WindowSpec</span>
 
-<span class="n">deisa</span> <span class="o">=</span> <span class="n">Deisa</span><span class="p">()</span>
+<span class="n">d</span> <span class="o">=</span> <span class="n">Deisa</span><span class="p">()</span>
 
+<span class="nd">@d</span><span class="o">.</span><span class="n">callback</span><span class="p">(</span><span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;array&quot;</span><span class="p">))</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">simulation_callback</span><span class="p">(</span><span class="n">array</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">]):</span>
     <span class="n">x</span> <span class="o">=</span> <span class="n">array</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
     <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Sum:&quot;</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
 
-<span class="n">deisa</span><span class="o">.</span><span class="n">register_callback</span><span class="p">(</span>
-    <span class="n">simulation_callback</span><span class="p">,</span>
-    <span class="p">[</span><span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;array&quot;</span><span class="p">)],</span>
-<span class="p">)</span>
-<span class="n">deisa</span><span class="o">.</span><span class="n">execute_callbacks</span><span class="p">()</span>
+<span class="n">d</span><span class="o">.</span><span class="n">execute_callbacks</span><span class="p">()</span>
 </pre></div>
 </div>
 </section>
 <section id="several-arrays">
 <h2>Several arrays<a class="headerlink" href="#several-arrays" title="Link to this heading">¶</a></h2>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.window_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">Deisa</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">WindowSpec</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">DeisaArray</span><span class="p">,</span> <span class="n">WindowSpec</span>
 
-<span class="n">deisa</span> <span class="o">=</span> <span class="n">Deisa</span><span class="p">()</span>
+<span class="n">d</span> <span class="o">=</span> <span class="n">Deisa</span><span class="p">()</span>
 
+<span class="nd">@d</span><span class="o">.</span><span class="n">callback</span><span class="p">(</span><span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;a&quot;</span><span class="p">),</span> <span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;b&quot;</span><span class="p">))</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">simulation_callback</span><span class="p">(</span><span class="n">a</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">],</span> <span class="n">b</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">]):</span>
-    <span class="n">r</span> <span class="o">=</span> <span class="p">(</span><span class="n">a</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span> <span class="o">-</span> <span class="n">a</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
+    <span class="n">r</span> <span class="o">=</span> <span class="p">(</span><span class="n">a</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span> <span class="o">-</span> <span class="n">b</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
 
-<span class="n">deisa</span><span class="o">.</span><span class="n">register_callback</span><span class="p">(</span>
-    <span class="n">simulation_callback</span><span class="p">,</span>
-    <span class="p">[</span><span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;a&quot;</span><span class="p">),</span> <span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;b&quot;</span><span class="p">)]</span>
-<span class="p">)</span>
-<span class="n">deisa</span><span class="o">.</span><span class="n">execute_callbacks</span><span class="p">()</span>
+<span class="n">d</span><span class="o">.</span><span class="n">execute_callbacks</span><span class="p">()</span>
 </pre></div>
 </div>
 </section>
@@ -292,10 +271,11 @@
 <p>If the analysis requires access to several iterations (for example, to compute
 a time derivative), it is possible to use the <code class="docutils literal notranslate"><span class="pre">window_size</span></code> parameter.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.window_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">Deisa</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">WindowSpec</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">DeisaArray</span><span class="p">,</span> <span class="n">WindowSpec</span>
 
-<span class="n">deisa</span> <span class="o">=</span> <span class="n">Deisa</span><span class="p">()</span>
+<span class="n">d</span> <span class="o">=</span> <span class="n">Deisa</span><span class="p">()</span>
 
+<span class="nd">@d</span><span class="o">.</span><span class="n">callback</span><span class="p">(</span><span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;array&quot;</span><span class="p">,</span> <span class="n">window_size</span><span class="o">=</span><span class="mi">2</span><span class="p">))</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">simulation_callback</span><span class="p">(</span><span class="n">arrays</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">]):</span>
     <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">arrays</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>  <span class="c1"># For the first iteration</span>
         <span class="k">return</span>
@@ -305,39 +285,120 @@ a time derivative), it is possible to use the <code class="docutils literal notr
 
     <span class="o">...</span>
 
-<span class="n">deisa</span><span class="o">.</span><span class="n">register_callback</span><span class="p">(</span>
-    <span class="n">simulation_callback</span><span class="p">,</span>
-    <span class="p">[</span>
-        <span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;array&quot;</span><span class="p">,</span> <span class="n">window_size</span><span class="o">=</span><span class="mi">2</span><span class="p">),</span>  <span class="c1"># Enable sliding window</span>
-    <span class="p">],</span>
-<span class="p">)</span>
-<span class="n">deisa</span><span class="o">.</span><span class="n">execute_callbacks</span><span class="p">()</span>
+<span class="n">d</span><span class="o">.</span><span class="n">execute_callbacks</span><span class="p">()</span>
 </pre></div>
 </div>
 </section>
 <section id="dask-persist">
 <h2>Dask persist<a class="headerlink" href="#dask-persist" title="Link to this heading">¶</a></h2>
 <p>Dask’s <code class="docutils literal notranslate"><span class="pre">persist</span></code> is supported:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.window_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">Deisa</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">WindowSpec</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">dask.array</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">da</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.window_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">Deisa</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">DeisaArray</span><span class="p">,</span> <span class="n">WindowSpec</span>
 
-<span class="n">deisa</span> <span class="o">=</span> <span class="n">Deisa</span><span class="p">()</span>
+<span class="n">d</span> <span class="o">=</span> <span class="n">Deisa</span><span class="p">()</span>
 
+<span class="nd">@d</span><span class="o">.</span><span class="n">callback</span><span class="p">(</span><span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;array&quot;</span><span class="p">))</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">simulation_callback</span><span class="p">(</span><span class="n">array</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">]):</span>
     <span class="n">x</span> <span class="o">=</span> <span class="n">array</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">persist</span><span class="p">()</span>
 
     <span class="c1"># x is still a Dask array, but the sum is being computed in the background</span>
     <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">da</span><span class="o">.</span><span class="n">Array</span><span class="p">)</span>
 
-    <span class="n">x_final</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
-    <span class="k">assert</span> <span class="n">x_final</span> <span class="o">==</span> <span class="mi">10</span> <span class="o">*</span> <span class="n">timestep</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;t=&quot;</span><span class="p">,</span> <span class="n">array</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">t</span><span class="p">,</span> <span class="s2">&quot;sum=&quot;</span><span class="p">,</span> <span class="n">x</span><span class="o">.</span><span class="n">compute</span><span class="p">())</span>
 
-<span class="n">deisa</span><span class="o">.</span><span class="n">register_callback</span><span class="p">(</span>
-    <span class="n">simulation_callback</span><span class="p">,</span>
-    <span class="p">[</span><span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;array&quot;</span><span class="p">)],</span>
-<span class="p">)</span>
+<span class="n">d</span><span class="o">.</span><span class="n">execute_callbacks</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+<section id="saving-to-hdf5">
+<h2>Saving to HDF5<a class="headerlink" href="#saving-to-hdf5" title="Link to this heading">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">DeisaArray</span></code> provides a convenience method for writing one array to HDF5:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.window_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">Deisa</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">DeisaArray</span><span class="p">,</span> <span class="n">WindowSpec</span>
 
-<span class="n">deisa</span><span class="o">.</span><span class="n">execute_callbacks</span><span class="p">()</span>
+<span class="n">d</span> <span class="o">=</span> <span class="n">Deisa</span><span class="p">()</span>
+
+<span class="nd">@d</span><span class="o">.</span><span class="n">callback</span><span class="p">(</span><span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;temperature&quot;</span><span class="p">))</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">save_temperature</span><span class="p">(</span><span class="n">array</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">]):</span>
+    <span class="k">if</span> <span class="n">array</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">t</span> <span class="o">==</span> <span class="mi">5</span><span class="p">:</span>
+        <span class="n">array</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">to_hdf5</span><span class="p">(</span><span class="s2">&quot;interesting-event.h5&quot;</span><span class="p">,</span> <span class="s2">&quot;temperature&quot;</span><span class="p">)</span>
+
+<span class="n">d</span><span class="o">.</span><span class="n">execute_callbacks</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>If you want to save several arrays into the same HDF5 file, use
+<code class="docutils literal notranslate"><span class="pre">deisa.ray.types.to_hdf5</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">DeisaArray</span><span class="p">,</span> <span class="n">WindowSpec</span><span class="p">,</span> <span class="n">to_hdf5</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.window_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">Deisa</span>
+
+<span class="n">d</span> <span class="o">=</span> <span class="n">Deisa</span><span class="p">()</span>
+
+<span class="nd">@d</span><span class="o">.</span><span class="n">callback</span><span class="p">(</span><span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;temperature&quot;</span><span class="p">),</span> <span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;pressure&quot;</span><span class="p">))</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">save_both</span><span class="p">(</span>
+    <span class="n">temperature</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">],</span>
+    <span class="n">pressure</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">],</span>
+<span class="p">):</span>
+    <span class="k">if</span> <span class="n">temperature</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">t</span> <span class="o">==</span> <span class="mi">5</span><span class="p">:</span>
+        <span class="n">to_hdf5</span><span class="p">(</span>
+            <span class="s2">&quot;state.h5&quot;</span><span class="p">,</span>
+            <span class="p">{</span>
+                <span class="s2">&quot;temperature&quot;</span><span class="p">:</span> <span class="n">temperature</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+                <span class="s2">&quot;pressure&quot;</span><span class="p">:</span> <span class="n">pressure</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+            <span class="p">},</span>
+        <span class="p">)</span>
+
+<span class="n">d</span><span class="o">.</span><span class="n">execute_callbacks</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+<section id="converting-to-xarray">
+<h2>Converting to Xarray<a class="headerlink" href="#converting-to-xarray" title="Link to this heading">¶</a></h2>
+<p>If you want to work with Xarray APIs, build an <code class="docutils literal notranslate"><span class="pre">xarray.DataArray</span></code> from the
+underlying Dask array:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">xarray</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">xr</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.window_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">Deisa</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">DeisaArray</span><span class="p">,</span> <span class="n">WindowSpec</span>
+
+<span class="n">d</span> <span class="o">=</span> <span class="n">Deisa</span><span class="p">()</span>
+
+<span class="nd">@d</span><span class="o">.</span><span class="n">callback</span><span class="p">(</span><span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;temperature&quot;</span><span class="p">))</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">xarray_example</span><span class="p">(</span><span class="n">array</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">]):</span>
+    <span class="n">da</span> <span class="o">=</span> <span class="n">xr</span><span class="o">.</span><span class="n">DataArray</span><span class="p">(</span>
+        <span class="n">array</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span><span class="p">,</span>
+        <span class="n">dims</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">],</span>
+        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;temperature&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;timestep:&quot;</span><span class="p">,</span> <span class="n">array</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">t</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">da</span><span class="p">)</span>
+
+<span class="n">d</span><span class="o">.</span><span class="n">execute_callbacks</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+<section id="saving-xarray-to-netcdf">
+<h2>Saving Xarray to NetCDF<a class="headerlink" href="#saving-xarray-to-netcdf" title="Link to this heading">¶</a></h2>
+<p>One convenient pattern is to convert the <code class="docutils literal notranslate"><span class="pre">DeisaArray</span></code> to an
+<code class="docutils literal notranslate"><span class="pre">xarray.DataArray</span></code> and then write it to NetCDF:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">xarray</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">xr</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.window_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">Deisa</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">DeisaArray</span><span class="p">,</span> <span class="n">WindowSpec</span>
+
+<span class="n">d</span> <span class="o">=</span> <span class="n">Deisa</span><span class="p">()</span>
+
+<span class="nd">@d</span><span class="o">.</span><span class="n">callback</span><span class="p">(</span><span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;temperature&quot;</span><span class="p">))</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">save_netcdf</span><span class="p">(</span><span class="n">array</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">]):</span>
+    <span class="k">if</span> <span class="n">array</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">t</span> <span class="o">==</span> <span class="mi">5</span><span class="p">:</span>
+        <span class="n">xarray_da</span> <span class="o">=</span> <span class="n">xr</span><span class="o">.</span><span class="n">DataArray</span><span class="p">(</span>
+            <span class="n">array</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span><span class="p">,</span>
+            <span class="n">dims</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">],</span>
+            <span class="n">name</span><span class="o">=</span><span class="s2">&quot;temperature&quot;</span><span class="p">,</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
+
+        <span class="n">xarray_da</span><span class="o">.</span><span class="n">to_netcdf</span><span class="p">(</span><span class="s2">&quot;interesting-event.nc&quot;</span><span class="p">)</span>
+
+<span class="n">d</span><span class="o">.</span><span class="n">execute_callbacks</span><span class="p">()</span>
 </pre></div>
 </div>
 </section>
@@ -348,12 +409,12 @@ a time derivative), it is possible to use the <code class="docutils literal notr
       <footer>
         
         <div class="related-pages">
-          <a class="next-page" href="deisa.ray.html">
+          <a class="next-page" href="tips.html">
               <div class="page-info">
                 <div class="context">
                   <span>Next</span>
                 </div>
-                <div class="title">deisa.ray package</div>
+                <div class="title">Tips</div>
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>
@@ -403,6 +464,9 @@ a time derivative), it is possible to use the <code class="docutils literal notr
 <li><a class="reference internal" href="#several-arrays">Several arrays</a></li>
 <li><a class="reference internal" href="#sliding-window">Sliding window</a></li>
 <li><a class="reference internal" href="#dask-persist">Dask persist</a></li>
+<li><a class="reference internal" href="#saving-to-hdf5">Saving to HDF5</a></li>
+<li><a class="reference internal" href="#converting-to-xarray">Converting to Xarray</a></li>
+<li><a class="reference internal" href="#saving-xarray-to-netcdf">Saving Xarray to NetCDF</a></li>
 </ul>
 </li>
 </ul>

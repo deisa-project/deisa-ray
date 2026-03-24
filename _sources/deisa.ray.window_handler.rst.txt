@@ -1,7 +1,0 @@
-deisa.ray.window\_handler module
-================================
-
-.. automodule:: deisa.ray.window_handler
-   :members:
-   :show-inheritance:
-   :undoc-members:

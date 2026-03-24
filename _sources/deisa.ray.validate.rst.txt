@@ -1,7 +1,0 @@
-deisa.ray.validate module
-=========================
-
-.. automodule:: deisa.ray.validate
-   :members:
-   :show-inheritance:
-   :undoc-members:

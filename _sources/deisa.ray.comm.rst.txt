@@ -1,7 +1,0 @@
-deisa.ray.comm module
-=====================
-
-.. automodule:: deisa.ray.comm
-   :members:
-   :show-inheritance:
-   :undoc-members:

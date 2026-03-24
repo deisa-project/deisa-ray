@@ -2,10 +2,12 @@
 <html class="no-js" lang="en" data-content_root="./">
   <head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <meta name="color-scheme" content="light dark"><link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html">
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="prev" title="Analytics" href="analytics.html">
 
-    <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 --><title>Python Module Index - deisa-ray documentation</title>
-<link rel="stylesheet" type="text/css" href="_static/pygments.css?v=d111a655" />
+    <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
+        <title>Tips - deisa-ray documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=d111a655" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
     
@@ -170,7 +172,7 @@
           <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
         </button>
       </div>
-      <label class="toc-overlay-icon toc-header-icon no-toc" for="__toc">
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
         <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
       </label>
     </div>
@@ -189,10 +191,10 @@
 </form>
 <div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
   <p class="caption" role="heading"><span class="caption-text">Guides</span></p>
-<ul>
+<ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="quick_start.html">Quick Start</a></li>
 <li class="toctree-l1"><a class="reference internal" href="analytics.html">Analytics</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tips.html">Tips</a></li>
+<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Tips</a></li>
 </ul>
 
 </div>
@@ -212,7 +214,13 @@
           <span>Back to top</span>
         </a>
         <div class="content-icon-container">
-          <div class="theme-toggle-container theme-toggle-content">
+          <div class="view-this-page">
+  <a class="muted-link" href="_sources/tips.rst.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
             <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
               <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
               <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
@@ -220,37 +228,40 @@
               <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
             </button>
           </div>
-          <label class="toc-overlay-icon toc-content-icon no-toc" for="__toc">
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
             <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
           </label>
         </div>
         <article role="main" id="furo-main-content">
-          
-<section class="domainindex-section">
-  <h1>Python Module Index</h1>
-  <div class="domainindex-jumpbox"><a href="#cap-r"><strong>r</strong></a></div>
+          <section id="tips">
+<h1>Tips<a class="headerlink" href="#tips" title="Link to this heading">¶</a></h1>
+<section id="determining-the-rendezvous-ip-address-and-port">
+<h2>Determining the rendezvous IP address and port<a class="headerlink" href="#determining-the-rendezvous-ip-address-and-port" title="Link to this heading">¶</a></h2>
+<p>When launching a simulation across multiple ranks, it is often convenient to
+have rank 0 choose the Gloo rendezvous address and port, then share them with
+the other ranks through a small JSON file.</p>
+<p>In the example below, rank 0 extracts the IPv4 address of the high-speed
+network interface named <code class="docutils literal notranslate"><span class="pre">hsn0</span></code>, binds a socket to port <code class="docutils literal notranslate"><span class="pre">0</span></code> to let the OS
+pick a free port, and writes both values to <code class="docutils literal notranslate"><span class="pre">gloo_rdzv.json</span></code>. All other
+ranks wait until that file exists, then read it and reuse the same rendezvous
+endpoint.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">rdzv</span> <span class="o">=</span> <span class="s2">&quot;./gloo_rdzv.json&quot;</span>
+<span class="k">if</span> <span class="n">rank</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+    <span class="n">ip</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">check_output</span><span class="p">(</span>
+        <span class="s2">&quot;ip -o -4 addr show hsn0 | awk &#39;{print $4}&#39; | cut -d/ -f1&quot;</span><span class="p">,</span>
+        <span class="n">shell</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">text</span><span class="o">=</span><span class="kc">True</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+    <span class="n">s</span> <span class="o">=</span> <span class="n">socket</span><span class="o">.</span><span class="n">socket</span><span class="p">();</span> <span class="n">s</span><span class="o">.</span><span class="n">bind</span><span class="p">((</span><span class="n">ip</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+    <span class="n">port</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">getsockname</span><span class="p">()[</span><span class="mi">1</span><span class="p">];</span> <span class="n">s</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+    <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">({</span><span class="s2">&quot;ip&quot;</span><span class="p">:</span> <span class="n">ip</span><span class="p">,</span> <span class="s2">&quot;port&quot;</span><span class="p">:</span> <span class="n">port</span><span class="p">},</span> <span class="nb">open</span><span class="p">(</span><span class="n">rdzv</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">))</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="k">while</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">rdzv</span><span class="p">):</span> <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mf">0.1</span><span class="p">)</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="n">rdzv</span><span class="p">))</span>
+<span class="n">master_addr</span><span class="p">,</span> <span class="n">master_port</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;ip&quot;</span><span class="p">],</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;port&quot;</span><span class="p">]</span>
+</pre></div>
+</div>
 </section>
-<table class="domainindex-table">
-  <tr class="pcap">
-    <td></td><td>&#160;</td><td></td>
-  </tr>
-  <tr class="cap" id="cap-r">
-    <td></td><td><strong>r</strong></td><td></td>
-  </tr>
-  <tr>
-    <td><img src="_static/minus.png" class="toggler"
-              id="toggle-1" style="display: none" alt="-" /></td>
-    <td>
-        <a href="ray.html#module-ray"><code class="xref">ray</code></a></td><td>
-    <em></em></td>
-  </tr>
-  <tr class="cg-1">
-    <td></td>
-    <td>&#160;&#160;&#160;
-        <a href="ray.types.html#module-ray.types"><code class="xref">ray.types</code></a></td><td>
-    <em></em></td>
-  </tr>
-</table>
+</section>
 
         </article>
       </div>
@@ -258,7 +269,17 @@
         
         <div class="related-pages">
           
-          
+          <a class="prev-page" href="analytics.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">Analytics</div>
+                
+              </div>
+            </a>
         </div>
         <div class="bottom-of-page">
           <div class="left-details">
@@ -277,8 +298,27 @@
         
       </footer>
     </div>
-    <aside class="toc-drawer no-toc">
+    <aside class="toc-drawer">
       
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Tips</a><ul>
+<li><a class="reference internal" href="#determining-the-rendezvous-ip-address-and-port">Determining the rendezvous IP address and port</a></li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
       
       
     </aside>

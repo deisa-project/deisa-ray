@@ -1,7 +1,0 @@
-deisa.ray.types module
-======================
-
-.. automodule:: deisa.ray.types
-   :members:
-   :show-inheritance:
-   :undoc-members:

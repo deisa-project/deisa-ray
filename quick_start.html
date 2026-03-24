@@ -194,22 +194,7 @@
 <ul class="current">
 <li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Quick Start</a></li>
 <li class="toctree-l1"><a class="reference internal" href="analytics.html">Analytics</a></li>
-</ul>
-<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
-<ul>
-<li class="toctree-l1 has-children"><a class="reference internal" href="deisa.ray.html">deisa.ray package</a><input aria-label="Toggle navigation of deisa.ray package" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
-<li class="toctree-l2"><a class="reference internal" href="deisa.ray.bridge.html">deisa.ray.bridge module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="deisa.ray.comm.html">deisa.ray.comm module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="deisa.ray.config.html">deisa.ray.config module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="deisa.ray.errors.html">deisa.ray.errors module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="deisa.ray.head_node.html">deisa.ray.head_node module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="deisa.ray.scheduling_actor.html">deisa.ray.scheduling_actor module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="deisa.ray.types.html">deisa.ray.types module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="deisa.ray.utils.html">deisa.ray.utils module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="deisa.ray.validate.html">deisa.ray.validate module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="deisa.ray.window_handler.html">deisa.ray.window_handler module</a></li>
-</ul>
-</li>
+<li class="toctree-l1"><a class="reference internal" href="tips.html">Tips</a></li>
 </ul>
 
 </div>
@@ -276,8 +261,7 @@ happen before any send for timestep <em>j &gt; i</em>.</p></li>
 <ul class="simple">
 <li><p>Analytics run on a Ray head node. Dask arrays are backed by Ray tasks.</p></li>
 <li><p>You register callbacks with <code class="docutils literal notranslate"><span class="pre">Deisa</span></code> and then execute them.</p></li>
-<li><p>Callback arguments are lists of <code class="docutils literal notranslate"><span class="pre">DeisaArray</span></code> objects, one list per
-<code class="docutils literal notranslate"><span class="pre">WindowSpec</span></code>.</p></li>
+<li><p>Callback arguments are lists of <code class="docutils literal notranslate"><span class="pre">DeisaArray</span></code> objects. The length of the list is the “window size”, defined when creating a <code class="docutils literal notranslate"><span class="pre">WindowSpec</span></code>.</p></li>
 <li><p>The array name in <code class="docutils literal notranslate"><span class="pre">WindowSpec</span></code> must match the bridge metadata name,
 otherwise the callback will not run for that array.</p></li>
 <li><p>The window list is time-ordered and only reflects the timesteps that were
@@ -296,38 +280,50 @@ ray<span class="w"> </span>start<span class="w"> </span>--address<span class="w"
 </section>
 <section id="simulation-quick-snippet">
 <h2>Simulation quick snippet<a class="headerlink" href="#simulation-quick-snippet" title="Link to this heading">¶</a></h2>
-<p>The simulation creates one <code class="docutils literal notranslate"><span class="pre">Bridge</span></code> per participating rank and sends chunks.
-The example metadata structure mirrors <code class="docutils literal notranslate"><span class="pre">tests/utils.py</span></code>.</p>
+<p>The simulation creates one <code class="docutils literal notranslate"><span class="pre">Bridge</span></code> per participating rank and sends chunks.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.bridge</span><span class="w"> </span><span class="kn">import</span> <span class="n">Bridge</span>
 
+<span class="c1"># 4 Bridges in total</span>
 <span class="n">world_size</span> <span class="o">=</span> <span class="mi">4</span>
 <span class="n">sys_md</span> <span class="o">=</span> <span class="p">{</span>
     <span class="s2">&quot;world_size&quot;</span><span class="p">:</span> <span class="n">world_size</span><span class="p">,</span>
+    <span class="c1"># must be a reachable address by all other bridges (localhost only single machine)</span>
     <span class="s2">&quot;master_address&quot;</span><span class="p">:</span> <span class="s2">&quot;127.0.0.1&quot;</span><span class="p">,</span>
+    <span class="c1"># free port</span>
     <span class="s2">&quot;master_port&quot;</span><span class="p">:</span> <span class="mi">29500</span><span class="p">,</span>
 <span class="p">}</span>
 
+<span class="c1"># descriptio of arrays being shared</span>
 <span class="n">arrays_md</span> <span class="o">=</span> <span class="p">{</span>
     <span class="s2">&quot;temperature&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="c1"># shape of the chunk</span>
         <span class="s2">&quot;chunk_shape&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">),</span>
+        <span class="c1"># how many chunks in each dimension</span>
         <span class="s2">&quot;nb_chunks_per_dim&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span>
-        <span class="s2">&quot;nb_chunks_of_node&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+        <span class="c1"># how many chunks / bridges per node</span>
+        <span class="s2">&quot;nb_chunks_of_node&quot;</span><span class="p">:</span> <span class="mi">4</span><span class="p">,</span>
+        <span class="c1"># dype</span>
         <span class="s2">&quot;dtype&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span>
+        <span class="c1"># the coordinates of the chunk block in</span>
+        <span class="c1"># the global distributed array</span>
         <span class="s2">&quot;chunk_position&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
     <span class="p">}</span>
 <span class="p">}</span>
 
+<span class="c1"># this call should be repeated 4 times with a different id</span>
 <span class="n">bridge</span> <span class="o">=</span> <span class="n">Bridge</span><span class="p">(</span>
-    <span class="n">bridge_id</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+    <span class="n">bridge_id</span><span class="o">=</span><span class="n">rank</span><span class="p">,</span>
     <span class="n">arrays_metadata</span><span class="o">=</span><span class="n">arrays_md</span><span class="p">,</span>
     <span class="n">system_metadata</span><span class="o">=</span><span class="n">sys_md</span><span class="p">,</span>
 <span class="p">)</span>
 
+<span class="c1"># sending data chunk</span>
 <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">):</span>
     <span class="n">chunk</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span> <span class="o">*</span> <span class="n">t</span>
     <span class="n">bridge</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">array_name</span><span class="o">=</span><span class="s2">&quot;temperature&quot;</span><span class="p">,</span> <span class="n">chunk</span><span class="o">=</span><span class="n">chunk</span><span class="p">,</span> <span class="n">timestep</span><span class="o">=</span><span class="n">t</span><span class="p">)</span>
 
+<span class="c1"># close bridge</span>
 <span class="n">bridge</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">timestep</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
 </pre></div>
 </div>
@@ -352,6 +348,69 @@ access to standard Dask array methods, and <code class="docutils literal notrans
 <span class="p">)</span>
 
 <span class="n">deisa</span><span class="o">.</span><span class="n">execute_callbacks</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">when</span></code> keyword controls when a callback is allowed to run. By default it
+is <code class="docutils literal notranslate"><span class="pre">&quot;AND&quot;</span></code>, which means the callback is executed only when all required
+arrays are available for the same timestep. You can also use <code class="docutils literal notranslate"><span class="pre">when=&quot;OR&quot;</span></code>,
+which means the callback is triggered whenever any input array has new data for
+a timestep; in that mode the analytics may reuse older arrays for the other
+inputs.</p>
+<p>Template:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">deisa</span><span class="o">.</span><span class="n">register_callback</span><span class="p">(</span>
+    <span class="n">my_callback</span><span class="p">,</span>
+    <span class="p">[</span><span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;temperature&quot;</span><span class="p">),</span> <span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;pressure&quot;</span><span class="p">)],</span>
+    <span class="n">when</span><span class="o">=</span><span class="s2">&quot;AND&quot;</span><span class="p">,</span>  <span class="c1"># or &quot;OR&quot;</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>You can also use the decorator form for a shorter registration pattern:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">d</span> <span class="o">=</span> <span class="n">Deisa</span><span class="p">()</span>
+
+<span class="nd">@d</span><span class="o">.</span><span class="n">callback</span><span class="p">(</span><span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;temperature&quot;</span><span class="p">),</span> <span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;pressure&quot;</span><span class="p">),</span> <span class="n">when</span><span class="o">=</span><span class="s2">&quot;OR&quot;</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">callback</span><span class="p">(</span><span class="n">temperature</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">],</span> <span class="n">pressure</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">]):</span>
+    <span class="o">...</span>
+</pre></div>
+</div>
+</section>
+<section id="using-windowspec-with-a-sliding-window">
+<h2>Using <code class="docutils literal notranslate"><span class="pre">WindowSpec</span></code> with a sliding window<a class="headerlink" href="#using-windowspec-with-a-sliding-window" title="Link to this heading">¶</a></h2>
+<p>To keep the last three timesteps of an array available inside a callback, use a
+<code class="docutils literal notranslate"><span class="pre">WindowSpec</span></code> with <code class="docutils literal notranslate"><span class="pre">window_size=3</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">WindowSpec</span>
+
+<span class="n">temperature_spec</span> <span class="o">=</span> <span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;temperature&quot;</span><span class="p">,</span> <span class="n">window_size</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The callback argument for that window spec will contain up to the three most
+recent arrays sent by the simulation. During the first two iterations, the list
+will contain fewer than three arrays, so the callback should guard against
+assuming the full window is already available.</p>
+<p>The window size should be chosen based on both memory capacity and the needs of
+the analysis. A window of length 3 means the system must be able to keep three
+copies of that array in memory at the same time. It should also match the
+algorithm you want to implement. For example, a midpoint Euler-style formula
+that needs three timesteps requires <code class="docutils literal notranslate"><span class="pre">window_size=3</span></code>.</p>
+<p>The list is ordered from oldest to newest: the oldest array is at the
+beginning, and the most recent array is at the end. Each entry is a
+<code class="docutils literal notranslate"><span class="pre">DeisaArray</span></code> object, so use <code class="docutils literal notranslate"><span class="pre">.dask</span></code> to access the Dask array and <code class="docutils literal notranslate"><span class="pre">.t</span></code> to
+access its timestep.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">midpoint_callback</span><span class="p">(</span><span class="n">temperature_window</span><span class="p">):</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">temperature_window</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="k">return</span>
+
+    <span class="n">oldest</span> <span class="o">=</span> <span class="n">temperature_window</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">middle</span> <span class="o">=</span> <span class="n">temperature_window</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">newest</span> <span class="o">=</span> <span class="n">temperature_window</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+    <span class="n">midpoint_estimate</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">oldest</span><span class="o">.</span><span class="n">dask</span> <span class="o">+</span> <span class="n">middle</span><span class="o">.</span><span class="n">dask</span> <span class="o">+</span> <span class="n">newest</span><span class="o">.</span><span class="n">dask</span>
+    <span class="p">)</span> <span class="o">/</span> <span class="mi">3</span>
+
+    <span class="nb">print</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;window covers timesteps </span><span class="si">{</span><span class="n">oldest</span><span class="o">.</span><span class="n">t</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">middle</span><span class="o">.</span><span class="n">t</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">newest</span><span class="o">.</span><span class="n">t</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="p">)</span>
+    <span class="n">midpoint_estimate</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
 </pre></div>
 </div>
 </section>
@@ -428,6 +487,7 @@ access to standard Dask array methods, and <code class="docutils literal notrans
 <li><a class="reference internal" href="#cluster-setup-ray">Cluster setup (Ray)</a></li>
 <li><a class="reference internal" href="#simulation-quick-snippet">Simulation quick snippet</a></li>
 <li><a class="reference internal" href="#analytics-quick-snippet">Analytics quick snippet</a></li>
+<li><a class="reference internal" href="#using-windowspec-with-a-sliding-window">Using <code class="docutils literal notranslate"><span class="pre">WindowSpec</span></code> with a sliding window</a></li>
 <li><a class="reference internal" href="#where-to-go-next">Where to go next</a></li>
 </ul>
 </li>
