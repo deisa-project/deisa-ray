@@ -1,6 +1,12 @@
-from typing import Protocol
-import torch.distributed as dist
 import datetime
+from typing import Protocol
+
+import torch.distributed as dist
+
+try:
+    from mpi4py import MPI as _MPI
+except ImportError:
+    _MPI = None
 
 
 # TODO : Add test about comm size > declared wolrd size
@@ -57,6 +63,31 @@ class Comm(Protocol):
 
     def barrier(self) -> None:
         """Block until all ranks reach this barrier."""
+
+
+def normalize_comm(comm) -> Comm | None:
+    """
+    Normalize supported communicator inputs to the shared Comm protocol.
+
+    Parameters
+    ----------
+    comm : Comm or mpi4py.MPI.Comm or None
+        Existing DEISA communicator, raw MPI communicator, or ``None``.
+
+    Returns
+    -------
+    Comm or None
+        ``None`` if no communicator was provided, the original ``Comm``
+        implementation unchanged, or an :class:`MPICommAdapter` wrapping a raw
+        ``mpi4py`` communicator.
+    """
+    if comm is None:
+        return None
+
+    if _MPI is not None and isinstance(comm, _MPI.Comm):
+        return MPICommAdapter(comm)
+
+    return comm
 
 
 class MPICommAdapter:

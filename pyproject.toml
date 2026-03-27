@@ -1,6 +1,6 @@
 [project]
 name = "deisa-ray"
-version = "0.0.7"
+version = "0.0.9"
 description = "In Situ Analytics with Ray backend"
 requires-python = ">=3.12"
 readme = "README.md"
@@ -9,14 +9,20 @@ dependencies = [
     "ray[default]==2.48.0",
     "numpy",
     "torch>=2.10.0",
+    "h5py>=3.15.1",
+    "zarr>=3.1.5",
+    "xarray",
+    "h5netcdf",
+]
+
+[project.optional-dependencies]
+mpi = [
+    "mpi4py",
 ]
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
-
-[tool.hatch.build.targets.sdist]
-packages = ["src/deisa"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/deisa"]
@@ -27,13 +33,20 @@ dev = [
     "poethepoet>=0.32.2,<0.33",
     "pytest>=8.3.5,<9",
     "pre-commit>=4.2.0,<5",
-    "mkdocs-material>=9.6.14",
-    "mkdocstrings[python]>=0.29.1",
-    "pyright (>=1.1.397,<2.0.0)",
+    "pyright>=1.1.397,<2.0.0",
     "py-spy>=0.4.0",
+]
+
+docs = [
     "sphinx>=8.2.3",
     "sphinx-autobuild>=2025.8.25",
     "furo>=2025.9.25",
+
+    # TEMP PIN:
+    # Sphinx ≥9.1 currently fails with roman-numerals 4.1.0
+    # (ModuleNotFoundError: roman_numerals when loading latex builder).
+    # Remove this pin once upstream issue is fixed.
+    "roman-numerals==4.0.0",
 ]
 
 [tool.ruff]
@@ -50,7 +63,3 @@ _sort-imports = "ruff check --select I --fix"
 [tool.poe.tasks.format]
 sequence = ["_format", "_sort-imports"]
 help = "Format the source code, and sort the imports"
-
-[tool.poe.tasks.serve-docs]
-cmd = "mkdocs serve"
-help = "Serve the documentation locally"
