@@ -483,7 +483,7 @@ dataframe = [
 
 [[package]]
 name = "deisa-ray"
-version = "0.0.9"
+version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "dask", extra = ["dataframe"] },
