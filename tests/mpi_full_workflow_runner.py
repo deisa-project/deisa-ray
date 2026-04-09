@@ -51,7 +51,7 @@ def main() -> None:
         }
     }
     bridge = Bridge(
-        bridge_id=rank,
+        id=rank,
         arrays_metadata=arrays_md,
         system_metadata=None,
         comm=mpi_comm,
@@ -61,7 +61,7 @@ def main() -> None:
     array = (rank + 1) * np.ones((1, 1), dtype=np.int32)
 
     for timestep in range(NB_ITERATIONS):
-        bridge.send(array_name="array", chunk=timestep * array, timestep=timestep)
+        bridge.send(array_name="array", data=timestep * array, timestep=timestep)
 
     assert bridge.close(timestep=NB_ITERATIONS) == NB_ITERATIONS
 

@@ -130,7 +130,7 @@ def test_actor_placement(enable_distributed_scheduling, ray_multinode_cluster):
         port = pick_free_port()
         sys_md = {"world_size": 1, "master_address": "127.0.0.1", "master_port": port}
         c = Bridge(
-            bridge_id=0,
+            id=0,
             arrays_metadata=arrays_md,
             system_metadata=sys_md,
             _node_id=None,

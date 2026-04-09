@@ -1,6 +1,9 @@
 import datetime
-from typing import Protocol
+from typing import Any, Optional
 
+from deisa.core.interface import ICommunicator
+
+import torch
 import torch.distributed as dist
 
 try:
@@ -57,15 +60,7 @@ def init_gloo_comm(
     return TorchDistComm(rank=rank, world_size=world_size)
 
 
-class Comm(Protocol):
-    rank: int
-    world_size: int
-
-    def barrier(self) -> None:
-        """Block until all ranks reach this barrier."""
-
-
-def normalize_comm(comm) -> Comm | None:
+def normalize_comm(comm) -> ICommunicator | None:
     """
     Normalize supported communicator inputs to the shared Comm protocol.
 
@@ -90,7 +85,7 @@ def normalize_comm(comm) -> Comm | None:
     return comm
 
 
-class MPICommAdapter:
+class MPICommAdapter(ICommunicator):
     """Adapter exposing an MPI communicator via the shared Comm protocol."""
 
     def __init__(self, comm):
@@ -109,6 +104,18 @@ class MPICommAdapter:
     def barrier(self) -> None:
         """Block until all MPI ranks reach this barrier."""
         self._comm.Barrier()
+
+    def Get_rank(self) -> int:
+        return self.rank
+
+    def Get_size(self) -> int:
+        return self.world_size
+
+    def gather(self, data: Any, root: int = 0) -> Optional[list[Any]]:
+        return self._comm.gather(data, root)
+
+    def bcast(self, obj: Any, root: int = 0) -> Any:
+        return self._comm.bcast(obj, root)
 
 
 class TorchDistComm:
@@ -131,6 +138,33 @@ class TorchDistComm:
     def barrier(self) -> None:
         """Block until all Torch distributed ranks reach this barrier."""
         dist.barrier()
+
+    def Get_rank(self) -> int:
+        return self.rank
+
+    def Get_size(self) -> int:
+        return self.world_size
+
+    def gather(self, data: Any, root: int = 0) -> Optional[list[Any]]:
+        tensor = torch.tensor([data])
+        if self.rank == root:
+            gather_list = [torch.zeros_like(tensor) for _ in range(self.world_size)]
+        else:
+            gather_list = None
+
+        dist.gather(data, gather_list, dst=root)
+
+        if self.rank == root and gather_list is not None:
+            return [t.item() for t in gather_list]
+
+    def bcast(self, obj: Any, root: int = 0) -> Any:
+        if self.rank == root:
+            tensor = torch.tensor([obj])
+        else:
+            tensor = torch.zeros(1)
+        dist.broadcast(tensor, src=root)
+
+        return tensor.item()
 
 
 class NoOpComm:

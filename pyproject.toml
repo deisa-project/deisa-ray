@@ -6,13 +6,16 @@ requires-python = ">=3.12"
 readme = "README.md"
 dependencies = [
     "dask[dataframe]==2025.5.0",
-    "ray[default]==2.48.0",
+    "deisa-core>=0.4.0",
+    "distributed==2025.5",
+    "ray[default]==2.54.1",
     "numpy",
     "torch>=2.10.0",
     "h5py>=3.15.1",
     "zarr>=3.1.5",
     "xarray",
     "h5netcdf",
+    "mpi4py"
 ]
 
 [project.optional-dependencies]

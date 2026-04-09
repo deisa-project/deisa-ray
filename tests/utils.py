@@ -72,7 +72,7 @@ def simple_worker(
         for name in array_name
     }
 
-    client = Bridge(bridge_id=rank, arrays_metadata=arrays_md, system_metadata=sys_md, _node_id=node_id)
+    client = Bridge(id=rank, arrays_metadata=arrays_md, system_metadata=sys_md, _node_id=node_id)
 
     array = (rank + 1) * np.ones(chunk_size, dtype=dtype)
 
@@ -81,7 +81,7 @@ def simple_worker(
         time.sleep(_sleep_intra_send)
         for array_described in list(arrays_md.keys()):
             chunk = i * array
-            client.send(array_name=array_described, chunk=chunk, timestep=i, chunked=True)
+            client.send(array_name=array_described, data=chunk, timestep=i, chunked=True)
 
     client.close(timestep=nb_iterations)
 
@@ -115,14 +115,14 @@ def simple_worker_error_test(
         }
     }
 
-    client = Bridge(bridge_id=rank, arrays_metadata=arrays_md, system_metadata=sys_md, _node_id=node_id)
+    client = Bridge(id=rank, arrays_metadata=arrays_md, system_metadata=sys_md, _node_id=node_id)
 
     array = (rank + 1) * np.ones(chunk_size, dtype=dtype)
 
     for i in range(nb_iterations):
         chunk = i * array
         if i == nb_iterations // 2:
-            client.send(array_name="error", chunk=chunk, timestep=i, chunked=True)
+            client.send(array_name="error", data=chunk, timestep=i, chunked=True)
         else:
-            client.send(array_name=array_name, chunk=chunk, timestep=i, chunked=True)
+            client.send(array_name=array_name, data=chunk, timestep=i, chunked=True)
     client.close(timestep=nb_iterations)

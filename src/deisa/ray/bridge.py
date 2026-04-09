@@ -18,6 +18,8 @@ from deisa.ray.errors import ContractError, _default_exception_handler
 from deisa.ray.comm import init_gloo_comm, normalize_comm
 from deisa.ray.validate import _validate_arrays_meta, _validate_system_meta
 from deisa.ray.utils import get_node_actor_options
+from deisa.core.interface import IBridge
+
 import torch.distributed as dist
 
 logger = logging.getLogger(__name__)
@@ -32,7 +34,7 @@ _GLOO_RENDEZVOUS_ERRORS = tuple(
 )
 
 
-class Bridge:
+class Bridge(IBridge):
     """
     Bridge between MPI ranks and Ray cluster for distributed array processing.
 
@@ -113,11 +115,11 @@ class Bridge:
     # should sim crash? Keep going?
     def __init__(
         self,
-        bridge_id: int,
+        id: int,
         arrays_metadata: Mapping[str, Mapping[str, Any]],
         system_metadata: Mapping[str, Any] | None = None,
-        comm: Any = None,
         *,
+        comm: Any = None,
         _node_id: str | None = None,
         scheduling_actor_cls: ActorClass = _RealSchedulingActor,
         _init_retries: int = 3,
@@ -128,7 +130,7 @@ class Bridge:
 
         Parameters
         ----------
-        bridge_id : int
+        id : int
             Unique identifier of this Bridge.
         arrays_metadata : Mapping[str, Mapping[str, Any]]
             Dictionary that describes the arrays being shared by the simulation.
@@ -176,7 +178,7 @@ class Bridge:
         node affinity scheduling when `_node_id` is None. The first remote call
         to the scheduling actor serves as a readiness check.
         """
-        self.bridge_id = bridge_id
+        self.bridge_id = id
         self._init_retries = _init_retries
 
         self.arrays_metadata = _validate_arrays_meta(arrays_metadata)
@@ -294,7 +296,7 @@ class Bridge:
         self,
         *,
         array_name: str,
-        chunk: np.ndarray,
+        data: np.ndarray,
         timestep: int,
         chunked: bool = True,
         store_externally: bool = False,
@@ -311,7 +313,7 @@ class Bridge:
         ----------
         array_name : str
             The name of the array this chunk belongs to.
-        chunk : numpy.ndarray
+        data : numpy.ndarray
             The chunk of data to be sent to the analytics.
         timestep : int
             The timestep index for this chunk of data.
@@ -344,7 +346,7 @@ class Bridge:
         """
         try:
             # Setting the owner allows keeping the reference when the simulation script terminates.
-            ref = ray.put(chunk, _owner=self.node_actor)
+            ref = ray.put(data, _owner=self.node_actor)
             future: ray.ObjectRef = self.node_actor.add_chunk.remote(
                 bridge_id=self.bridge_id,
                 array_name=array_name,
@@ -450,7 +452,7 @@ class Bridge:
     def get(
         self,
         *,
-        name: str,
+        key: str,
         default: Any | None = None,
         chunked: bool = False,
     ) -> Any | None:
@@ -497,7 +499,7 @@ class Bridge:
             Chunked retrieval is not implemented yet.
         """
         if not chunked:
-            return ray.get(self.node_actor.get.remote(name, default, chunked))
+            return ray.get(self.node_actor.get.remote(key, default, chunked))
 
         raise NotImplementedError("Retrieving chunked arrays via Bridge.get is not implemented yet.")
 

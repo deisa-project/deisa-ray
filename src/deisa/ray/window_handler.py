@@ -19,6 +19,7 @@ from deisa.ray.types import (
     _CallbackConfig,
 )
 from deisa.ray.utils import get_head_actor_options
+from deisa.core.interface import IDeisa
 
 
 def _ray_start_impl() -> None:
@@ -34,7 +35,7 @@ def _ray_start_impl() -> None:
         ray.init(address="auto", log_to_driver=False, logging_level=logging.ERROR)
 
 
-class Deisa:
+class Deisa(IDeisa):
     """
     Entry point that orchestrates analytics callbacks on Ray.
 

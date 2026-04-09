@@ -41,17 +41,17 @@ def strange_worker(
         for name in array_names
     }
 
-    client = Bridge(bridge_id=rank, arrays_metadata=arrays_md, system_metadata=sys_md, _node_id=node_id)
+    client = Bridge(id=rank, arrays_metadata=arrays_md, system_metadata=sys_md, _node_id=node_id)
 
     array = (rank + 1) * np.ones(chunk_size, dtype=dtype)
 
     for i in range(nb_iterations):
         if i % 2 == 0:
             chunk = i * array
-            client.send(array_name=array_names[0], chunk=chunk, timestep=i, chunked=True)
+            client.send(array_name=array_names[0], data=chunk, timestep=i, chunked=True)
         if i % 2 == 1:
             chunk = i * array
-            client.send(array_name=array_names[1], chunk=chunk, timestep=i, chunked=True)
+            client.send(array_name=array_names[1], data=chunk, timestep=i, chunked=True)
     client.close(timestep=nb_iterations)
 
 
