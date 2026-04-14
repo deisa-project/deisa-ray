@@ -10,7 +10,6 @@ from deisa.ray.errors import ContractError
 from deisa.ray.types import (
     ActorID,
     ArrayPerTimestep,
-    ChunkRef,
     GraphInfo,
     GraphKey,
     GraphValue,
@@ -433,7 +432,7 @@ class SchedulingActor(NodeActorBase):
         Schedule a Dask task graph for execution.
 
         This method processes a Dask task graph, replacing placeholders
-        (ChunkRef and ScheduledByOtherActor) with actual ObjectRefs, and
+        ScheduledByOtherActor with actual ObjectRefs, and
         schedules the graph for execution using Ray's Dask scheduler.
 
         Parameters
@@ -445,7 +444,6 @@ class SchedulingActor(NodeActorBase):
             The Dask task graph dictionary. Keys are task identifiers, and
             values may be:
             - Regular Dask tasks
-            - ChunkRef objects (replaced with actual chunk ObjectRefs)
             - ScheduledByOtherActor objects (replaced with remote calls to
               other actors)
         initial_refs : dict[GraphKey, ray.ObjectRef] or None, optional
@@ -462,7 +460,6 @@ class SchedulingActor(NodeActorBase):
         3. Optionally pre-populates GraphInfo with seeded references
         4. Processes the task graph:
            - Replaces ScheduledByOtherActor with remote calls to other actors
-           - Replaces ChunkRef with actual chunk ObjectRefs from local storage
            - Converts pickled chunk references back to ObjectRefs
         5. Schedules the graph using remote_ray_dask_get
         6. Stores the resulting *double* ObjectRefs in GraphInfo
@@ -519,16 +516,13 @@ class SchedulingActor(NodeActorBase):
         graph_id : int
             Identifier of the graph being processed.
         graph : dict[GraphKey, GraphValue]
-            Task graph that may contain :class:`ChunkRef` or
-            :class:`ScheduledByOtherActor` placeholders.
+            Task graph that may contain :class:`ScheduledByOtherActor` placeholders.
 
         Notes
         -----
         The provided ``graph`` is mutated in place.
         - ``ScheduledByOtherActor`` entries are rewritten to remote calls
           to the owning scheduling actor.
-        - (not used for now) ``ChunkRef`` entries are replaced with the pickled or direct
-          ObjectRefs stored locally for the relevant timestep/position.
         - When a stored ref is still in-memory, it is pickled to ensure
           ownership transfer and memory release after scheduling.
         """
@@ -537,34 +531,6 @@ class SchedulingActor(NodeActorBase):
             if isinstance(val, ScheduledByOtherActor):
                 actor = self.scheduling_actors[val.actor_id]
                 graph[key] = actor.get_value.options(enable_task_events=False).remote(graph_id, key)
-
-            # Replace the false chunks by the real ObjectRefs
-            # TODO we never enter this condition due to new dask version
-            # so for now prepare iteration (in the future) will not work.
-            # FOR FUTURE WHOEVER: if trying to enable prepare iteration stuff, you need to make sure
-            # that the function enters the if below somehow, because the awaits are made so that
-            # the actor will wait until the refs are created and the leaf nodes will therefore exist.
-            # only then, can the tasks proceed. However, the graph itself is already created.
-
-            if isinstance(val, ChunkRef):
-                assert val.actorid == self.actor_id
-
-                array = await self.partial_arrays.wait_for_key(val.array_name)
-
-                array_timestep = await array.per_timestep_arrays.wait_for_key(val.timestep)
-
-                # should be pickled ref of ref
-                ref = await array_timestep.local_chunks.wait_for_key(val.bridge_id)
-
-                # This may not be the case depending on the asyncio scheduling order
-                if isinstance(ref, bytes):
-                    ref = pickle.loads(ref)
-                else:
-                    # To free the memory automatically
-                    ref = pickle.loads(pickle.dumps(ref))
-
-                # replace ChunkRef by actual ref (still ref of ref)
-                graph[key] = ref
 
     # this function does a 1 level unpacking of a ref of ref among other things.
     # TODO rename this function to something better. It is called by other scheduling actors to retrieve
