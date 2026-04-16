@@ -8,8 +8,7 @@ from dask.core import flatten
 import ray
 from ray.util.dask.scheduler_utils import nested_get
 
-from deisa.ray.scheduling_actor import ChunkRef, ScheduledByOtherActor
-from deisa.ray.types import ActorID, GraphKey, GraphValue, RayActorHandle
+from deisa.ray.types import ActorID, GraphKey, GraphValue, RayActorHandle, ChunkRef, ScheduledByOtherActor
 
 
 def random_partitioning(dsk, scheduling_actors: dict) -> dict[str, int]:
@@ -65,13 +64,15 @@ def random_partitioning(dsk, scheduling_actors: dict) -> dict[str, int]:
             partition[key] = chunkref.actorid
             dsk[key] = DataNode(key, chunkref.ref)
         elif deps == set() and isinstance(val, Task):
-            data_node = next(
-                (v for v in val.args[0].values() if isinstance(v, DataNode) and isinstance(v.value, ChunkRef)), None
+            data_item = next(
+                ((k, v) for k, v in val.args[0].items() if isinstance(v, DataNode) and isinstance(v.value, ChunkRef)),
+                (None, None),
             )
+            dict_key, data_node = data_item
             if data_node is not None:
                 chunkref: ChunkRef = data_node.value
                 partition[key] = chunkref.actorid
-                dsk[key] = DataNode(key, chunkref.ref)
+                val.args[0][dict_key] = DataNode(key, chunkref.ref)
             else:
                 partition[key] = actors.pop()
         else:
@@ -141,13 +142,19 @@ def greedy_partitioning(dsk, scheduling_actors: dict) -> dict[str, int]:
             partition[k] = chunkref.actorid
             dsk[k] = DataNode(k, chunkref.ref)
         elif deps == set() and isinstance(dsk[k], Task):
-            data_node = next(
-                (v for v in dsk[k].args[0].values() if isinstance(v, DataNode) and isinstance(v.value, ChunkRef)), None
+            data_item = next(
+                (
+                    (k, v)
+                    for k, v in dsk[k].args[0].items()
+                    if isinstance(v, DataNode) and isinstance(v.value, ChunkRef)
+                ),
+                (None, None),
             )
+            dict_key, data_node = data_item
             if data_node is not None:
                 chunkref: ChunkRef = data_node.value
-                partition[k] = chunkref.actorid
-                dsk[k] = DataNode(k, chunkref.ref)
+                partition[key] = chunkref.actorid
+                dsk[k].args[0][dict_key] = DataNode(key, chunkref.ref)
             else:
                 partition[k] = random.choice(actor_names)
         else:
