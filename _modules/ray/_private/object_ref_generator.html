@@ -229,13 +229,16 @@
           <h1>Source code for ray._private.object_ref_generator</h1><div class="highlight"><pre>
 <span></span><span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
 
+<span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">collections</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span><span class="p">,</span> <span class="n">Deque</span><span class="p">,</span> <span class="n">Iterator</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span><span class="p">,</span> <span class="n">Deque</span><span class="p">,</span> <span class="n">Iterator</span><span class="p">,</span> <span class="n">Optional</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">ray.util.annotations</span><span class="w"> </span><span class="kn">import</span> <span class="n">DeveloperAPI</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">ray</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">ray.exceptions</span><span class="w"> </span><span class="kn">import</span> <span class="n">ObjectRefStreamEndOfStreamError</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">ray.util.annotations</span><span class="w"> </span><span class="kn">import</span> <span class="n">DeveloperAPI</span><span class="p">,</span> <span class="n">PublicAPI</span>
 
 <span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
-    <span class="kn">import</span><span class="w"> </span><span class="nn">ray</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">ray._private.worker</span><span class="w"> </span><span class="kn">import</span> <span class="n">Worker</span>
 
 
 <div class="viewcode-block" id="DynamicObjectRefGenerator">
@@ -255,6 +258,306 @@
     <span class="k">def</span><span class="w"> </span><span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
         <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_refs</span><span class="p">)</span></div>
 
+
+
+<span class="nd">@PublicAPI</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">ObjectRefGenerator</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A generator to obtain object references from a task in a streaming manner.</span>
+
+<span class="sd">    The class is compatible with the Python generator and async generator interfaces.</span>
+
+<span class="sd">    The class is not thread-safe.</span>
+
+<span class="sd">    Do not initialize the class and create an instance directly.</span>
+<span class="sd">    The instance should be created by `.remote`.</span>
+
+<span class="sd">    .. testcode::</span>
+
+<span class="sd">        import ray</span>
+<span class="sd">        from typing import Generator</span>
+
+<span class="sd">        @ray.remote(num_returns=&quot;streaming&quot;)</span>
+<span class="sd">        def gen() -&gt; Generator[int, None, None]:</span>
+<span class="sd">            for i in range(5):</span>
+<span class="sd">                yield i</span>
+
+<span class="sd">        obj_ref_gen: ray.ObjectRefGenerator = gen.remote()</span>
+<span class="sd">        for obj_ref in obj_ref_gen:</span>
+<span class="sd">            print(&quot;Got:&quot;, ray.get(obj_ref))</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">generator_ref</span><span class="p">:</span> <span class="s2">&quot;ray.ObjectRef&quot;</span><span class="p">,</span> <span class="n">worker</span><span class="p">:</span> <span class="s2">&quot;Worker&quot;</span><span class="p">):</span>
+        <span class="c1"># The reference to a generator task.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_generator_ref</span> <span class="o">=</span> <span class="n">generator_ref</span>
+        <span class="c1"># True if an exception has been raised from the generator task.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_generator_task_raised</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="c1"># Ray&#39;s worker class. ray._private.worker.global_worker</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">worker</span> <span class="o">=</span> <span class="n">worker</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">worker</span><span class="o">.</span><span class="n">check_connected</span><span class="p">()</span>
+        <span class="k">assert</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">worker</span><span class="p">,</span> <span class="s2">&quot;core_worker&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Public APIs</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;ObjectRefGenerator&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__next__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;ray.ObjectRef&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Waits until a next ref is available and returns the object ref.</span>
+
+<span class="sd">        Raises StopIteration if there&#39;s no more objects</span>
+<span class="sd">        to generate.</span>
+
+<span class="sd">        The object ref will contain an exception if the task fails.</span>
+<span class="sd">        When the generator task returns N objects, it can return</span>
+<span class="sd">        up to N + 1 objects (if there&#39;s a system failure, the</span>
+<span class="sd">        last object will contain a system level exception).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_next_sync</span><span class="p">()</span>
+
+<div class="viewcode-block" id="ObjectRefGenerator.send">
+<a class="viewcode-back" href="../../../ray.html#ray.ObjectRefGenerator.send">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">send</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;`gen.send` is not supported.&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ObjectRefGenerator.throw">
+<a class="viewcode-back" href="../../../ray.html#ray.ObjectRefGenerator.throw">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">throw</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;`gen.throw` is not supported.&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ObjectRefGenerator.close">
+<a class="viewcode-back" href="../../../ray.html#ray.ObjectRefGenerator.close">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;`gen.close` is not supported.&quot;</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__aiter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;ObjectRefGenerator&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="fm">__anext__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_next_async</span><span class="p">()</span>
+
+<div class="viewcode-block" id="ObjectRefGenerator.asend">
+<a class="viewcode-back" href="../../../ray.html#ray.ObjectRefGenerator.asend">[docs]</a>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">asend</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;`gen.asend` is not supported.&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ObjectRefGenerator.athrow">
+<a class="viewcode-back" href="../../../ray.html#ray.ObjectRefGenerator.athrow">[docs]</a>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">athrow</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;`gen.athrow` is not supported.&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ObjectRefGenerator.aclose">
+<a class="viewcode-back" href="../../../ray.html#ray.ObjectRefGenerator.aclose">[docs]</a>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">aclose</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;`gen.aclose` is not supported.&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ObjectRefGenerator.completed">
+<a class="viewcode-back" href="../../../ray.html#ray.ObjectRefGenerator.completed">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">completed</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;ray.ObjectRef&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns an object ref that is ready when</span>
+<span class="sd">        a generator task completes.</span>
+
+<span class="sd">        If the task is failed unexpectedly (e.g., worker failure),</span>
+<span class="sd">        the `ray.get(gen.completed())` raises an exception.</span>
+
+<span class="sd">        The function returns immediately.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_generator_ref</span></div>
+
+
+<div class="viewcode-block" id="ObjectRefGenerator.next_ready">
+<a class="viewcode-back" href="../../../ray.html#ray.ObjectRefGenerator.next_ready">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">next_ready</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;If True, it means the output of next(gen) is ready and</span>
+<span class="sd">        ray.get(next(gen)) returns immediately. False otherwise.</span>
+
+<span class="sd">        It returns False when next(gen) raises a StopIteration</span>
+<span class="sd">        (this condition should be checked using is_finished).</span>
+
+<span class="sd">        The function returns immediately.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">worker</span><span class="o">.</span><span class="n">check_connected</span><span class="p">()</span>
+        <span class="n">core_worker</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">worker</span><span class="o">.</span><span class="n">core_worker</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_finished</span><span class="p">():</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="n">expected_ref</span><span class="p">,</span> <span class="n">is_ready</span> <span class="o">=</span> <span class="n">core_worker</span><span class="o">.</span><span class="n">peek_object_ref_stream</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_generator_ref</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">is_ready</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">True</span>
+
+        <span class="n">ready</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">ray</span><span class="o">.</span><span class="n">wait</span><span class="p">([</span><span class="n">expected_ref</span><span class="p">],</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">fetch_local</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="n">ready</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span></div>
+
+
+<div class="viewcode-block" id="ObjectRefGenerator.is_finished">
+<a class="viewcode-back" href="../../../ray.html#ray.ObjectRefGenerator.is_finished">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_finished</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;If True, it means the generator is finished</span>
+<span class="sd">        and all output is taken. False otherwise.</span>
+
+<span class="sd">        When True, if next(gen) is called, it will raise StopIteration</span>
+<span class="sd">        or StopAsyncIteration</span>
+
+<span class="sd">        The function returns immediately.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">worker</span><span class="o">.</span><span class="n">check_connected</span><span class="p">()</span>
+        <span class="n">core_worker</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">worker</span><span class="o">.</span><span class="n">core_worker</span>
+
+        <span class="n">finished</span> <span class="o">=</span> <span class="n">core_worker</span><span class="o">.</span><span class="n">is_object_ref_stream_finished</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_generator_ref</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">finished</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_generator_task_raised</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">True</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># We should try ray.get on a generator ref.</span>
+                <span class="c1"># If it raises an exception and</span>
+                <span class="c1"># _generator_task_raised is not set,</span>
+                <span class="c1"># this means the last ref is not taken yet.</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">ray</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_generator_ref</span><span class="p">)</span>
+                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                    <span class="c1"># The exception from _generator_ref</span>
+                    <span class="c1"># hasn&#39;t been taken yet.</span>
+                    <span class="k">return</span> <span class="kc">False</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="kc">True</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span></div>
+
+
+    <span class="c1"># Private APIs</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_next_ref</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;ray.ObjectRef&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the next reference from a generator.</span>
+
+<span class="sd">        Note that the ObjectID generated from a generator</span>
+<span class="sd">        is always deterministic.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">worker</span><span class="o">.</span><span class="n">check_connected</span><span class="p">()</span>
+        <span class="n">core_worker</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">worker</span><span class="o">.</span><span class="n">core_worker</span>
+        <span class="k">return</span> <span class="n">core_worker</span><span class="o">.</span><span class="n">peek_object_ref_stream</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_generator_ref</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_next_sync</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">timeout_s</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span> <span class="o">|</span> <span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;ray.ObjectRef&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Waits for timeout_s and returns the object ref if available.</span>
+
+<span class="sd">        If an object is not available within the given timeout, it</span>
+<span class="sd">        returns a nil object reference.</span>
+
+<span class="sd">        If -1 timeout is provided, it means it waits infinitely.</span>
+
+<span class="sd">        Waiting is implemented as busy waiting.</span>
+
+<span class="sd">        Raises StopIteration if there&#39;s no more objects</span>
+<span class="sd">        to generate.</span>
+
+<span class="sd">        The object ref will contain an exception if the task fails.</span>
+<span class="sd">        When the generator task returns N objects, it can return</span>
+<span class="sd">        up to N + 1 objects (if there&#39;s a system failure, the</span>
+<span class="sd">        last object will contain a system level exception).</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            timeout_s: If the next object is not ready within</span>
+<span class="sd">                this timeout, it returns the nil object ref.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            ObjectRef corresponding to the next result in the stream.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">core_worker</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">worker</span><span class="o">.</span><span class="n">core_worker</span>
+
+        <span class="c1"># Wait for the next ObjectRef to become ready.</span>
+        <span class="n">expected_ref</span><span class="p">,</span> <span class="n">is_ready</span> <span class="o">=</span> <span class="n">core_worker</span><span class="o">.</span><span class="n">peek_object_ref_stream</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_generator_ref</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">is_ready</span><span class="p">:</span>
+            <span class="n">_</span><span class="p">,</span> <span class="n">unready</span> <span class="o">=</span> <span class="n">ray</span><span class="o">.</span><span class="n">wait</span><span class="p">([</span><span class="n">expected_ref</span><span class="p">],</span> <span class="n">timeout</span><span class="o">=</span><span class="n">timeout_s</span><span class="p">,</span> <span class="n">fetch_local</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">unready</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">ray</span><span class="o">.</span><span class="n">ObjectRef</span><span class="o">.</span><span class="n">nil</span><span class="p">()</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">ref</span> <span class="o">=</span> <span class="n">core_worker</span><span class="o">.</span><span class="n">try_read_next_object_ref_stream</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_generator_ref</span><span class="p">)</span>
+            <span class="k">assert</span> <span class="ow">not</span> <span class="n">ref</span><span class="o">.</span><span class="n">is_nil</span><span class="p">()</span>
+        <span class="k">except</span> <span class="n">ObjectRefStreamEndOfStreamError</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_generator_task_raised</span><span class="p">:</span>
+                <span class="c1"># Exception has been returned.</span>
+                <span class="k">raise</span> <span class="ne">StopIteration</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
+
+            <span class="k">try</span><span class="p">:</span>
+                <span class="c1"># The generator ref contains an exception</span>
+                <span class="c1"># if there&#39;s any failure. It contains nothing otherwise.</span>
+                <span class="c1"># In that case, it should raise StopIteration.</span>
+                <span class="n">ray</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_generator_ref</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_generator_task_raised</span> <span class="o">=</span> <span class="kc">True</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_generator_ref</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># The task finished without an exception.</span>
+                <span class="k">raise</span> <span class="ne">StopIteration</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
+        <span class="k">return</span> <span class="n">ref</span>
+
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">_suppress_exceptions</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref</span><span class="p">:</span> <span class="s2">&quot;ray.ObjectRef&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># Wrap a streamed ref to avoid asyncio warnings about not retrieving</span>
+        <span class="c1"># the exception when we are just waiting for the ref to become ready.</span>
+        <span class="c1"># The exception will get returned (or warned) to the user once they</span>
+        <span class="c1"># actually await the ref.</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">await</span> <span class="n">ref</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="k">pass</span>
+
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">_next_async</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">timeout_s</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span> <span class="o">|</span> <span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Same API as _next_sync, but it is for async context.&quot;&quot;&quot;</span>
+        <span class="n">core_worker</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">worker</span><span class="o">.</span><span class="n">core_worker</span>
+        <span class="n">ref</span><span class="p">,</span> <span class="n">is_ready</span> <span class="o">=</span> <span class="n">core_worker</span><span class="o">.</span><span class="n">peek_object_ref_stream</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_generator_ref</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">is_ready</span><span class="p">:</span>
+            <span class="c1"># TODO(swang): Avoid fetching the value.</span>
+            <span class="n">_</span><span class="p">,</span> <span class="n">unready</span> <span class="o">=</span> <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">wait</span><span class="p">(</span>
+                <span class="p">[</span><span class="n">asyncio</span><span class="o">.</span><span class="n">create_task</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_suppress_exceptions</span><span class="p">(</span><span class="n">ref</span><span class="p">))],</span> <span class="n">timeout</span><span class="o">=</span><span class="n">timeout_s</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">unready</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">ray</span><span class="o">.</span><span class="n">ObjectRef</span><span class="o">.</span><span class="n">nil</span><span class="p">()</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">ref</span> <span class="o">=</span> <span class="n">core_worker</span><span class="o">.</span><span class="n">try_read_next_object_ref_stream</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_generator_ref</span><span class="p">)</span>
+            <span class="k">assert</span> <span class="ow">not</span> <span class="n">ref</span><span class="o">.</span><span class="n">is_nil</span><span class="p">()</span>
+        <span class="k">except</span> <span class="n">ObjectRefStreamEndOfStreamError</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_generator_task_raised</span><span class="p">:</span>
+                <span class="c1"># Exception has been returned.</span>
+                <span class="k">raise</span> <span class="ne">StopAsyncIteration</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
+
+            <span class="k">try</span><span class="p">:</span>
+                <span class="c1"># The generator ref contains an exception</span>
+                <span class="c1"># if there&#39;s any failure. It contains nothing otherwise.</span>
+                <span class="c1"># In that case, it should raise StopSyncIteration.</span>
+                <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_generator_ref</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_generator_task_raised</span> <span class="o">=</span> <span class="kc">True</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_generator_ref</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># Meaning the task succeed without failure raise StopAsyncIteration.</span>
+                <span class="k">raise</span> <span class="ne">StopAsyncIteration</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
+
+        <span class="k">return</span> <span class="n">ref</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__del__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">worker</span><span class="p">,</span> <span class="s2">&quot;core_worker&quot;</span><span class="p">):</span>
+            <span class="c1"># The stream is created when a task is first submitted.</span>
+            <span class="c1"># NOTE: This can be called multiple times</span>
+            <span class="c1"># because python doesn&#39;t guarantee __del__ is called</span>
+            <span class="c1"># only once.</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">worker</span><span class="o">.</span><span class="n">core_worker</span><span class="o">.</span><span class="n">async_delete_object_ref_stream</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_generator_ref</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">__getstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+            <span class="s2">&quot;You cannot return or pass a generator to other task. &quot;</span>
+            <span class="s2">&quot;Serializing a ObjectRefGenerator is not allowed.&quot;</span>
+        <span class="p">)</span>
 </pre></div>
         </article>
       </div>

@@ -231,13 +231,14 @@
 <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">collections</span><span class="w"> </span><span class="kn">import</span> <span class="n">defaultdict</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">threading</span><span class="w"> </span><span class="kn">import</span> <span class="n">Lock</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Optional</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">ray</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">ray._common.constants</span><span class="w"> </span><span class="kn">import</span> <span class="n">HEAD_NODE_RESOURCE_NAME</span><span class="p">,</span> <span class="n">NODE_ID_PREFIX</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">ray._common.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">binary_to_hex</span><span class="p">,</span> <span class="n">decode</span><span class="p">,</span> <span class="n">hex_to_binary</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">ray._private.client_mode_hook</span><span class="w"> </span><span class="kn">import</span> <span class="n">client_mode_hook</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">ray._private.protobuf_compat</span><span class="w"> </span><span class="kn">import</span> <span class="n">message_to_dict</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">ray._private.resource_spec</span><span class="w"> </span><span class="kn">import</span> <span class="n">HEAD_NODE_RESOURCE_NAME</span><span class="p">,</span> <span class="n">NODE_ID_PREFIX</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">ray._private.utils</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">validate_actor_state_name</span><span class="p">,</span>
 <span class="p">)</span>
@@ -260,32 +261,43 @@
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a GlobalState object.&quot;&quot;&quot;</span>
         <span class="c1"># Args used for lazy init of this object.</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">gcs_options</span> <span class="o">=</span> <span class="kc">None</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">global_state_accessor</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_global_state_accessor</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_init_lock</span> <span class="o">=</span> <span class="n">Lock</span><span class="p">()</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">_check_connected</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Ensure that the object has been initialized before it is used.</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_connect_and_get_accessor</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">GlobalStateAccessor</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        This lazily initializes clients needed for state accessors and returns a connected global state accessor.</span>
 
-<span class="sd">        This lazily initializes clients needed for state accessors.</span>
-
+<span class="sd">        Returns:</span>
+<span class="sd">            GlobalStateAccessor: A connected global state accessor.</span>
 <span class="sd">        Raises:</span>
-<span class="sd">            RuntimeError: An exception is raised if ray.init() has not been</span>
-<span class="sd">                called yet.</span>
+<span class="sd">            RuntimeError: An exception is raised if ray.init() has not been called yet.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">gcs_options</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">global_state_accessor</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_really_init_global_state</span><span class="p">()</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_init_lock</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_global_state_accessor</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_global_state_accessor</span>
 
-        <span class="c1"># _really_init_global_state should have set self.global_state_accessor</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">global_state_accessor</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="n">ray</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">RaySystemError</span><span class="p">(</span>
-                <span class="s2">&quot;Ray has not been started yet. You can start Ray with &#39;ray.init()&#39;.&quot;</span>
-            <span class="p">)</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">gcs_options</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">ray</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">RaySystemError</span><span class="p">(</span>
+                    <span class="s2">&quot;Ray has not been started yet. Trying to use state API before ray.init() has been called.&quot;</span>
+                <span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_global_state_accessor</span> <span class="o">=</span> <span class="n">GlobalStateAccessor</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">gcs_options</span><span class="p">)</span>
+            <span class="n">connected</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_global_state_accessor</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">connected</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_global_state_accessor</span> <span class="o">=</span> <span class="kc">None</span>
+                <span class="k">raise</span> <span class="n">ray</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">RaySystemError</span><span class="p">(</span>
+                    <span class="s2">&quot;Failed to connect to GCS. Please check if the GCS server is running &quot;</span>
+                    <span class="s2">&quot;and if this node can connect to the head node.&quot;</span>
+                <span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_global_state_accessor</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">disconnect</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Disconnect global state from GCS.&quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">gcs_options</span> <span class="o">=</span> <span class="kc">None</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">global_state_accessor</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">global_state_accessor</span><span class="o">.</span><span class="n">disconnect</span><span class="p">()</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">global_state_accessor</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_init_lock</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">gcs_options</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_global_state_accessor</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_global_state_accessor</span> <span class="o">=</span> <span class="kc">None</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_initialize_global_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">gcs_options</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Set args for lazily initialization of the GlobalState object.</span>
@@ -300,11 +312,8 @@
 
         <span class="c1"># Save args for lazy init of global state. This avoids opening extra</span>
         <span class="c1"># gcs connections from each worker until needed.</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">gcs_options</span> <span class="o">=</span> <span class="n">gcs_options</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">_really_init_global_state</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">global_state_accessor</span> <span class="o">=</span> <span class="n">GlobalStateAccessor</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">gcs_options</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">global_state_accessor</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_init_lock</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">gcs_options</span> <span class="o">=</span> <span class="n">gcs_options</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">actor_table</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -328,11 +337,11 @@
 <span class="sd">        Returns:</span>
 <span class="sd">            Information from the actor table.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_check_connected</span><span class="p">()</span>
+        <span class="n">accessor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_connect_and_get_accessor</span><span class="p">()</span>
 
         <span class="k">if</span> <span class="n">actor_id</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">actor_id</span> <span class="o">=</span> <span class="n">ray</span><span class="o">.</span><span class="n">ActorID</span><span class="p">(</span><span class="n">hex_to_binary</span><span class="p">(</span><span class="n">actor_id</span><span class="p">))</span>
-            <span class="n">actor_info</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">global_state_accessor</span><span class="o">.</span><span class="n">get_actor_info</span><span class="p">(</span><span class="n">actor_id</span><span class="p">)</span>
+            <span class="n">actor_info</span> <span class="o">=</span> <span class="n">accessor</span><span class="o">.</span><span class="n">get_actor_info</span><span class="p">(</span><span class="n">actor_id</span><span class="p">)</span>
             <span class="k">if</span> <span class="n">actor_info</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                 <span class="k">return</span> <span class="p">{}</span>
             <span class="k">else</span><span class="p">:</span>
@@ -340,9 +349,7 @@
                 <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_gen_actor_info</span><span class="p">(</span><span class="n">actor_table_data</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">validate_actor_state_name</span><span class="p">(</span><span class="n">actor_state_name</span><span class="p">)</span>
-            <span class="n">actor_table</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">global_state_accessor</span><span class="o">.</span><span class="n">get_actor_table</span><span class="p">(</span>
-                <span class="n">job_id</span><span class="p">,</span> <span class="n">actor_state_name</span>
-            <span class="p">)</span>
+            <span class="n">actor_table</span> <span class="o">=</span> <span class="n">accessor</span><span class="o">.</span><span class="n">get_actor_table</span><span class="p">(</span><span class="n">job_id</span><span class="p">,</span> <span class="n">actor_state_name</span><span class="p">)</span>
             <span class="n">results</span> <span class="o">=</span> <span class="p">{}</span>
             <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">actor_table</span><span class="p">)):</span>
                 <span class="n">actor_table_data</span> <span class="o">=</span> <span class="n">gcs_pb2</span><span class="o">.</span><span class="n">ActorTableData</span><span class="o">.</span><span class="n">FromString</span><span class="p">(</span><span class="n">actor_table</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
@@ -367,12 +374,12 @@
             <span class="s2">&quot;Address&quot;</span><span class="p">:</span> <span class="p">{</span>
                 <span class="s2">&quot;IPAddress&quot;</span><span class="p">:</span> <span class="n">actor_table_data</span><span class="o">.</span><span class="n">address</span><span class="o">.</span><span class="n">ip_address</span><span class="p">,</span>
                 <span class="s2">&quot;Port&quot;</span><span class="p">:</span> <span class="n">actor_table_data</span><span class="o">.</span><span class="n">address</span><span class="o">.</span><span class="n">port</span><span class="p">,</span>
-                <span class="s2">&quot;NodeID&quot;</span><span class="p">:</span> <span class="n">binary_to_hex</span><span class="p">(</span><span class="n">actor_table_data</span><span class="o">.</span><span class="n">address</span><span class="o">.</span><span class="n">raylet_id</span><span class="p">),</span>
+                <span class="s2">&quot;NodeID&quot;</span><span class="p">:</span> <span class="n">binary_to_hex</span><span class="p">(</span><span class="n">actor_table_data</span><span class="o">.</span><span class="n">address</span><span class="o">.</span><span class="n">node_id</span><span class="p">),</span>
             <span class="p">},</span>
             <span class="s2">&quot;OwnerAddress&quot;</span><span class="p">:</span> <span class="p">{</span>
                 <span class="s2">&quot;IPAddress&quot;</span><span class="p">:</span> <span class="n">actor_table_data</span><span class="o">.</span><span class="n">owner_address</span><span class="o">.</span><span class="n">ip_address</span><span class="p">,</span>
                 <span class="s2">&quot;Port&quot;</span><span class="p">:</span> <span class="n">actor_table_data</span><span class="o">.</span><span class="n">owner_address</span><span class="o">.</span><span class="n">port</span><span class="p">,</span>
-                <span class="s2">&quot;NodeID&quot;</span><span class="p">:</span> <span class="n">binary_to_hex</span><span class="p">(</span><span class="n">actor_table_data</span><span class="o">.</span><span class="n">owner_address</span><span class="o">.</span><span class="n">raylet_id</span><span class="p">),</span>
+                <span class="s2">&quot;NodeID&quot;</span><span class="p">:</span> <span class="n">binary_to_hex</span><span class="p">(</span><span class="n">actor_table_data</span><span class="o">.</span><span class="n">owner_address</span><span class="o">.</span><span class="n">node_id</span><span class="p">),</span>
             <span class="p">},</span>
             <span class="s2">&quot;State&quot;</span><span class="p">:</span> <span class="n">gcs_pb2</span><span class="o">.</span><span class="n">ActorTableData</span><span class="o">.</span><span class="n">ActorState</span><span class="o">.</span><span class="n">DESCRIPTOR</span><span class="o">.</span><span class="n">values_by_number</span><span class="p">[</span>
                 <span class="n">actor_table_data</span><span class="o">.</span><span class="n">state</span>
@@ -392,9 +399,9 @@
 <span class="sd">        Returns:</span>
 <span class="sd">            Information about the node in the cluster.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_check_connected</span><span class="p">()</span>
+        <span class="n">accessor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_connect_and_get_accessor</span><span class="p">()</span>
 
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">global_state_accessor</span><span class="o">.</span><span class="n">get_node_table</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">accessor</span><span class="o">.</span><span class="n">get_node_table</span><span class="p">()</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">job_table</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Fetch and parse the gcs job table.</span>
@@ -408,9 +415,9 @@
 <span class="sd">            - &quot;StartTime&quot; (UNIX timestamp of the start time of this job),</span>
 <span class="sd">            - &quot;StopTime&quot; (UNIX timestamp of the stop time of this job, if any)</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_check_connected</span><span class="p">()</span>
+        <span class="n">accessor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_connect_and_get_accessor</span><span class="p">()</span>
 
-        <span class="n">job_table</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">global_state_accessor</span><span class="o">.</span><span class="n">get_job_table</span><span class="p">(</span>
+        <span class="n">job_table</span> <span class="o">=</span> <span class="n">accessor</span><span class="o">.</span><span class="n">get_job_table</span><span class="p">(</span>
             <span class="n">skip_submission_job_info_field</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">skip_is_running_tasks_field</span><span class="o">=</span><span class="kc">True</span>
         <span class="p">)</span>
 
@@ -436,9 +443,9 @@
 <span class="sd">        Returns:</span>
 <span class="sd">            Next job id in the cluster.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_check_connected</span><span class="p">()</span>
+        <span class="n">accessor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_connect_and_get_accessor</span><span class="p">()</span>
 
-        <span class="k">return</span> <span class="n">ray</span><span class="o">.</span><span class="n">JobID</span><span class="o">.</span><span class="n">from_int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">global_state_accessor</span><span class="o">.</span><span class="n">get_next_job_id</span><span class="p">())</span>
+        <span class="k">return</span> <span class="n">ray</span><span class="o">.</span><span class="n">JobID</span><span class="o">.</span><span class="n">from_int</span><span class="p">(</span><span class="n">accessor</span><span class="o">.</span><span class="n">get_next_job_id</span><span class="p">())</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">profile_events</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Retrieve and return task profiling events from GCS.</span>
@@ -459,10 +466,10 @@
 <span class="sd">                ]</span>
 <span class="sd">            }</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_check_connected</span><span class="p">()</span>
+        <span class="n">accessor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_connect_and_get_accessor</span><span class="p">()</span>
 
         <span class="n">result</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
-        <span class="n">task_events</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">global_state_accessor</span><span class="o">.</span><span class="n">get_task_events</span><span class="p">()</span>
+        <span class="n">task_events</span> <span class="o">=</span> <span class="n">accessor</span><span class="o">.</span><span class="n">get_task_events</span><span class="p">()</span>
         <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">task_events</span><span class="p">)):</span>
             <span class="n">event</span> <span class="o">=</span> <span class="n">gcs_pb2</span><span class="o">.</span><span class="n">TaskEvents</span><span class="o">.</span><span class="n">FromString</span><span class="p">(</span><span class="n">task_events</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
             <span class="n">profile</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">profile_events</span>
@@ -493,9 +500,9 @@
         <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">get_placement_group_by_name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">placement_group_name</span><span class="p">,</span> <span class="n">ray_namespace</span><span class="p">):</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_check_connected</span><span class="p">()</span>
+        <span class="n">accessor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_connect_and_get_accessor</span><span class="p">()</span>
 
-        <span class="n">placement_group_info</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">global_state_accessor</span><span class="o">.</span><span class="n">get_placement_group_by_name</span><span class="p">(</span>
+        <span class="n">placement_group_info</span> <span class="o">=</span> <span class="n">accessor</span><span class="o">.</span><span class="n">get_placement_group_by_name</span><span class="p">(</span>
             <span class="n">placement_group_name</span><span class="p">,</span> <span class="n">ray_namespace</span>
         <span class="p">)</span>
         <span class="k">if</span> <span class="n">placement_group_info</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -507,15 +514,13 @@
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_gen_placement_group_info</span><span class="p">(</span><span class="n">placement_group_table_data</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">placement_group_table</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">placement_group_id</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_check_connected</span><span class="p">()</span>
+        <span class="n">accessor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_connect_and_get_accessor</span><span class="p">()</span>
 
         <span class="k">if</span> <span class="n">placement_group_id</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">placement_group_id</span> <span class="o">=</span> <span class="n">ray</span><span class="o">.</span><span class="n">PlacementGroupID</span><span class="p">(</span>
                 <span class="n">hex_to_binary</span><span class="p">(</span><span class="n">placement_group_id</span><span class="o">.</span><span class="n">hex</span><span class="p">())</span>
             <span class="p">)</span>
-            <span class="n">placement_group_info</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">global_state_accessor</span><span class="o">.</span><span class="n">get_placement_group_info</span><span class="p">(</span>
-                <span class="n">placement_group_id</span>
-            <span class="p">)</span>
+            <span class="n">placement_group_info</span> <span class="o">=</span> <span class="n">accessor</span><span class="o">.</span><span class="n">get_placement_group_info</span><span class="p">(</span><span class="n">placement_group_id</span><span class="p">)</span>
             <span class="k">if</span> <span class="n">placement_group_info</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                 <span class="k">return</span> <span class="p">{}</span>
             <span class="k">else</span><span class="p">:</span>
@@ -524,9 +529,7 @@
                 <span class="p">)</span>
                 <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_gen_placement_group_info</span><span class="p">(</span><span class="n">placement_group_info</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="n">placement_group_table</span> <span class="o">=</span> <span class="p">(</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">global_state_accessor</span><span class="o">.</span><span class="n">get_placement_group_table</span><span class="p">()</span>
-            <span class="p">)</span>
+            <span class="n">placement_group_table</span> <span class="o">=</span> <span class="n">accessor</span><span class="o">.</span><span class="n">get_placement_group_table</span><span class="p">()</span>
             <span class="n">results</span> <span class="o">=</span> <span class="p">{}</span>
             <span class="k">for</span> <span class="n">placement_group_info</span> <span class="ow">in</span> <span class="n">placement_group_table</span><span class="p">:</span>
                 <span class="n">placement_group_table_data</span> <span class="o">=</span> <span class="n">gcs_pb2</span><span class="o">.</span><span class="n">PlacementGroupTableData</span><span class="o">.</span><span class="n">FromString</span><span class="p">(</span>
@@ -685,7 +688,7 @@
         <span class="c1"># TODO(rkn): This should support viewing just a window of time or a</span>
         <span class="c1"># limited number of events.</span>
 
-        <span class="bp">self</span><span class="o">.</span><span class="n">_check_connected</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_connect_and_get_accessor</span><span class="p">()</span>
 
         <span class="c1"># Add a small delay to account for propagation delay of events to the GCS.</span>
         <span class="c1"># This should be harmless enough but prevents calls to timeline() from</span>
@@ -766,7 +769,7 @@
 <span class="sd">            If filename is not provided, this returns a list of profiling</span>
 <span class="sd">                events. Each profile event is a dictionary.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_check_connected</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_connect_and_get_accessor</span><span class="p">()</span>
 
         <span class="n">node_id_to_address</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="k">for</span> <span class="n">node_info</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">node_table</span><span class="p">():</span>
@@ -847,10 +850,10 @@
 
     <span class="k">def</span><span class="w"> </span><span class="nf">workers</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Get a dictionary mapping worker ID to worker information.&quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_check_connected</span><span class="p">()</span>
+        <span class="n">accessor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_connect_and_get_accessor</span><span class="p">()</span>
 
         <span class="c1"># Get all data in worker table</span>
-        <span class="n">worker_table</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">global_state_accessor</span><span class="o">.</span><span class="n">get_worker_table</span><span class="p">()</span>
+        <span class="n">worker_table</span> <span class="o">=</span> <span class="n">accessor</span><span class="o">.</span><span class="n">get_worker_table</span><span class="p">()</span>
         <span class="n">workers_data</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">worker_table</span><span class="p">)):</span>
             <span class="n">worker_table_data</span> <span class="o">=</span> <span class="n">gcs_pb2</span><span class="o">.</span><span class="n">WorkerTableData</span><span class="o">.</span><span class="n">FromString</span><span class="p">(</span><span class="n">worker_table</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
@@ -887,15 +890,15 @@
 <span class="sd">        Returns:</span>
 <span class="sd">             Is operation success</span>
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">accessor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_connect_and_get_accessor</span><span class="p">()</span>
+
         <span class="n">worker_data</span> <span class="o">=</span> <span class="n">gcs_pb2</span><span class="o">.</span><span class="n">WorkerTableData</span><span class="p">()</span>
         <span class="n">worker_data</span><span class="o">.</span><span class="n">is_alive</span> <span class="o">=</span> <span class="kc">True</span>
         <span class="n">worker_data</span><span class="o">.</span><span class="n">worker_address</span><span class="o">.</span><span class="n">worker_id</span> <span class="o">=</span> <span class="n">worker_id</span>
         <span class="n">worker_data</span><span class="o">.</span><span class="n">worker_type</span> <span class="o">=</span> <span class="n">worker_type</span>
         <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">worker_info</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
             <span class="n">worker_data</span><span class="o">.</span><span class="n">worker_info</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="nb">bytes</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">global_state_accessor</span><span class="o">.</span><span class="n">add_worker_info</span><span class="p">(</span>
-            <span class="n">worker_data</span><span class="o">.</span><span class="n">SerializeToString</span><span class="p">()</span>
-        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">accessor</span><span class="o">.</span><span class="n">add_worker_info</span><span class="p">(</span><span class="n">worker_data</span><span class="o">.</span><span class="n">SerializeToString</span><span class="p">())</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">update_worker_debugger_port</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">worker_id</span><span class="p">,</span> <span class="n">debugger_port</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Update the debugger port of a worker.</span>
@@ -907,16 +910,14 @@
 <span class="sd">        Returns:</span>
 <span class="sd">             Is operation success</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_check_connected</span><span class="p">()</span>
+        <span class="n">accessor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_connect_and_get_accessor</span><span class="p">()</span>
 
         <span class="k">assert</span> <span class="n">worker_id</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;worker_id is not valid&quot;</span>
         <span class="k">assert</span> <span class="p">(</span>
             <span class="n">debugger_port</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">debugger_port</span> <span class="o">&gt;</span> <span class="mi">0</span>
         <span class="p">),</span> <span class="s2">&quot;debugger_port is not valid&quot;</span>
 
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">global_state_accessor</span><span class="o">.</span><span class="n">update_worker_debugger_port</span><span class="p">(</span>
-            <span class="n">worker_id</span><span class="p">,</span> <span class="n">debugger_port</span>
-        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">accessor</span><span class="o">.</span><span class="n">update_worker_debugger_port</span><span class="p">(</span><span class="n">worker_id</span><span class="p">,</span> <span class="n">debugger_port</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">get_worker_debugger_port</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">worker_id</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the debugger port of a worker.</span>
@@ -927,11 +928,11 @@
 <span class="sd">        Returns:</span>
 <span class="sd">             Debugger port of the worker.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_check_connected</span><span class="p">()</span>
+        <span class="n">accessor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_connect_and_get_accessor</span><span class="p">()</span>
 
         <span class="k">assert</span> <span class="n">worker_id</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;worker_id is not valid&quot;</span>
 
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">global_state_accessor</span><span class="o">.</span><span class="n">get_worker_debugger_port</span><span class="p">(</span><span class="n">worker_id</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">accessor</span><span class="o">.</span><span class="n">get_worker_debugger_port</span><span class="p">(</span><span class="n">worker_id</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">update_worker_num_paused_threads</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">worker_id</span><span class="p">,</span> <span class="n">num_paused_threads_delta</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Updates the number of paused threads of a worker.</span>
@@ -943,12 +944,12 @@
 <span class="sd">        Returns:</span>
 <span class="sd">             Is operation success</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_check_connected</span><span class="p">()</span>
+        <span class="n">accessor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_connect_and_get_accessor</span><span class="p">()</span>
 
         <span class="k">assert</span> <span class="n">worker_id</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;worker_id is not valid&quot;</span>
         <span class="k">assert</span> <span class="n">num_paused_threads_delta</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;worker_id is not valid&quot;</span>
 
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">global_state_accessor</span><span class="o">.</span><span class="n">update_worker_num_paused_threads</span><span class="p">(</span>
+        <span class="k">return</span> <span class="n">accessor</span><span class="o">.</span><span class="n">update_worker_num_paused_threads</span><span class="p">(</span>
             <span class="n">worker_id</span><span class="p">,</span> <span class="n">num_paused_threads_delta</span>
         <span class="p">)</span>
 
@@ -962,7 +963,7 @@
 <span class="sd">            A dictionary mapping resource name to the total quantity of that</span>
 <span class="sd">                resource in the cluster.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_check_connected</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_connect_and_get_accessor</span><span class="p">()</span>
 
         <span class="c1"># Calculate total resources.</span>
         <span class="n">total_resources</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
@@ -978,12 +979,10 @@
 
     <span class="k">def</span><span class="w"> </span><span class="nf">available_resources_per_node</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns a dictionary mapping node id to available resources.&quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_check_connected</span><span class="p">()</span>
+        <span class="n">accessor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_connect_and_get_accessor</span><span class="p">()</span>
         <span class="n">available_resources_by_id</span> <span class="o">=</span> <span class="p">{}</span>
 
-        <span class="n">all_available_resources</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">global_state_accessor</span><span class="o">.</span><span class="n">get_all_available_resources</span><span class="p">()</span>
-        <span class="p">)</span>
+        <span class="n">all_available_resources</span> <span class="o">=</span> <span class="n">accessor</span><span class="o">.</span><span class="n">get_all_available_resources</span><span class="p">()</span>
         <span class="k">for</span> <span class="n">available_resource</span> <span class="ow">in</span> <span class="n">all_available_resources</span><span class="p">:</span>
             <span class="n">message</span> <span class="o">=</span> <span class="n">gcs_pb2</span><span class="o">.</span><span class="n">AvailableResources</span><span class="o">.</span><span class="n">FromString</span><span class="p">(</span><span class="n">available_resource</span><span class="p">)</span>
             <span class="c1"># Calculate available resources for this node.</span>
@@ -998,10 +997,10 @@
 
     <span class="c1"># returns a dict that maps node_id(hex string) to a dict of {resource_id: capacity}</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">total_resources_per_node</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]:</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_check_connected</span><span class="p">()</span>
+        <span class="n">accessor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_connect_and_get_accessor</span><span class="p">()</span>
         <span class="n">total_resources_by_node</span> <span class="o">=</span> <span class="p">{}</span>
 
-        <span class="n">all_total_resources</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">global_state_accessor</span><span class="o">.</span><span class="n">get_all_total_resources</span><span class="p">()</span>
+        <span class="n">all_total_resources</span> <span class="o">=</span> <span class="n">accessor</span><span class="o">.</span><span class="n">get_all_total_resources</span><span class="p">()</span>
         <span class="k">for</span> <span class="n">node_total_resources</span> <span class="ow">in</span> <span class="n">all_total_resources</span><span class="p">:</span>
             <span class="n">message</span> <span class="o">=</span> <span class="n">gcs_pb2</span><span class="o">.</span><span class="n">TotalResources</span><span class="o">.</span><span class="n">FromString</span><span class="p">(</span><span class="n">node_total_resources</span><span class="p">)</span>
             <span class="c1"># Calculate total resources for this node.</span>
@@ -1028,7 +1027,7 @@
 <span class="sd">                is currently not available (i.e., quantity is 0), it will not</span>
 <span class="sd">                be included in this dictionary.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_check_connected</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_connect_and_get_accessor</span><span class="p">()</span>
 
         <span class="n">available_resources_by_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">available_resources_per_node</span><span class="p">()</span>
 
@@ -1042,20 +1041,13 @@
 
     <span class="k">def</span><span class="w"> </span><span class="nf">get_system_config</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the system config of the cluster.&quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_check_connected</span><span class="p">()</span>
-        <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">global_state_accessor</span><span class="o">.</span><span class="n">get_system_config</span><span class="p">())</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">get_node_to_connect_for_driver</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">node_ip_address</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the node to connect for a Ray driver.&quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_check_connected</span><span class="p">()</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">global_state_accessor</span><span class="o">.</span><span class="n">get_node_to_connect_for_driver</span><span class="p">(</span>
-            <span class="n">node_ip_address</span>
-        <span class="p">)</span>
+        <span class="n">accessor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_connect_and_get_accessor</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">accessor</span><span class="o">.</span><span class="n">get_system_config</span><span class="p">())</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">get_node</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">node_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the node information for a node id.&quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_check_connected</span><span class="p">()</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">global_state_accessor</span><span class="o">.</span><span class="n">get_node</span><span class="p">(</span><span class="n">node_id</span><span class="p">)</span>
+        <span class="n">accessor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_connect_and_get_accessor</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">accessor</span><span class="o">.</span><span class="n">get_node</span><span class="p">(</span><span class="n">node_id</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">get_draining_nodes</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Get all the hex ids of nodes that are being drained</span>
@@ -1063,13 +1055,13 @@
 
 <span class="sd">        There is no deadline if the timestamp is 0.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_check_connected</span><span class="p">()</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">global_state_accessor</span><span class="o">.</span><span class="n">get_draining_nodes</span><span class="p">()</span>
+        <span class="n">accessor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_connect_and_get_accessor</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">accessor</span><span class="o">.</span><span class="n">get_draining_nodes</span><span class="p">()</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">get_cluster_config</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">autoscaler_pb2</span><span class="o">.</span><span class="n">ClusterConfig</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the cluster config of the current cluster.&quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_check_connected</span><span class="p">()</span>
-        <span class="n">serialized_cluster_config</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">global_state_accessor</span><span class="o">.</span><span class="n">get_internal_kv</span><span class="p">(</span>
+        <span class="n">accessor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_connect_and_get_accessor</span><span class="p">()</span>
+        <span class="n">serialized_cluster_config</span> <span class="o">=</span> <span class="n">accessor</span><span class="o">.</span><span class="n">get_internal_kv</span><span class="p">(</span>
             <span class="n">ray</span><span class="o">.</span><span class="n">_raylet</span><span class="o">.</span><span class="n">GCS_AUTOSCALER_STATE_NAMESPACE</span><span class="o">.</span><span class="n">encode</span><span class="p">(),</span>
             <span class="n">ray</span><span class="o">.</span><span class="n">_raylet</span><span class="o">.</span><span class="n">GCS_AUTOSCALER_CLUSTER_CONFIG_KEY</span><span class="o">.</span><span class="n">encode</span><span class="p">(),</span>
         <span class="p">)</span>
@@ -1128,6 +1120,11 @@
             <span class="n">result</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">max_value</span> <span class="k">if</span> <span class="n">max_value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="mi">0</span>
 
         <span class="k">return</span> <span class="n">result</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_actor_info</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">actor_id</span><span class="p">:</span> <span class="n">ray</span><span class="o">.</span><span class="n">ActorID</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the actor info for a actor id.&quot;&quot;&quot;</span>
+        <span class="n">accessor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_connect_and_get_accessor</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">accessor</span><span class="o">.</span><span class="n">get_actor_info</span><span class="p">(</span><span class="n">actor_id</span><span class="p">)</span>
 
 
 <span class="n">state</span> <span class="o">=</span> <span class="n">GlobalState</span><span class="p">()</span>

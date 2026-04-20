@@ -243,9 +243,8 @@
     <span class="n">RAY_NAMESPACE_ENVIRONMENT_VARIABLE</span><span class="p">,</span>
     <span class="n">RAY_RUNTIME_ENV_ENVIRONMENT_VARIABLE</span><span class="p">,</span>
 <span class="p">)</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">ray._private.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">check_ray_client_dependencies_installed</span><span class="p">,</span> <span class="n">split_address</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">ray._private.worker</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseContext</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">ray._private.worker</span><span class="w"> </span><span class="kn">import</span> <span class="n">init</span> <span class="k">as</span> <span class="n">ray_driver_init</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">ray._private.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_ray_client_dependency_error</span><span class="p">,</span> <span class="n">split_address</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">ray._private.worker</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseContext</span><span class="p">,</span> <span class="n">init</span> <span class="k">as</span> <span class="n">ray_driver_init</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">ray.job_config</span><span class="w"> </span><span class="kn">import</span> <span class="n">JobConfig</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">ray.util.annotations</span><span class="w"> </span><span class="kn">import</span> <span class="n">Deprecated</span><span class="p">,</span> <span class="n">PublicAPI</span>
 
@@ -326,7 +325,7 @@
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">address</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">check_ray_client_dependencies_installed</span><span class="p">():</span>
+        <span class="k">if</span> <span class="n">get_ray_client_dependency_error</span><span class="p">()</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
                 <span class="s2">&quot;Ray Client requires pip package `ray[client]`. &quot;</span>
                 <span class="s2">&quot;If you installed the minimal Ray (e.g. `pip install ray`), &quot;</span>

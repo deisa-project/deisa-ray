@@ -228,11 +228,12 @@
         <article role="main" id="furo-main-content">
           <h1>Source code for ray.runtime_context</h1><div class="highlight"><pre>
 <span></span><span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">threading</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">ray._private.worker</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">ray._private.client_mode_hook</span><span class="w"> </span><span class="kn">import</span> <span class="n">client_mode_hook</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">ray._private.state</span><span class="w"> </span><span class="kn">import</span> <span class="n">actors</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">ray._private.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">parse_pg_formatted_resources_to_original</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">ray._raylet</span><span class="w"> </span><span class="kn">import</span> <span class="n">TaskID</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">ray.runtime_env</span><span class="w"> </span><span class="kn">import</span> <span class="n">RuntimeEnv</span>
@@ -298,21 +299,23 @@
 <span class="sd">            job ID will be hex format.</span>
 
 <span class="sd">        Raises:</span>
-<span class="sd">            AssertionError: If not called in a driver or worker. Generally,</span>
-<span class="sd">                this means that ray.init() was not called.</span>
+<span class="sd">            RuntimeError: If Ray has not been initialized.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">assert</span> <span class="p">(</span>
-            <span class="n">ray</span><span class="o">.</span><span class="n">is_initialized</span><span class="p">()</span>
-        <span class="p">),</span> <span class="s2">&quot;Job ID is not available because Ray has not been initialized.&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">ray</span><span class="o">.</span><span class="n">is_initialized</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                <span class="s2">&quot;Job ID is not available because Ray has not been initialized.&quot;</span>
+            <span class="p">)</span>
         <span class="n">job_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">worker</span><span class="o">.</span><span class="n">current_job_id</span>
         <span class="k">return</span> <span class="n">job_id</span><span class="o">.</span><span class="n">hex</span><span class="p">()</span>
 
     <span class="nd">@property</span>
     <span class="nd">@Deprecated</span><span class="p">(</span><span class="n">message</span><span class="o">=</span><span class="s2">&quot;Use get_node_id() instead&quot;</span><span class="p">,</span> <span class="n">warning</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">node_id</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get current node ID for this worker or driver.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the ID for the node that this process is running on.</span>
 
-<span class="sd">        Node ID is the id of a node that your driver, task, or actor runs.</span>
+<span class="sd">        This can be called from within a driver, task, or actor.</span>
+<span class="sd">        When called from a driver that is connected to a remote Ray cluster using</span>
+<span class="sd">        Ray Client, this returns the ID of the head node.</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            A node id for this worker or driver.</span>
@@ -322,33 +325,81 @@
         <span class="k">return</span> <span class="n">node_id</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">get_node_id</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get current node ID for this worker or driver.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the ID for the node that this process is running on.</span>
 
-<span class="sd">        Node ID is the id of a node that your driver, task, or actor runs.</span>
-<span class="sd">        The ID will be in hex format.</span>
+<span class="sd">        This can be called from within a driver, task, or actor.</span>
+<span class="sd">        When called from a driver that is connected to a remote Ray cluster using</span>
+<span class="sd">        Ray Client, this returns the ID of the head node.</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            A node id in hex format for this worker or driver.</span>
 
 <span class="sd">        Raises:</span>
-<span class="sd">            AssertionError: If not called in a driver or worker. Generally,</span>
-<span class="sd">                this means that ray.init() was not called.</span>
+<span class="sd">            RuntimeError: If Ray has not been initialized.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">assert</span> <span class="p">(</span>
-            <span class="n">ray</span><span class="o">.</span><span class="n">is_initialized</span><span class="p">()</span>
-        <span class="p">),</span> <span class="s2">&quot;Node ID is not available because Ray has not been initialized.&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">ray</span><span class="o">.</span><span class="n">is_initialized</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                <span class="s2">&quot;Node ID is not available because Ray has not been initialized.&quot;</span>
+            <span class="p">)</span>
         <span class="n">node_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">worker</span><span class="o">.</span><span class="n">current_node_id</span>
         <span class="k">return</span> <span class="n">node_id</span><span class="o">.</span><span class="n">hex</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_session_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the session name for the Ray cluster this process is connected to.</span>
+
+<span class="sd">        The session name uniquely identifies a Ray cluster instance. This is the</span>
+<span class="sd">        same value that appears as the ``SessionName`` label in Ray metrics,</span>
+<span class="sd">        making it useful for filtering metrics when multiple clusters run the same</span>
+<span class="sd">        application name.</span>
+
+<span class="sd">        This can be called from within a driver, task, or actor.</span>
+
+<span class="sd">        Example:</span>
+
+<span class="sd">            .. testcode::</span>
+
+<span class="sd">                import ray</span>
+
+<span class="sd">                ray.init()</span>
+<span class="sd">                session_name = ray.get_runtime_context().get_session_name()</span>
+<span class="sd">                print(f&quot;Session Name: {session_name}&quot;)</span>
+
+<span class="sd">                @ray.remote</span>
+<span class="sd">                def get_session_name():</span>
+<span class="sd">                    return ray.get_runtime_context().get_session_name()</span>
+
+<span class="sd">                # Session name is the same across all processes in the cluster</span>
+<span class="sd">                assert ray.get(get_session_name.remote()) == session_name</span>
+
+<span class="sd">                # Use SessionName label to filter metrics by cluster, e.g.:</span>
+<span class="sd">                # ray_serve_http_request_latency_ms_bucket{SessionName=&quot;&lt;session_name&gt;&quot;}</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A session name string for the Ray cluster (e.g.,</span>
+<span class="sd">            &quot;session_2025-01-01_00-00-00_000000_1234&quot;).</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If Ray has not been initialized.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">ray</span><span class="o">.</span><span class="n">is_initialized</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                <span class="s2">&quot;Session name is not available because Ray has not been initialized.&quot;</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">worker</span><span class="o">.</span><span class="n">node</span><span class="o">.</span><span class="n">session_name</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">get_worker_id</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Get current worker ID for this worker or driver process.</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            A worker id in hex format for this worker or driver process.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If Ray has not been initialized.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">assert</span> <span class="p">(</span>
-            <span class="n">ray</span><span class="o">.</span><span class="n">is_initialized</span><span class="p">()</span>
-        <span class="p">),</span> <span class="s2">&quot;Worker ID is not available because Ray has not been initialized.&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">ray</span><span class="o">.</span><span class="n">is_initialized</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                <span class="s2">&quot;Worker ID is not available because Ray has not been initialized.&quot;</span>
+            <span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">worker</span><span class="o">.</span><span class="n">worker_id</span><span class="o">.</span><span class="n">hex</span><span class="p">()</span>
 
     <span class="nd">@property</span>
@@ -447,7 +498,7 @@
     <span class="k">def</span><span class="w"> </span><span class="nf">get_task_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Get current task name for this worker.</span>
 
-<span class="sd">        Task name by default is the task&#39;s funciton call string. It can also be</span>
+<span class="sd">        Task name by default is the task&#39;s function call string. It can also be</span>
 <span class="sd">        specified in options when triggering a task.</span>
 
 <span class="sd">        Example:</span>
@@ -474,7 +525,7 @@
 <span class="sd">                b = AsyncActor.remote()</span>
 <span class="sd">                # Task names are available for actor tasks.</span>
 <span class="sd">                print(ray.get(a.get_task_name.remote()))</span>
-<span class="sd">                # Task names are avaiable for async actor tasks.</span>
+<span class="sd">                # Task names are available for async actor tasks.</span>
 <span class="sd">                print(ray.get(b.get_task_name.remote()))</span>
 <span class="sd">                # Task names are available for normal tasks.</span>
 <span class="sd">                # Get default task name</span>
@@ -488,7 +539,7 @@
 <span class="sd">                Actor.get_task_name</span>
 <span class="sd">                AsyncActor.get_task_name</span>
 <span class="sd">                get_task_name</span>
-<span class="sd">                task_nams</span>
+<span class="sd">                task_name</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            The current worker&#39;s task name</span>
@@ -537,9 +588,9 @@
 <span class="sd">            .. testoutput::</span>
 <span class="sd">                :options: +MOCK</span>
 
-<span class="sd">                [python modual name].Actor.get_task_function_name</span>
-<span class="sd">                [python modual name].AsyncActor.get_task_function_name</span>
-<span class="sd">                [python modual name].get_task_function_name</span>
+<span class="sd">                [python module name].Actor.get_task_function_name</span>
+<span class="sd">                [python module name].AsyncActor.get_task_function_name</span>
+<span class="sd">                [python module name].get_task_function_name</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            The current worker&#39;s task function call string</span>
@@ -634,7 +685,7 @@
         <span class="k">assert</span> <span class="p">(</span>
             <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">actor_id</span><span class="o">.</span><span class="n">is_nil</span><span class="p">()</span>
         <span class="p">),</span> <span class="s2">&quot;This method should&#39;t be called inside Ray tasks.&quot;</span>
-        <span class="n">actor_info</span> <span class="o">=</span> <span class="n">ray</span><span class="o">.</span><span class="n">_private</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">actors</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">actor_id</span><span class="o">.</span><span class="n">hex</span><span class="p">())</span>
+        <span class="n">actor_info</span> <span class="o">=</span> <span class="n">actors</span><span class="p">(</span><span class="n">actor_id</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">actor_id</span><span class="o">.</span><span class="n">hex</span><span class="p">())</span>
         <span class="k">return</span> <span class="n">actor_info</span> <span class="ow">and</span> <span class="n">actor_info</span><span class="p">[</span><span class="s2">&quot;NumRestarts&quot;</span><span class="p">]</span> <span class="o">!=</span> <span class="mi">0</span>
 
     <span class="nd">@property</span>
@@ -730,6 +781,7 @@
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">gcs_address</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the GCS address of the ray cluster.</span>
+
 <span class="sd">        Returns:</span>
 <span class="sd">            The GCS address of the cluster.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
@@ -774,6 +826,29 @@
 
         <span class="k">return</span> <span class="n">worker</span><span class="o">.</span><span class="n">current_node_labels</span>
 
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_canceled</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Check if the current task has been canceled.</span>
+
+<span class="sd">        This can be used to periodically check if ray.cancel() has been</span>
+<span class="sd">        called on the current task and perform graceful cleanup.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            True if the task has been canceled, False otherwise.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If called from a driver or async actor context.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">worker</span><span class="o">.</span><span class="n">mode</span> <span class="o">!=</span> <span class="n">ray</span><span class="o">.</span><span class="n">_private</span><span class="o">.</span><span class="n">worker</span><span class="o">.</span><span class="n">WORKER_MODE</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                <span class="s2">&quot;This method is only available when the process is a worker. &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;Current mode: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">worker</span><span class="o">.</span><span class="n">mode</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">worker</span><span class="o">.</span><span class="n">core_worker</span><span class="o">.</span><span class="n">current_actor_is_asyncio</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;This method is not supported in an async actor.&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">worker</span><span class="o">.</span><span class="n">is_canceled</span>
+
 
 <span class="n">_runtime_context</span> <span class="o">=</span> <span class="kc">None</span>
 <span class="n">_runtime_context_lock</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Lock</span><span class="p">()</span>
@@ -787,11 +862,7 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Get the runtime context of the current driver/worker.</span>
 
 <span class="sd">    The obtained runtime context can be used to get the metadata</span>
-<span class="sd">    of the current task and actor.</span>
-
-<span class="sd">    Note: For Ray Client, ray.get_runtime_context().get_node_id() should</span>
-<span class="sd">    point to the head node. Also, keep in mind that ray._private.worker.global_worker</span>
-<span class="sd">    will create a new worker object here if global_worker doesn&#39;t point to one.</span>
+<span class="sd">    of the current driver, task, or actor.</span>
 
 <span class="sd">    Example:</span>
 
@@ -800,6 +871,8 @@
 <span class="sd">            import ray</span>
 <span class="sd">            # Get the job id.</span>
 <span class="sd">            ray.get_runtime_context().get_job_id()</span>
+<span class="sd">            # Get the session name (used as SessionName label in Ray metrics).</span>
+<span class="sd">            ray.get_runtime_context().get_session_name()</span>
 <span class="sd">            # Get the actor id.</span>
 <span class="sd">            ray.get_runtime_context().get_actor_id()</span>
 <span class="sd">            # Get the task id.</span>
