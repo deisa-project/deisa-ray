@@ -1,4 +1,6 @@
 import asyncio
+from collections import deque
+from typing import Any, Hashable
 
 import dask.array as da
 import numpy as np
@@ -51,7 +53,7 @@ class HeadNodeActor:
     # TODO: Discuss if max_pending_arrays should be here or in register callback. In that case, what
     # should happen when the freqs are diff and max_pending_arrays are diff too? When does the sim
     # stop?''
-    def __init__(self, max_simulation_ahead: int = 1) -> None:
+    def __init__(self, max_simulation_ahead: int = 1, feedback_queue_size: int = 1024) -> None:
         """
         Initialize synchronization primitives and bookkeeping containers.
 
@@ -77,10 +79,15 @@ class HeadNodeActor:
         self.max_simulation_ahead = max_simulation_ahead
         self.semaphore_per_array = {}
 
+        if feedback_queue_size <= 0:
+            raise ValueError(f"feedback_queue_size must be > 0, got {feedback_queue_size}")
+
         # All the newly created arrays
         self.arrays_ready: asyncio.Queue[tuple[str, Timestep, da.Array]] = asyncio.Queue()
         self.registered_arrays: dict[str, DaskArrayData] = {}
         self.analytics_ready_for_execution: asyncio.Event = asyncio.Event()
+        self.feedback_queue_size = feedback_queue_size
+        self.feedback_queues: dict[Hashable, deque[tuple[Timestep, Any]]] = {}
 
     def set_analytics_ready_for_execution(self):
         """
@@ -199,6 +206,79 @@ class HeadNodeActor:
         """
         self.config = config
         self._experimental_distributed_scheduling_enabled = config["experimental_distributed_scheduling_enabled"]
+
+    def set_feedback(self, key: Hashable, timestep: Timestep, value: Any) -> None:
+        """
+        Store a timestamped feedback value for simulation bridges.
+
+        Notes
+        -----
+        Values are kept in a fixed-size per-key queue. Timesteps for each key
+        must be strictly increasing; duplicate or older timesteps are rejected
+        so the newest queue element remains the upper bound for future writes.
+        """
+        queue = self.feedback_queues.setdefault(key, deque(maxlen=self.feedback_queue_size))
+        if queue:
+            newest_timestep = queue[-1][0]
+            if timestep == newest_timestep:
+                raise ValueError(
+                    f"feedback timestep {timestep!r} for key {key!r} has already been set; "
+                    "feedback timesteps must be strictly increasing"
+                )
+            try:
+                is_older = timestep < newest_timestep
+            except TypeError as exc:
+                raise TypeError(
+                    "feedback timesteps for a key must be mutually comparable to enforce strictly increasing order"
+                ) from exc
+            if is_older:
+                raise ValueError(
+                    f"feedback timestep {timestep!r} for key {key!r} is older than newest "
+                    f"timestep {newest_timestep!r}; feedback timesteps must be strictly increasing"
+                )
+        queue.append((timestep, value))
+
+    def get_feedback(self, key: Hashable, timestep: Timestep | None = None) -> tuple[bool, Any]:
+        """
+        Look up feedback for a key.
+
+        Parameters
+        ----------
+        key : Hashable
+            Feedback key to retrieve.
+        timestep : Timestep | None, optional
+            When provided, retrieve only the value for this timestep. When
+            omitted, return the whole fixed-size queue for ``key`` as a list
+            of ``(timestep, value)`` pairs. User is expected to react accordingly
+            to the presence or absence of the requested timestep in the queue.
+
+        Returns
+        -------
+        tuple[bool, Any]
+            ``(True, value)`` when the requested feedback exists, otherwise
+            ``(False, None)``. The explicit flag lets ``None`` be used as a
+            legitimate feedback value. When ``timestep`` is omitted, ``value``
+            is the full queue converted to a list.
+
+        Warning
+        -------
+        Feedback timing is asynchronous and not reproducible run to run. The
+        queue may be populated at slightly different times, and bridges may
+        read it at slightly different times. Callers must treat feedback as an
+        opportunistic signal and must not rely on the exact timestep at which
+        an analytics event becomes visible for simulation correctness.
+        """
+        queue = self.feedback_queues.get(key)
+        if queue is None:
+            return False, None
+
+        if timestep is None:
+            return True, list(queue)
+
+        for stored_timestep, value in reversed(queue):
+            if stored_timestep == timestep:
+                return True, value
+        return False, None
 
     async def chunks_ready(
         self, array_name: str, timestep: Timestep, pos_to_ref: dict[tuple, ray.ObjectRef], actor_id: str

@@ -397,3 +397,22 @@ def test_dask_save_netcdf_xarray(fname, enable_distributed_scheduling, ray_clust
 
     if os.path.exists(full_name):
         os.system(f"rm -f {full_name}")
+
+
+# Regression note:
+# test_feedback_loop previously leaked a Dask scheduler change into this file.
+# The leak happened in the pytest driver process: Deisa.set() called
+# _ensure_connected(), which globally set Dask's scheduler to ray_dask_get. The
+# enable_experimental_distributed_scheduling() calls in this file happen inside
+# Ray remote head_script tasks, so they configure those Ray worker processes, not
+# the pytest driver process that later opens HDF5/Zarr output and calls
+# data.sum().compute() or data.compute().
+#
+# With the leaked ray_dask_get scheduler, these driver-side HDF5/Zarr Dask graphs
+# were submitted to Ray workers instead of running with Dask's normal local
+# scheduler. Dask-on-Ray is valid for many graphs, but these file-backed graphs
+# appear to break on the Ray serialization/execution path in this environment
+# while working with the normal Dask scheduler. That interaction is why
+# window_handler.py now scopes the Ray scheduler with a context manager around
+# execute_callbacks() only, rather than setting it globally during Deisa
+# connection or feedback publication.

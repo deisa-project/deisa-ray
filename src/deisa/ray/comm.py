@@ -64,6 +64,9 @@ class Comm(Protocol):
     def barrier(self) -> None:
         """Block until all ranks reach this barrier."""
 
+    def broadcast_object(self, obj, src: int = 0):
+        """Broadcast a Python object from ``src`` to all ranks."""
+
 
 def normalize_comm(comm) -> Comm | None:
     """
@@ -110,6 +113,10 @@ class MPICommAdapter:
         """Block until all MPI ranks reach this barrier."""
         self._comm.Barrier()
 
+    def broadcast_object(self, obj, src: int = 0):
+        """Broadcast a Python object from ``src`` to all MPI ranks."""
+        return self._comm.bcast(obj, root=src)
+
 
 class TorchDistComm:
     """Torch distributed communicator implementing the Comm protocol."""
@@ -132,6 +139,12 @@ class TorchDistComm:
         """Block until all Torch distributed ranks reach this barrier."""
         dist.barrier()
 
+    def broadcast_object(self, obj, src: int = 0):
+        """Broadcast a Python object from ``src`` to all Torch distributed ranks."""
+        objects = [obj]
+        dist.broadcast_object_list(objects, src=src)
+        return objects[0]
+
 
 class NoOpComm:
     """Fallback communicator that no-ops synchronization calls."""
@@ -153,3 +166,7 @@ class NoOpComm:
     def barrier(self) -> None:
         """No-op barrier for single-process setups."""
         return
+
+    def broadcast_object(self, obj, src: int = 0):
+        """Return ``obj`` unchanged in single-process setups."""
+        return obj

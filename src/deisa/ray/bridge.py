@@ -12,6 +12,7 @@ import numpy as np
 import ray
 from ray.actor import ActorClass
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
+from deisa.ray import Timestep
 from deisa.ray.scheduling_actor import SchedulingActor as _RealSchedulingActor
 from deisa.ray.types import RayActorHandle
 from deisa.ray.errors import ContractError, _default_exception_handler
@@ -247,6 +248,7 @@ class Bridge:
 
         # create node actor
         self._create_node_actor(scheduling_actor_cls, node_actor_options)
+        self.head_actor: RayActorHandle | None = None
         # exchange meta with node actor
         self._exchange_chunks_meta_with_node_actor()
         # make sure node actor is ready
@@ -446,74 +448,74 @@ class Bridge:
         else:
             raise RuntimeError(f"Failed to create/ready scheduling actor for node {self.node_id}") from last_err
 
-    # TODO feedback needs testing
+    def _get_head_actor(self) -> RayActorHandle:
+        """
+        Return the global head actor handle, caching it on bridge ``0``.
+
+        Notes
+        -----
+        Bridge ``0`` is the only rank that reads global feedback from Ray.
+        Other ranks receive the result through the communicator broadcast in
+        :meth:`get`.
+        """
+        if self.head_actor is None:
+            self.head_actor = ray.get_actor(name="simulation_head", namespace="deisa_ray")
+            ray.get(self.head_actor.ready.remote())
+        return self.head_actor
+
     def get(
         self,
-        *,
         name: str,
-        default: Any | None = None,
-        chunked: bool = False,
+        *,
+        timestep: Timestep | None = None,
     ) -> Any | None:
         """
-        Retrieve information back from Analytics.
+        Retrieve feedback from analytics to influence the simulation.
 
-        Used for two cases:
-
-        1. Retrieve a simple value that is set in the analytics so that the
-           simulation can react to some event that has been detected. This
-           case is asynchronous.
-        2. (Planned) Retrieve a distributed array that has been modified by
-           the analytics. This case is synchronous and currently not
-           implemented for ``chunked=True``.
+        Bridge ``0`` queries the global head actor directly, then broadcasts
+        the lookup result to every bridge in the communicator.
 
         Parameters
         ----------
         name : str
             The name of the key that is being retrieved from the Analytics.
-        default : Any, optional
-            The default value to return if the key has not been set or does
-            not exist. Default is None.
-        chunked : bool, optional
-            Whether the value that is returned is distributed or not. Should
-            be set to True only if retrieving a distributed array that is
-            handled by the bridge. Currently not implemented. Default is
-            False.
+        timestep : Timestep | None, optional
+            Timestep associated with the requested feedback value. When
+            omitted, returns the entire retained queue for ``name``.
 
         Notes
         -----
-        When ``chunked`` is False, this method simply forwards the request to
-        the node actor and returns the result (or ``default`` if not set).
-        When ``chunked`` is True, a :class:`NotImplementedError` is raised.
+        This remains a collective operation when a communicator is used: all
+        bridges must call ``get`` in the same order so the broadcast completes.
+        The retained feedback queue is fixed-size, so old entries may be
+        dropped if analytics publishes more values than the queue can hold.
+        Callback execution is intentionally one timestep behind: analytics
+        processes a timestep only after a later timestep or the close sentinel
+        arrives. As a result, feedback for the final simulated timestep may
+        only be published after ``close`` and is not meant to drive another
+        simulation step.
 
         Returns
         -------
         Any | None
-            The value associated with ``name`` or ``default`` if the key is
-            missing.
+            The feedback value for ``timestep``, the full retained queue when
+            ``timestep`` is omitted, or ``None`` when no feedback exists.
 
-        Raises
-        ------
-        NotImplementedError
-            Chunked retrieval is not implemented yet.
+        Warning
+        -------
+        Feedback timing is asynchronous and not reproducible run to run. The
+        head queue may be populated at slightly different times, and this
+        bridge may read it at slightly different times. Simulation code should
+        decide how to react whenever a signal becomes available, and must not
+        rely on exactly when an analytics event becomes visible for simulation
+        correctness.
+
         """
-        if not chunked:
-            return ray.get(self.node_actor.get.remote(name, default, chunked))
+        message = None
+        if self.bridge_id == 0:
+            found, value = ray.get(self._get_head_actor().get_feedback.remote(name, timestep))
+            message = {"found": found, "value": value}
 
-        raise NotImplementedError("Retrieving chunked arrays via Bridge.get is not implemented yet.")
-
-    def _delete(self, *, name: str) -> None:
-        """
-        Delete a feedback key from the node actor if present.
-
-        Parameters
-        ----------
-        name : str
-            Key to remove.
-
-        Notes
-        -----
-        This is currently used internally after :meth:`get` to avoid
-        repeatedly signaling the same event. Missing keys are silently
-        ignored.
-        """
-        self.node_actor.delete.remote(name)
+        message = self.comm.broadcast_object(message, src=0)
+        # NOTE: should it return message["found"]?
+        return message["value"]  # will be value or None

@@ -15,6 +15,7 @@ from deisa.ray.types import (
     ActorID,
     DeisaArray,
     RayActorHandle,
+    Timestep,
     WindowSpec,
     _CallbackConfig,
 )
@@ -47,6 +48,7 @@ class Deisa:
         *,
         ray_start: Optional[Callable[[], None]] = None,
         max_simulation_ahead: int = 1,
+        feedback_queue_size: int = 1024,
     ) -> None:
         """
         Initialize handler state without touching Ray.
@@ -72,6 +74,7 @@ class Deisa:
         self.registered_callbacks: list[_CallbackConfig] = []
         self.queue_per_array: dict[str, deque]
         self.max_simulation_ahead: int = max_simulation_ahead
+        self.feedback_queue_size: int = feedback_queue_size
         self.has_new_timestep: dict[str, bool] = defaultdict(bool)
         self.has_seen_array: dict[str, bool] = defaultdict(bool)
         self.queue_per_array = {}
@@ -82,21 +85,14 @@ class Deisa:
 
         Notes
         -----
-        Starts Ray (if needed), configures Dask to use the correct scheduler,
-        creates the head actor, and exchanges configuration so that
-        scheduling actors can register themselves.
+        Starts Ray (if needed), creates the head actor, and exchanges
+        configuration so that scheduling actors can register themselves.
         """
         if self._connected:
             return
 
         # Side effects begin here (only once)
         self._ray_start()
-
-        # configure dask here if it must reflect actual cluster runtime
-        if self._experimental_distributed_scheduling_enabled:
-            dask.config.set(scheduler=deisa_ray_get, shuffle="tasks")
-        else:
-            dask.config.set(scheduler=ray_dask_get, shuffle="tasks")
 
         # head is created
         self._create_head_actor()
@@ -108,6 +104,18 @@ class Deisa:
         )
         self._connected = True
 
+    def _dask_config(self):
+        """
+        Return the Dask scheduler config needed while executing analytics callbacks.
+
+        The scheduler is intentionally scoped by callers with Dask's config
+        context manager. Leaving it set globally in the driver process leaks
+        into unrelated Dask computations in later tests or user code.
+        """
+        if self._experimental_distributed_scheduling_enabled:
+            return dask.config.set(scheduler=deisa_ray_get, shuffle="tasks")
+        return dask.config.set(scheduler=ray_dask_get, shuffle="tasks")
+
     def _create_head_actor(self) -> None:
         """
         Instantiate the head actor that coordinates array delivery.
@@ -118,7 +126,8 @@ class Deisa:
         with a detached lifetime so that analytics can connect later.
         """
         self.head = HeadNodeActor.options(**get_head_actor_options()).remote(
-            max_simulation_ahead=self.max_simulation_ahead
+            max_simulation_ahead=self.max_simulation_ahead,
+            feedback_queue_size=self.feedback_queue_size,
         )
 
     def callback(
@@ -252,97 +261,100 @@ class Deisa:
         # ensure connected to ray cluster
         self._ensure_connected()
 
-        # signal analytics ready to start
-        ray.get(self.head.set_analytics_ready_for_execution.remote())
-        # ray.get(self.head.wait_for_bridges_ready.remote())
+        with self._dask_config():
+            # signal analytics ready to start
+            ray.get(self.head.set_analytics_ready_for_execution.remote())
+            # ray.get(self.head.wait_for_bridges_ready.remote())
 
-        # TODO: test
-        # raise error and kill analytics
-        if not self.registered_callbacks:
-            raise RuntimeError("Please register at least one callback before calling execute_callbacks()")
+            # TODO: test
+            # raise error and kill analytics
+            if not self.registered_callbacks:
+                raise RuntimeError("Please register at least one callback before calling execute_callbacks()")
 
-        # generate one queue per array which cleanly handles the window size
-        self.generate_queue_per_array()
+            # generate one queue per array which cleanly handles the window size
+            self.generate_queue_per_array()
 
-        # get first array to kickstart the process
-        # - Add to queue, mark as new timestep arrived
-        name, arr_timestep, array = ray.get(self.head.get_next_array.remote())
-        if name == "__deisa_last_iteration_array":
-            return
+            # get first array to kickstart the process
+            # - Add to queue, mark as new timestep arrived
+            name, arr_timestep, array = ray.get(self.head.get_next_array.remote())
+            if name == "__deisa_last_iteration_array":
+                return
 
-        queue = self.queue_per_array.get(name)
-        if queue is not None:
-            queue.append(DeisaArray(dask=array, t=arr_timestep))
-            self.has_new_timestep[name] = True
-            self.has_seen_array[name] = True
+            queue = self.queue_per_array.get(name)
+            if queue is not None:
+                queue.append(DeisaArray(dask=array, t=arr_timestep))
+                self.has_new_timestep[name] = True
+                self.has_seen_array[name] = True
 
-        end_reached = False
-        while not end_reached:
-            # inner while loop stops once a bigger timestep has been pushed to queue
-            # WARNING: Big assumption is that it is impossible for any array in timestep i+1 to be placed
-            # BEFORE timestep i. This is violated in embarrassingly parallel workflows where each rank can go ahead
-            # independently. Without this assumption, it would be much more complex to determine a good moment to analyze
-            # which callbacks should be called - as such, memory handling and flow execution become difficult to
-            # guarantee.
-            current_timestep = arr_timestep
-            while True:
-                name, arr_timestep, array = ray.get(self.head.get_next_array.remote())
-                # guarantee sequential flow of data.
-                # TODO add test
-                if arr_timestep < current_timestep:
-                    raise RuntimeError(
-                        f"Logical flow of data was violated. Timestep {arr_timestep} sent after timestep {current_timestep}. Exiting..."
-                    )
-                if name == "__deisa_last_iteration_array":
-                    end_reached = True
-                    break
-                # simulation has produced a higher timestep -> process all arrays for current_timestep
-                if arr_timestep > current_timestep:
-                    break
+            end_reached = False
+            while not end_reached:
+                # inner while loop stops once a bigger timestep has been pushed to queue
+                # WARNING: Big assumption is that it is impossible for any array in timestep i+1 to be placed
+                # BEFORE timestep i. This is violated in embarrassingly parallel workflows where each rank can go ahead
+                # independently. Without this assumption, it would be much more complex to determine a good moment to analyze
+                # which callbacks should be called - as such, memory handling and flow execution become difficult to
+                # guarantee.
+                current_timestep = arr_timestep
+                while True:
+                    name, arr_timestep, array = ray.get(self.head.get_next_array.remote())
+                    # guarantee sequential flow of data.
+                    # TODO add test
+                    if arr_timestep < current_timestep:
+                        raise RuntimeError(
+                            f"Logical flow of data was violated. Timestep {arr_timestep} sent after timestep {current_timestep}. Exiting..."
+                        )
+                    if name == "__deisa_last_iteration_array":
+                        end_reached = True
+                        break
+                    # simulation has produced a higher timestep -> process all arrays for current_timestep
+                    if arr_timestep > current_timestep:
+                        break
 
-                queue = self.queue_per_array.get(name)
-                if queue is not None:
-                    queue.append(DeisaArray(dask=array, t=arr_timestep))
-                    self.has_new_timestep[name] = True
-                    self.has_seen_array[name] = True
+                    queue = self.queue_per_array.get(name)
+                    if queue is not None:
+                        queue.append(DeisaArray(dask=array, t=arr_timestep))
+                        self.has_new_timestep[name] = True
+                        self.has_seen_array[name] = True
 
-            # inspect what callbacks can be called
-            for cb_cfg in self.registered_callbacks:
-                simulation_callback = cb_cfg.simulation_callback
-                description_arrays_needed = cb_cfg.arrays_description
-                exception_handler = cb_cfg.exception_handler
-                when = cb_cfg.when
+                # inspect what callbacks can be called
+                for cb_cfg in self.registered_callbacks:
+                    simulation_callback = cb_cfg.simulation_callback
+                    description_arrays_needed = cb_cfg.arrays_description
+                    exception_handler = cb_cfg.exception_handler
+                    when = cb_cfg.when
 
-                should_call = self.should_call(description_arrays_needed, when)
-                if should_call:
-                    # Compute the arrays to pass to the callback
-                    callback_args: dict[str, List[DeisaArray]] = self.determine_callback_args(description_arrays_needed)
-                    try:
-                        simulation_callback(**callback_args)
-                    except TimeoutError as e:
-                        raise e
-                    except AssertionError as e:
-                        raise e
-                    except BaseException as e:
+                    should_call = self.should_call(description_arrays_needed, when)
+                    if should_call:
+                        # Compute the arrays to pass to the callback
+                        callback_args: dict[str, List[DeisaArray]] = self.determine_callback_args(
+                            description_arrays_needed
+                        )
                         try:
-                            exception_handler(e)
+                            simulation_callback(**callback_args)
+                        except TimeoutError as e:
+                            raise e
+                        except AssertionError as e:
+                            raise e
                         except BaseException as e:
-                            _default_exception_handler(e)
+                            try:
+                                exception_handler(e)
+                            except BaseException as e:
+                                _default_exception_handler(e)
 
-                    del callback_args
-                    gc.collect()
+                        del callback_args
+                        gc.collect()
 
-            # set all new timesteps to be false
-            for queue in self.has_new_timestep:
-                self.has_new_timestep[queue] = False
+                # set all new timesteps to be false
+                for queue in self.has_new_timestep:
+                    self.has_new_timestep[queue] = False
 
-            # add the first "bigger" timestep back into queue and set new_timestep flag
-            if not end_reached:
-                queue = self.queue_per_array.get(name)
-                if queue is not None:
-                    queue.append(DeisaArray(dask=array, t=arr_timestep))
-                    self.has_new_timestep[name] = True
-                    self.has_seen_array[name] = True
+                # add the first "bigger" timestep back into queue and set new_timestep flag
+                if not end_reached:
+                    queue = self.queue_per_array.get(name)
+                    if queue is not None:
+                        queue.append(DeisaArray(dask=array, t=arr_timestep))
+                        self.has_new_timestep[name] = True
+                        self.has_seen_array[name] = True
 
     def determine_callback_args(self, description_of_arrays_needed) -> dict[str, List[DeisaArray]]:
         """
@@ -392,39 +404,33 @@ class Deisa:
         else:  # when == 'OR'
             return all(self.has_seen_array[n] for n in names) and any(self.has_new_timestep[n] for n in names)
 
-    # TODO add persist
-    def set(self, *, key: Hashable, value: Any, chunked: bool = False, persist: bool = False) -> None:
+    def set(
+        self,
+        key: Hashable,
+        *,
+        value: Any,
+        timestep: Timestep,
+    ) -> None:
         """
-        Broadcast a feedback value to all scheduling actors.
+        Publish a feedback value for bridges.
 
         Parameters
         ----------
         key : Hashable
             Identifier for the shared value.
         value : Any
-            Value to distribute.
-        chunked : bool, optional
-            Placeholder for future distributed-array feedback. Only ``False``
-            is supported today. Default is ``False``.
-        persist : bool, optional
-            Whether the value should survive the next retrieval.
-            Defaults to ``False``.
+            Value to store.
+        timestep : Hashable
+            Timestep associated with ``value``.
 
         Notes
         -----
-        The method lazily fetches node actors once and uses fire-and-forget
-        remote calls; callers should not assume synchronous delivery.
+        Timestamped values are stored in a fixed-size queue on the head actor.
+        For a given key, timesteps must be strictly increasing; publishing the
+        same timestep twice or publishing an older timestep raises
+        :class:`ValueError`.
+        Bridges retrieve them collectively with
+        ``bridge.get("foo", timestep=t)``.
         """
-        # TODO test
-        if not self.node_actors:
-            # retrieve node actors at least once
-            self.node_actors = ray.get(self.head.list_scheduling_actors.remote())
-
-        if not chunked:
-            for _, handle in self.node_actors.items():
-                # set the value inside each node actor
-                # TODO: does it need to be blocking?
-                handle.set.remote(key, value, chunked, persist)
-        else:
-            # TODO: implement chunked version
-            raise NotImplementedError()
+        self._ensure_connected()
+        ray.get(self.head.set_feedback.remote(key, timestep, value))
