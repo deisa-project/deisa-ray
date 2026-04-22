@@ -16,6 +16,7 @@ This documentation includes:
 
    quick_start
    analytics
+   API
    tips
 
 
