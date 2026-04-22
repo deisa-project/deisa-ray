@@ -1,0 +1,6 @@
+deisa.ray.bridge module
+=======================
+
+.. automodule:: deisa.ray.bridge
+   :members:
+   :show-inheritance:

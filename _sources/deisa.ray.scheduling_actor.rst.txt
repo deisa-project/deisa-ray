@@ -1,0 +1,6 @@
+deisa.ray.scheduling\_actor module
+==================================
+
+.. automodule:: deisa.ray.scheduling_actor
+   :members:
+   :show-inheritance:

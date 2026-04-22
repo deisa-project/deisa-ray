@@ -1,0 +1,6 @@
+deisa.ray.head\_node module
+===========================
+
+.. automodule:: deisa.ray.head_node
+   :members:
+   :show-inheritance:

@@ -1,7 +1,0 @@
-ray.head\_node module
-=====================
-
-.. automodule:: ray.head_node
-   :members:
-   :show-inheritance:
-   :undoc-members:
