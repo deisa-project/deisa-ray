@@ -28,11 +28,20 @@ autosummary_generate = True
 napoleon_numpy_docstring = True
 
 templates_path = ["_templates"]
-exclude_patterns = []
+exclude_patterns = [
+    # sphinx-apidoc creates a wrapper page for the PEP 420 namespace root.
+    # The public API entry point for this project is deisa.ray.
+    "deisa.rst",
+    # Older apidoc runs may have left the generated top-level toctree behind.
+    "modules.rst",
+    # Ignore stale API files from older apidoc runs that treated src/deisa/ray
+    # as a top-level ray package and accidentally imported upstream Ray.
+    "ray*.rst",
+]
 
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 html_theme = "furo"
-html_static_path = ["_static"]
+html_static_path = ["_static"] if os.path.isdir(os.path.join(os.path.dirname(__file__), "_static")) else []
