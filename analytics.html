@@ -3,7 +3,7 @@
   <head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Tips" href="tips.html"><link rel="prev" title="Quick Start" href="quick_start.html">
+<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="User API" href="API.html"><link rel="prev" title="Quick Start" href="quick_start.html">
 
     <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
         <title>Analytics - deisa-ray documentation</title>
@@ -194,6 +194,7 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="quick_start.html">Quick Start</a></li>
 <li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Analytics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="API.html">User API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tips.html">Tips</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
@@ -251,6 +252,10 @@
         <article role="main" id="furo-main-content">
           <section id="analytics">
 <h1>Analytics<a class="headerlink" href="#analytics" title="Link to this heading">¶</a></h1>
+<p>In callback examples, the name passed to <code class="docutils literal notranslate"><span class="pre">WindowSpec</span></code> is also the keyword
+argument name used when DEISA calls the callback. Each argument is a
+<code class="docutils literal notranslate"><span class="pre">list[DeisaArray]</span></code> ordered from oldest to newest; with no explicit
+<code class="docutils literal notranslate"><span class="pre">window_size</span></code> the list contains only the latest shared timestep.</p>
 <section id="simple-example">
 <h2>Simple example<a class="headerlink" href="#simple-example" title="Link to this heading">¶</a></h2>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.window_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">Deisa</span>
@@ -258,10 +263,10 @@
 
 <span class="n">d</span> <span class="o">=</span> <span class="n">Deisa</span><span class="p">()</span>
 
-<span class="nd">@d</span><span class="o">.</span><span class="n">callback</span><span class="p">(</span><span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;array&quot;</span><span class="p">))</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">simulation_callback</span><span class="p">(</span><span class="n">array</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">]):</span>
-    <span class="n">x</span> <span class="o">=</span> <span class="n">array</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
-    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Sum:&quot;</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
+<span class="nd">@d</span><span class="o">.</span><span class="n">callback</span><span class="p">(</span><span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;temperature&quot;</span><span class="p">))</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">summarize_temperature</span><span class="p">(</span><span class="n">temperature</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">]):</span>
+    <span class="n">mean_temperature</span> <span class="o">=</span> <span class="n">temperature</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Mean temperature:&quot;</span><span class="p">,</span> <span class="n">mean_temperature</span><span class="p">)</span>
 
 <span class="n">d</span><span class="o">.</span><span class="n">execute_callbacks</span><span class="p">()</span>
 </pre></div>
@@ -274,32 +279,111 @@
 
 <span class="n">d</span> <span class="o">=</span> <span class="n">Deisa</span><span class="p">()</span>
 
-<span class="nd">@d</span><span class="o">.</span><span class="n">callback</span><span class="p">(</span><span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;a&quot;</span><span class="p">),</span> <span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;b&quot;</span><span class="p">))</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">simulation_callback</span><span class="p">(</span><span class="n">a</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">],</span> <span class="n">b</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">]):</span>
-    <span class="n">r</span> <span class="o">=</span> <span class="p">(</span><span class="n">a</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span> <span class="o">-</span> <span class="n">b</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
+<span class="nd">@d</span><span class="o">.</span><span class="n">callback</span><span class="p">(</span><span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;temperature&quot;</span><span class="p">),</span> <span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;pressure&quot;</span><span class="p">))</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">compare_state</span><span class="p">(</span>
+    <span class="n">temperature</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">],</span>
+    <span class="n">pressure</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">],</span>
+<span class="p">):</span>
+    <span class="n">thermal_pressure_balance</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">temperature</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span> <span class="o">-</span> <span class="n">pressure</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;thermal-pressure balance:&quot;</span><span class="p">,</span> <span class="n">thermal_pressure_balance</span><span class="p">)</span>
 
 <span class="n">d</span><span class="o">.</span><span class="n">execute_callbacks</span><span class="p">()</span>
 </pre></div>
 </div>
 </section>
+<section id="when-and-and-when-or">
+<h2><code class="docutils literal notranslate"><span class="pre">when=&quot;AND&quot;</span></code> and <code class="docutils literal notranslate"><span class="pre">when=&quot;OR&quot;</span></code><a class="headerlink" href="#when-and-and-when-or" title="Link to this heading">¶</a></h2>
+<p>When a callback depends on several arrays, <code class="docutils literal notranslate"><span class="pre">when</span></code> controls which arrivals
+are allowed to trigger it.</p>
+<p>Before applying <code class="docutils literal notranslate"><span class="pre">when</span></code>, DEISA first groups shares by timestep. It keeps
+collecting arrays for the current timestep and does not analyze callbacks for
+that timestep until it receives any share from a higher timestep, or the final
+close sentinel. The higher-timestep share acts as the signal that the previous
+timestep is complete enough to inspect.</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>incoming shares:
+
+event      share received                  DEISA action
+1          temperature, t = 1              collect t = 1; do not call yet
+2          pressure, t = 1                 collect t = 1; do not call yet
+3          velocity, t = 1                 collect t = 1; do not call yet
+4          temperature, t = 2              now analyze callbacks for t = 1
+                                            keep temperature, t = 2 for later
+</pre></div>
+</div>
+<p>After that boundary is reached, DEISA uses the callback’s <code class="docutils literal notranslate"><span class="pre">when</span></code> value to
+decide whether the callback should run for the timestep being analyzed.
+<code class="docutils literal notranslate"><span class="pre">when</span></code> is evaluated per callback, using only the arrays requested by that
+callback.</p>
+<p><code class="docutils literal notranslate"><span class="pre">when=&quot;AND&quot;</span></code> is the default. The callback runs only if all arrays requested
+by that callback have a new share for the timestep being analyzed. If a
+callback asks for temperature, pressure, and velocity, but only temperature and
+pressure were shared for timestep 2, the callback is not called.</p>
+<p><code class="docutils literal notranslate"><span class="pre">when=&quot;OR&quot;</span></code> runs if at least one array requested by the callback has a new
+share for the timestep being analyzed. Arrays that did not receive a new share
+reuse their most recent available window, after they have been seen at least
+once. If none of the arrays requested by a callback have a new share, the
+callback is not called in either <code class="docutils literal notranslate"><span class="pre">AND</span></code> or <code class="docutils literal notranslate"><span class="pre">OR</span></code> mode.</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Callback inputs:
+    WindowSpec(&quot;temperature&quot;), WindowSpec(&quot;pressure&quot;), WindowSpec(&quot;velocity&quot;)
+
+timestep being analyzed      new shares seen          when=&quot;AND&quot;        when=&quot;OR&quot;
+t = 1                        temperature, pressure,   run               run
+                             velocity
+t = 2                        temperature, pressure    do not run        run
+t = 3                        none of these arrays     do not run        do not run
+</pre></div>
+</div>
+<p>In both modes, callback arguments are still lists of <code class="docutils literal notranslate"><span class="pre">DeisaArray</span></code> objects.
+With <code class="docutils literal notranslate"><span class="pre">when=&quot;OR&quot;</span></code>, a list may be reused from an older timestep if that array
+did not produce a new share for the current trigger.</p>
+</section>
 <section id="sliding-window">
 <h2>Sliding window<a class="headerlink" href="#sliding-window" title="Link to this heading">¶</a></h2>
 <p>If the analysis requires access to several iterations (for example, to compute
-a time derivative), it is possible to use the <code class="docutils literal notranslate"><span class="pre">window_size</span></code> parameter.</p>
+a time derivative), it is possible to use the <code class="docutils literal notranslate"><span class="pre">window_size</span></code> parameter.
+Choose the window size from both the available system memory and the analytics
+algorithm you want to run. A <code class="docutils literal notranslate"><span class="pre">window_size</span></code> of 5 means DEISA may need to keep
+five timesteps of that array available, so it costs more memory than a smaller
+window. It is the right choice for an analysis that needs five temporal points,
+such as a five-point stencil finite-difference approximation.</p>
+<p>The window size is an upper bound on what the callback receives, not a
+requirement that every operation in the callback must consume the whole window.
+A callback registered with <code class="docutils literal notranslate"><span class="pre">window_size=5</span></code> can still compute single-timestep
+statistics from <code class="docutils literal notranslate"><span class="pre">temperature[-1]</span></code>, three-timestep estimates from the newest
+three entries, and five-timestep estimates only when all five entries are
+available.</p>
+<p>Callbacks are called as soon as their input arrays are available, even before
+the sliding window is full. During the first few calls, the list may contain
+fewer entries than <code class="docutils literal notranslate"><span class="pre">window_size</span></code>. The callback must check <code class="docutils literal notranslate"><span class="pre">len(window)</span></code> for
+any operation that needs a minimum number of timesteps.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.window_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">Deisa</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">DeisaArray</span><span class="p">,</span> <span class="n">WindowSpec</span>
 
 <span class="n">d</span> <span class="o">=</span> <span class="n">Deisa</span><span class="p">()</span>
 
-<span class="nd">@d</span><span class="o">.</span><span class="n">callback</span><span class="p">(</span><span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;array&quot;</span><span class="p">,</span> <span class="n">window_size</span><span class="o">=</span><span class="mi">2</span><span class="p">))</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">simulation_callback</span><span class="p">(</span><span class="n">arrays</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">]):</span>
-    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">arrays</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>  <span class="c1"># For the first iteration</span>
+<span class="nd">@d</span><span class="o">.</span><span class="n">callback</span><span class="p">(</span><span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;temperature&quot;</span><span class="p">,</span> <span class="n">window_size</span><span class="o">=</span><span class="mi">5</span><span class="p">))</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">estimate_temperature_change</span><span class="p">(</span><span class="n">temperature</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">]):</span>
+    <span class="n">latest_mean</span> <span class="o">=</span> <span class="n">temperature</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;mean temperature:&quot;</span><span class="p">,</span> <span class="n">latest_mean</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">temperature</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="n">newest</span> <span class="o">=</span> <span class="n">temperature</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">middle</span> <span class="o">=</span> <span class="n">temperature</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">]</span>
+        <span class="n">oldest</span> <span class="o">=</span> <span class="n">temperature</span><span class="p">[</span><span class="o">-</span><span class="mi">3</span><span class="p">]</span>
+        <span class="n">three_point_rate</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">newest</span><span class="o">.</span><span class="n">dask</span> <span class="o">-</span> <span class="n">oldest</span><span class="o">.</span><span class="n">dask</span>
+        <span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">newest</span><span class="o">.</span><span class="n">t</span> <span class="o">-</span> <span class="n">oldest</span><span class="o">.</span><span class="n">t</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;three-point mean dT/dt:&quot;</span><span class="p">,</span> <span class="n">three_point_rate</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="o">.</span><span class="n">compute</span><span class="p">())</span>
+
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">temperature</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">5</span><span class="p">:</span>
         <span class="k">return</span>
 
-    <span class="n">current_array</span> <span class="o">=</span> <span class="n">arrays</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span>
-    <span class="n">previous_array</span> <span class="o">=</span> <span class="n">arrays</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span>
-
-    <span class="o">...</span>
+    <span class="n">five_point_average</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span>
+        <span class="n">timestep</span><span class="o">.</span><span class="n">dask</span> <span class="k">for</span> <span class="n">timestep</span> <span class="ow">in</span> <span class="n">temperature</span>
+    <span class="p">)</span> <span class="o">/</span> <span class="mi">5</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;five-point average:&quot;</span><span class="p">,</span> <span class="n">five_point_average</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="o">.</span><span class="n">compute</span><span class="p">())</span>
 
 <span class="n">d</span><span class="o">.</span><span class="n">execute_callbacks</span><span class="p">()</span>
 </pre></div>
@@ -314,14 +398,14 @@ a time derivative), it is possible to use the <code class="docutils literal notr
 
 <span class="n">d</span> <span class="o">=</span> <span class="n">Deisa</span><span class="p">()</span>
 
-<span class="nd">@d</span><span class="o">.</span><span class="n">callback</span><span class="p">(</span><span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;array&quot;</span><span class="p">))</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">simulation_callback</span><span class="p">(</span><span class="n">array</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">]):</span>
-    <span class="n">x</span> <span class="o">=</span> <span class="n">array</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">persist</span><span class="p">()</span>
+<span class="nd">@d</span><span class="o">.</span><span class="n">callback</span><span class="p">(</span><span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;vorticity&quot;</span><span class="p">))</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">track_vorticity</span><span class="p">(</span><span class="n">vorticity</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">]):</span>
+    <span class="n">total_vorticity</span> <span class="o">=</span> <span class="n">vorticity</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">persist</span><span class="p">()</span>
 
-    <span class="c1"># x is still a Dask array, but the sum is being computed in the background</span>
-    <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">da</span><span class="o">.</span><span class="n">Array</span><span class="p">)</span>
+    <span class="c1"># The result is still a Dask array, but the sum is computing in the background.</span>
+    <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">total_vorticity</span><span class="p">,</span> <span class="n">da</span><span class="o">.</span><span class="n">Array</span><span class="p">)</span>
 
-    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;t=&quot;</span><span class="p">,</span> <span class="n">array</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">t</span><span class="p">,</span> <span class="s2">&quot;sum=&quot;</span><span class="p">,</span> <span class="n">x</span><span class="o">.</span><span class="n">compute</span><span class="p">())</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;t=&quot;</span><span class="p">,</span> <span class="n">vorticity</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">t</span><span class="p">,</span> <span class="s2">&quot;total vorticity=&quot;</span><span class="p">,</span> <span class="n">total_vorticity</span><span class="o">.</span><span class="n">compute</span><span class="p">())</span>
 
 <span class="n">d</span><span class="o">.</span><span class="n">execute_callbacks</span><span class="p">()</span>
 </pre></div>
@@ -336,9 +420,9 @@ a time derivative), it is possible to use the <code class="docutils literal notr
 <span class="n">d</span> <span class="o">=</span> <span class="n">Deisa</span><span class="p">()</span>
 
 <span class="nd">@d</span><span class="o">.</span><span class="n">callback</span><span class="p">(</span><span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;temperature&quot;</span><span class="p">))</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">save_temperature</span><span class="p">(</span><span class="n">array</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">]):</span>
-    <span class="k">if</span> <span class="n">array</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">t</span> <span class="o">==</span> <span class="mi">5</span><span class="p">:</span>
-        <span class="n">array</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">to_hdf5</span><span class="p">(</span><span class="s2">&quot;interesting-event.h5&quot;</span><span class="p">,</span> <span class="s2">&quot;temperature&quot;</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">save_hotspot_temperature</span><span class="p">(</span><span class="n">temperature</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">]):</span>
+    <span class="k">if</span> <span class="n">temperature</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">t</span> <span class="o">==</span> <span class="mi">5</span><span class="p">:</span>
+        <span class="n">temperature</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">to_hdf5</span><span class="p">(</span><span class="s2">&quot;interesting-event.h5&quot;</span><span class="p">,</span> <span class="s2">&quot;temperature&quot;</span><span class="p">)</span>
 
 <span class="n">d</span><span class="o">.</span><span class="n">execute_callbacks</span><span class="p">()</span>
 </pre></div>
@@ -351,7 +435,7 @@ a time derivative), it is possible to use the <code class="docutils literal notr
 <span class="n">d</span> <span class="o">=</span> <span class="n">Deisa</span><span class="p">()</span>
 
 <span class="nd">@d</span><span class="o">.</span><span class="n">callback</span><span class="p">(</span><span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;temperature&quot;</span><span class="p">),</span> <span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;pressure&quot;</span><span class="p">))</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">save_both</span><span class="p">(</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">save_state_snapshot</span><span class="p">(</span>
     <span class="n">temperature</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">],</span>
     <span class="n">pressure</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">],</span>
 <span class="p">):</span>
@@ -379,15 +463,15 @@ underlying Dask array:</p>
 <span class="n">d</span> <span class="o">=</span> <span class="n">Deisa</span><span class="p">()</span>
 
 <span class="nd">@d</span><span class="o">.</span><span class="n">callback</span><span class="p">(</span><span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;temperature&quot;</span><span class="p">))</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">xarray_example</span><span class="p">(</span><span class="n">array</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">]):</span>
-    <span class="n">da</span> <span class="o">=</span> <span class="n">xr</span><span class="o">.</span><span class="n">DataArray</span><span class="p">(</span>
-        <span class="n">array</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span><span class="p">,</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">inspect_temperature_field</span><span class="p">(</span><span class="n">temperature</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">]):</span>
+    <span class="n">temperature_da</span> <span class="o">=</span> <span class="n">xr</span><span class="o">.</span><span class="n">DataArray</span><span class="p">(</span>
+        <span class="n">temperature</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span><span class="p">,</span>
         <span class="n">dims</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">],</span>
         <span class="n">name</span><span class="o">=</span><span class="s2">&quot;temperature&quot;</span><span class="p">,</span>
     <span class="p">)</span>
 
-    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;timestep:&quot;</span><span class="p">,</span> <span class="n">array</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">t</span><span class="p">)</span>
-    <span class="nb">print</span><span class="p">(</span><span class="n">da</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;timestep:&quot;</span><span class="p">,</span> <span class="n">temperature</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">t</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">temperature_da</span><span class="p">)</span>
 
 <span class="n">d</span><span class="o">.</span><span class="n">execute_callbacks</span><span class="p">()</span>
 </pre></div>
@@ -404,10 +488,10 @@ underlying Dask array:</p>
 <span class="n">d</span> <span class="o">=</span> <span class="n">Deisa</span><span class="p">()</span>
 
 <span class="nd">@d</span><span class="o">.</span><span class="n">callback</span><span class="p">(</span><span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;temperature&quot;</span><span class="p">))</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">save_netcdf</span><span class="p">(</span><span class="n">array</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">]):</span>
-    <span class="k">if</span> <span class="n">array</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">t</span> <span class="o">==</span> <span class="mi">5</span><span class="p">:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">save_temperature_netcdf</span><span class="p">(</span><span class="n">temperature</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">]):</span>
+    <span class="k">if</span> <span class="n">temperature</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">t</span> <span class="o">==</span> <span class="mi">5</span><span class="p">:</span>
         <span class="n">xarray_da</span> <span class="o">=</span> <span class="n">xr</span><span class="o">.</span><span class="n">DataArray</span><span class="p">(</span>
-            <span class="n">array</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span><span class="p">,</span>
+            <span class="n">temperature</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dask</span><span class="p">,</span>
             <span class="n">dims</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">],</span>
             <span class="n">name</span><span class="o">=</span><span class="s2">&quot;temperature&quot;</span><span class="p">,</span>
         <span class="p">)</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
@@ -425,12 +509,12 @@ underlying Dask array:</p>
       <footer>
         
         <div class="related-pages">
-          <a class="next-page" href="tips.html">
+          <a class="next-page" href="API.html">
               <div class="page-info">
                 <div class="context">
                   <span>Next</span>
                 </div>
-                <div class="title">Tips</div>
+                <div class="title">User API</div>
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>
@@ -478,6 +562,7 @@ underlying Dask array:</p>
 <li><a class="reference internal" href="#">Analytics</a><ul>
 <li><a class="reference internal" href="#simple-example">Simple example</a></li>
 <li><a class="reference internal" href="#several-arrays">Several arrays</a></li>
+<li><a class="reference internal" href="#when-and-and-when-or"><code class="docutils literal notranslate"><span class="pre">when=&quot;AND&quot;</span></code> and <code class="docutils literal notranslate"><span class="pre">when=&quot;OR&quot;</span></code></a></li>
 <li><a class="reference internal" href="#sliding-window">Sliding window</a></li>
 <li><a class="reference internal" href="#dask-persist">Dask persist</a></li>
 <li><a class="reference internal" href="#saving-to-hdf5">Saving to HDF5</a></li>

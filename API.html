@@ -1,0 +1,871 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="./">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Tips" href="tips.html"><link rel="prev" title="Analytics" href="analytics.html">
+
+    <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
+        <title>User API - deisa-ray documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=d111a655" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f2f2f2;
+  --color-code-foreground: #1e1e1e;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="index.html"><div class="brand">deisa-ray  documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
+  
+  <span class="sidebar-brand-text">deisa-ray  documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Guides</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="quick_start.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="analytics.html">Analytics</a></li>
+<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">User API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tips.html">Tips</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="deisa.ray.html">deisa.ray package</a><input aria-label="Toggle navigation of deisa.ray package" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.bridge.html">deisa.ray.bridge module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.comm.html">deisa.ray.comm module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.config.html">deisa.ray.config module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.errors.html">deisa.ray.errors module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.head_node.html">deisa.ray.head_node module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.scheduling_actor.html">deisa.ray.scheduling_actor module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.types.html">deisa.ray.types module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.utils.html">deisa.ray.utils module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.validate.html">deisa.ray.validate module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="deisa.ray.window_handler.html">deisa.ray.window_handler module</a></li>
+</ul>
+</li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="_sources/API.rst.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section id="user-api">
+<h1>User API<a class="headerlink" href="#user-api" title="Link to this heading">¶</a></h1>
+<p>This page describes the user-facing API of <code class="docutils literal notranslate"><span class="pre">deisa-ray</span></code>. It is written from
+the behavior of this repository, not only from the <code class="docutils literal notranslate"><span class="pre">deisa-core</span></code>
+protocols. The core model is intentionally small:</p>
+<ul class="simple">
+<li><p>simulation processes create one <code class="docutils literal notranslate"><span class="pre">Bridge</span></code> per participating rank and call
+<code class="docutils literal notranslate"><span class="pre">send</span></code> whenever a local chunk is ready and the simulation chooses to share
+that timestep with analytics;</p></li>
+<li><p>analytics code creates one <code class="docutils literal notranslate"><span class="pre">Deisa</span></code> object, registers callbacks, and calls
+<code class="docutils literal notranslate"><span class="pre">execute_callbacks</span></code>;</p></li>
+<li><p>callbacks receive lists of <code class="docutils literal notranslate"><span class="pre">DeisaArray</span></code> objects, where each object wraps a
+Dask array and the timestep it came from.</p></li>
+</ul>
+<p>Think of <code class="docutils literal notranslate"><span class="pre">send</span></code> as the point where the simulation exposes a timestep to
+DEISA. For a distributed array at a given timestep, all bridges that own chunks
+of that array must share their local chunk for the same timestep before DEISA
+can assemble the full Dask array seen by analytics.</p>
+<p>Callbacks see those shares through a sliding window. A <code class="docutils literal notranslate"><span class="pre">WindowSpec</span></code> with
+<code class="docutils literal notranslate"><span class="pre">window_size=N</span></code> gives the callback up to the most recent <code class="docutils literal notranslate"><span class="pre">N</span></code> shared
+timesteps for that array, ordered oldest to newest. This is what lets analysis
+code combine data across time, for example comparing the newest field with the
+previous one or computing a derivative over several timesteps.</p>
+<p>The simulation and analytics may start in either order. The runtime uses Ray
+actors to rendezvous, collect chunks, build Dask arrays, and execute Dask graphs
+close to the data.</p>
+<p>Bridges also use a communicator to coordinate with each other. By default,
+<code class="docutils literal notranslate"><span class="pre">deisa-ray</span></code> creates a Gloo communicator from <code class="docutils literal notranslate"><span class="pre">system_metadata</span></code>, but
+applications that already run under MPI can pass an MPI communicator instead.
+That communicator is used for fast, efficient bridge-to-bridge coordination,
+including barriers and feedback broadcasts.</p>
+<section id="main-imports">
+<h2>Main imports<a class="headerlink" href="#main-imports" title="Link to this heading">¶</a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.bridge</span><span class="w"> </span><span class="kn">import</span> <span class="n">Bridge</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.window_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">Deisa</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">deisa.ray.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">DeisaArray</span><span class="p">,</span> <span class="n">WindowSpec</span><span class="p">,</span> <span class="n">to_hdf5</span>
+</pre></div>
+</div>
+</section>
+<section id="simulation-side-api">
+<h2>Simulation-side API<a class="headerlink" href="#simulation-side-api" title="Link to this heading">¶</a></h2>
+<section id="bridge">
+<h3><code class="docutils literal notranslate"><span class="pre">Bridge</span></code><a class="headerlink" href="#bridge" title="Link to this heading">¶</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">Bridge</span></code> is the simulation-side entry point.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">bridge</span> <span class="o">=</span> <span class="n">Bridge</span><span class="p">(</span>
+    <span class="n">bridge_id</span><span class="o">=</span><span class="n">rank</span><span class="p">,</span>
+    <span class="n">arrays_metadata</span><span class="o">=</span><span class="n">arrays_metadata</span><span class="p">,</span>
+    <span class="n">system_metadata</span><span class="o">=</span><span class="n">system_metadata</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>Each rank that will ever send data must create a <code class="docutils literal notranslate"><span class="pre">Bridge</span></code>. The
+<code class="docutils literal notranslate"><span class="pre">bridge_id</span></code> must be unique among participating ranks, and there must be a
+bridge with <code class="docutils literal notranslate"><span class="pre">bridge_id=0</span></code>. Bridge <code class="docutils literal notranslate"><span class="pre">0</span></code> is special because it sends the final
+sentinel array used to stop analytics callback execution.</p>
+<section id="arguments">
+<h4>Arguments<a class="headerlink" href="#arguments" title="Link to this heading">¶</a></h4>
+<dl>
+<dt><code class="docutils literal notranslate"><span class="pre">bridge_id</span></code></dt><dd><p>Integer identifier for this simulation rank. In MPI programs this is
+usually the MPI rank.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">arrays_metadata</span></code></dt><dd><p>Mapping from array name to metadata for the chunk owned by this bridge.
+Each value must contain:</p>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">chunk_shape</span></code></dt><dd><p>Shape of the local chunk as a tuple/list/1D NumPy array of positive
+integers.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">nb_chunks_per_dim</span></code></dt><dd><p>Number of chunks in each dimension of the global array. The full array
+shape is approximately <code class="docutils literal notranslate"><span class="pre">chunk_shape</span> <span class="pre">*</span> <span class="pre">nb_chunks_per_dim</span></code> dimension by
+dimension.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">nb_chunks_of_node</span></code></dt><dd><p>Number of chunks for this array expected on the current scheduling
+actor. This is the local completeness count used before forwarding an
+array timestep.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">dtype</span></code></dt><dd><p>NumPy dtype, or a value accepted by <code class="docutils literal notranslate"><span class="pre">numpy.dtype</span></code>.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">chunk_position</span></code></dt><dd><p>Position of this bridge’s chunk in the global chunk grid. It must have
+the same dimensionality as <code class="docutils literal notranslate"><span class="pre">chunk_shape</span></code> and each index must be within
+<code class="docutils literal notranslate"><span class="pre">nb_chunks_per_dim</span></code>.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">system_metadata</span></code></dt><dd><p>Required when <code class="docutils literal notranslate"><span class="pre">comm</span></code> is omitted. The default communicator uses
+<code class="docutils literal notranslate"><span class="pre">system_metadata[&quot;world_size&quot;]</span></code>, <code class="docutils literal notranslate"><span class="pre">system_metadata[&quot;master_address&quot;]</span></code>,
+and <code class="docutils literal notranslate"><span class="pre">system_metadata[&quot;master_port&quot;]</span></code> to initialize a Gloo process group.
+If a custom communicator is supplied, this argument may be omitted.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">comm</span></code></dt><dd><p>Optional communicator. A raw <code class="docutils literal notranslate"><span class="pre">mpi4py.MPI.Comm</span></code> is accepted and wrapped
+automatically. Any custom communicator must expose <code class="docutils literal notranslate"><span class="pre">rank</span></code>, <code class="docutils literal notranslate"><span class="pre">world_size</span></code>,
+<code class="docutils literal notranslate"><span class="pre">barrier()</span></code>, and <code class="docutils literal notranslate"><span class="pre">broadcast_object(obj,</span> <span class="pre">src=0)</span></code>. <code class="docutils literal notranslate"><span class="pre">Bridge.get</span></code> uses
+<code class="docutils literal notranslate"><span class="pre">broadcast_object</span></code> so bridge <code class="docutils literal notranslate"><span class="pre">0</span></code> can query feedback once and share the
+result with all participating bridges. Passing an MPI communicator is the
+recommended option when the simulation already has one, because it reuses
+the simulation’s native fast communication layer instead of creating the
+default Gloo process group.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">_node_id</span></code>, <code class="docutils literal notranslate"><span class="pre">scheduling_actor_cls</span></code>, <code class="docutils literal notranslate"><span class="pre">_init_retries</span></code>, <code class="docutils literal notranslate"><span class="pre">_comm_timeout</span></code></dt><dd><p>Implementation and testing hooks. Normal users should not need them.
+<code class="docutils literal notranslate"><span class="pre">_comm_timeout</span></code> controls the default Gloo rendezvous timeout in seconds.</p>
+</dd>
+</dl>
+</section>
+<section id="behavior">
+<h4>Behavior<a class="headerlink" href="#behavior" title="Link to this heading">¶</a></h4>
+<p>During construction, <code class="docutils literal notranslate"><span class="pre">Bridge</span></code> validates array metadata, initializes or
+normalizes its communicator, starts Ray with <code class="docutils literal notranslate"><span class="pre">address=&quot;auto&quot;</span></code> if needed,
+creates or reuses a detached scheduling actor on the local Ray node, registers
+the chunk metadata with that actor, waits for actor readiness, and finally
+enters a communicator barrier so all bridges start from a consistent point.</p>
+<p>If the default Gloo communicator is used and not all bridge processes connect
+before the timeout, construction raises the underlying torch distributed
+rendezvous error with extra context about the expected rank count and master
+address.</p>
+</section>
+</section>
+<section id="bridge-send">
+<h3><code class="docutils literal notranslate"><span class="pre">Bridge.send</span></code><a class="headerlink" href="#bridge-send" title="Link to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">bridge</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">array_name</span><span class="o">=</span><span class="s2">&quot;temperature&quot;</span><span class="p">,</span> <span class="n">chunk</span><span class="o">=</span><span class="n">chunk</span><span class="p">,</span> <span class="n">timestep</span><span class="o">=</span><span class="n">t</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">send</span></code> makes one local chunk available to analytics.</p>
+<section id="id1">
+<h4>Arguments<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h4>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">array_name</span></code></dt><dd><p>Name of the array. It must match a key in <code class="docutils literal notranslate"><span class="pre">arrays_metadata</span></code> and the
+analytics-side <code class="docutils literal notranslate"><span class="pre">WindowSpec</span></code> name.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">chunk</span></code></dt><dd><p>A <code class="docutils literal notranslate"><span class="pre">numpy.ndarray</span></code> containing this bridge’s local chunk. If the simulation
+computes on GPU, copy the data to CPU before calling <code class="docutils literal notranslate"><span class="pre">send</span></code>.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">timestep</span></code></dt><dd><p>Integer timestep for the chunk.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">chunked</span></code></dt><dd><p>Reserved for future use. The current implementation always sends chunked
+data through the distributed-array path.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">store_externally</span></code></dt><dd><p>Reserved for future external storage support. It is passed through the
+internal actor layer but external storage is not implemented yet.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">test_mode</span></code></dt><dd><p>Reserved test hook and currently ignored.</p>
+</dd>
+</dl>
+</section>
+<section id="id2">
+<h4>Behavior<a class="headerlink" href="#id2" title="Link to this heading">¶</a></h4>
+<p><code class="docutils literal notranslate"><span class="pre">send</span></code> stores the chunk in Ray’s object store with the scheduling actor as
+owner, forwards the object reference to the scheduling actor, and blocks until
+that actor has processed the chunk. If the scheduling layer detects a contract
+violation, <code class="docutils literal notranslate"><span class="pre">send</span></code> raises <code class="docutils literal notranslate"><span class="pre">ContractError</span></code>.</p>
+<p>The timestep stream must be non-decreasing globally: all data for timestep
+<code class="docutils literal notranslate"><span class="pre">i</span></code> must be sent before any data for timestep <code class="docutils literal notranslate"><span class="pre">j</span> <span class="pre">&gt;</span> <span class="pre">i</span></code>. The analytics loop
+checks this ordering and raises if it observes an older timestep after a newer
+one.</p>
+</section>
+</section>
+<section id="bridge-close">
+<h3><code class="docutils literal notranslate"><span class="pre">Bridge.close</span></code><a class="headerlink" href="#bridge-close" title="Link to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">bridge</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">timestep</span><span class="o">=</span><span class="n">final_timestep</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">close</span></code> tells analytics that the simulation has finished. All bridges must
+call it because it begins with a communicator barrier. After the barrier,
+bridge <code class="docutils literal notranslate"><span class="pre">0</span></code> sends an internal sentinel array named
+<code class="docutils literal notranslate"><span class="pre">&quot;__deisa_last_iteration_array&quot;</span></code>. Analytics stop when that sentinel is
+received.</p>
+<p><code class="docutils literal notranslate"><span class="pre">timestep</span></code> is the timestep attached to the sentinel. A common pattern is to
+use the first timestep after the last real send. <code class="docutils literal notranslate"><span class="pre">close</span></code> returns the same
+integer.</p>
+</section>
+<section id="bridge-get">
+<h3><code class="docutils literal notranslate"><span class="pre">Bridge.get</span></code><a class="headerlink" href="#bridge-get" title="Link to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">value</span> <span class="o">=</span> <span class="n">bridge</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;cooling_factor&quot;</span><span class="p">,</span> <span class="n">timestep</span><span class="o">=</span><span class="n">t</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">get</span></code> retrieves a timestamped feedback value published by analytics with
+<code class="docutils literal notranslate"><span class="pre">Deisa.set</span></code>. It is a collective operation: when a communicator is used, every
+bridge must call <code class="docutils literal notranslate"><span class="pre">get</span></code> in the same order for a given key/timestep lookup.
+Bridge <code class="docutils literal notranslate"><span class="pre">0</span></code> queries the global head actor and broadcasts the result to the
+other bridges.</p>
+<section id="id3">
+<h4>Arguments<a class="headerlink" href="#id3" title="Link to this heading">¶</a></h4>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">name</span></code></dt><dd><p>Feedback key to read.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">timestep</span></code></dt><dd><p>Optional timestep associated with the requested feedback value. When it is
+provided, <code class="docutils literal notranslate"><span class="pre">get</span></code> returns the value for exactly that timestep, or <code class="docutils literal notranslate"><span class="pre">None</span></code>
+if no value is currently retained for that key/timestep. When omitted,
+<code class="docutils literal notranslate"><span class="pre">get</span></code> returns the retained queue for <code class="docutils literal notranslate"><span class="pre">name</span></code> as a list of
+<code class="docutils literal notranslate"><span class="pre">(timestep,</span> <span class="pre">value)</span></code> pairs, or <code class="docutils literal notranslate"><span class="pre">None</span></code> if no feedback exists for the key.</p>
+</dd>
+</dl>
+</section>
+<section id="id4">
+<h4>Behavior<a class="headerlink" href="#id4" title="Link to this heading">¶</a></h4>
+<p>Feedback values are stored in fixed-size per-key queues on the head actor.
+Older entries may be dropped after analytics publishes more values than the
+queue can hold. A missing value returns <code class="docutils literal notranslate"><span class="pre">None</span></code>; there is no <code class="docutils literal notranslate"><span class="pre">default</span></code>
+argument in the current API.</p>
+<p>Feedback is asynchronous and intentionally opportunistic. Analytics callbacks
+run after DEISA has observed a later timestep, or the close sentinel, so
+feedback for the final simulated timestep may only become visible during
+shutdown. Simulation correctness should not depend on observing an analytics
+event at one exact timestep.</p>
+</section>
+</section>
+</section>
+<section id="analytics-side-api">
+<h2>Analytics-side API<a class="headerlink" href="#analytics-side-api" title="Link to this heading">¶</a></h2>
+<section id="deisa">
+<h3><code class="docutils literal notranslate"><span class="pre">Deisa</span></code><a class="headerlink" href="#deisa" title="Link to this heading">¶</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">Deisa</span></code> is the analytics-side entry point.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">deisa</span> <span class="o">=</span> <span class="n">Deisa</span><span class="p">(</span><span class="n">max_simulation_ahead</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">feedback_queue_size</span><span class="o">=</span><span class="mi">1024</span><span class="p">)</span>
+</pre></div>
+</div>
+<section id="id5">
+<h4>Arguments<a class="headerlink" href="#id5" title="Link to this heading">¶</a></h4>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">ray_start</span></code></dt><dd><p>Optional callable used to start Ray. If omitted, <code class="docutils literal notranslate"><span class="pre">Deisa</span></code> calls
+<code class="docutils literal notranslate"><span class="pre">ray.init(address=&quot;auto&quot;,</span> <span class="pre">log_to_driver=False,</span> <span class="pre">logging_level=logging.ERROR)</span></code>
+when it first connects.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">max_simulation_ahead</span></code></dt><dd><p>Number of timesteps the simulation may be ahead of analytics before
+scheduling applies back-pressure. The default is <code class="docutils literal notranslate"><span class="pre">1</span></code>.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">feedback_queue_size</span></code></dt><dd><p>Maximum number of feedback entries retained per key on the head actor.
+The default is <code class="docutils literal notranslate"><span class="pre">1024</span></code>. It must be greater than zero.</p>
+</dd>
+</dl>
+</section>
+<section id="id6">
+<h4>Behavior<a class="headerlink" href="#id6" title="Link to this heading">¶</a></h4>
+<p>The constructor is intentionally cheap: it records configuration but does not
+start Ray. Ray connection, Dask scheduler configuration, and head actor creation
+happen lazily when registering callbacks or executing them.</p>
+</section>
+</section>
+<section id="deisa-register-callback">
+<h3><code class="docutils literal notranslate"><span class="pre">Deisa.register_callback</span></code><a class="headerlink" href="#deisa-register-callback" title="Link to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">summary</span><span class="p">(</span><span class="n">temperature</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">]):</span>
+    <span class="n">latest</span> <span class="o">=</span> <span class="n">temperature</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">latest</span><span class="o">.</span><span class="n">t</span><span class="p">,</span> <span class="n">latest</span><span class="o">.</span><span class="n">dask</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="o">.</span><span class="n">compute</span><span class="p">())</span>
+
+<span class="n">deisa</span><span class="o">.</span><span class="n">register_callback</span><span class="p">(</span>
+    <span class="n">summary</span><span class="p">,</span>
+    <span class="p">[</span><span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;temperature&quot;</span><span class="p">,</span> <span class="n">window_size</span><span class="o">=</span><span class="mi">3</span><span class="p">)],</span>
+    <span class="n">when</span><span class="o">=</span><span class="s2">&quot;AND&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>Registers a callback to be called from <code class="docutils literal notranslate"><span class="pre">execute_callbacks</span></code>.</p>
+<section id="id7">
+<h4>Arguments<a class="headerlink" href="#id7" title="Link to this heading">¶</a></h4>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">simulation_callback</span></code></dt><dd><p>Callable that receives keyword arguments named after each <code class="docutils literal notranslate"><span class="pre">WindowSpec</span></code>.
+Each argument is a <code class="docutils literal notranslate"><span class="pre">list[DeisaArray]</span></code>. For ergonomic callbacks, choose
+array names that are valid Python parameter names, or write the callback to
+accept <code class="docutils literal notranslate"><span class="pre">**kwargs</span></code>.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">arrays_spec</span></code></dt><dd><p>List of <code class="docutils literal notranslate"><span class="pre">WindowSpec</span></code> objects describing which arrays the callback needs
+and how many timesteps should be kept for each array.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">exception_handler</span></code></dt><dd><p>Optional callable invoked when the user callback raises. If omitted, the
+default handler prints/logs the exception and callback execution continues.
+<code class="docutils literal notranslate"><span class="pre">TimeoutError</span></code> and <code class="docutils literal notranslate"><span class="pre">AssertionError</span></code> are re-raised by the execution loop.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">when</span></code></dt><dd><p><code class="docutils literal notranslate"><span class="pre">&quot;AND&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">&quot;OR&quot;</span></code>. With <code class="docutils literal notranslate"><span class="pre">&quot;AND&quot;</span></code>, the callback runs only when every
+requested array has new data for the current timestep. With <code class="docutils literal notranslate"><span class="pre">&quot;OR&quot;</span></code>, the
+callback runs after all requested arrays have been seen at least once and
+at least one requested array has new data; arrays without new data reuse
+their latest window.</p>
+</dd>
+</dl>
+</section>
+<section id="returns">
+<h4>Returns<a class="headerlink" href="#returns" title="Link to this heading">¶</a></h4>
+<p>Returns the original callback so the method can be used by decorator helpers
+and by code that wants to keep the callable.</p>
+</section>
+</section>
+<section id="deisa-callback">
+<h3><code class="docutils literal notranslate"><span class="pre">Deisa.callback</span></code><a class="headerlink" href="#deisa-callback" title="Link to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@deisa</span><span class="o">.</span><span class="n">callback</span><span class="p">(</span><span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;temperature&quot;</span><span class="p">),</span> <span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;pressure&quot;</span><span class="p">),</span> <span class="n">when</span><span class="o">=</span><span class="s2">&quot;OR&quot;</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">compare</span><span class="p">(</span><span class="n">temperature</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">],</span> <span class="n">pressure</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">]):</span>
+    <span class="o">...</span>
+</pre></div>
+</div>
+<p>Decorator form of <code class="docutils literal notranslate"><span class="pre">register_callback</span></code>. It accepts <code class="docutils literal notranslate"><span class="pre">WindowSpec</span></code> objects as
+positional arguments and the same <code class="docutils literal notranslate"><span class="pre">exception_handler</span></code> and <code class="docutils literal notranslate"><span class="pre">when</span></code> keyword
+arguments.</p>
+</section>
+<section id="deisa-execute-callbacks">
+<h3><code class="docutils literal notranslate"><span class="pre">Deisa.execute_callbacks</span></code><a class="headerlink" href="#deisa-execute-callbacks" title="Link to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">deisa</span><span class="o">.</span><span class="n">execute_callbacks</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>Starts the analytics loop. At least one callback must be registered first,
+otherwise <code class="docutils literal notranslate"><span class="pre">RuntimeError</span></code> is raised.</p>
+<section id="id8">
+<h4>Behavior<a class="headerlink" href="#id8" title="Link to this heading">¶</a></h4>
+<p><code class="docutils literal notranslate"><span class="pre">execute_callbacks</span></code> marks analytics as ready, builds one internal queue per
+array, waits for arrays from the head actor, and calls every registered
+callback whose <code class="docutils literal notranslate"><span class="pre">when</span></code> condition is satisfied. The loop ends when bridge <code class="docutils literal notranslate"><span class="pre">0</span></code>
+sends the internal final sentinel through <code class="docutils literal notranslate"><span class="pre">Bridge.close</span></code>.</p>
+<p>Callback arguments are always lists. With no explicit window size, the list has
+one element: the latest <code class="docutils literal notranslate"><span class="pre">DeisaArray</span></code>. With <code class="docutils literal notranslate"><span class="pre">window_size=N</span></code>, the list
+contains up to the last <code class="docutils literal notranslate"><span class="pre">N</span></code> arrays for that name, ordered oldest to newest.
+Early timesteps may have shorter lists, so callbacks that require a full
+window should check <code class="docutils literal notranslate"><span class="pre">len(window)</span></code> before computing.</p>
+</section>
+</section>
+<section id="deisa-set">
+<h3><code class="docutils literal notranslate"><span class="pre">Deisa.set</span></code><a class="headerlink" href="#deisa-set" title="Link to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">deisa</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;cooling_factor&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">timestep</span><span class="o">=</span><span class="n">latest</span><span class="o">.</span><span class="n">t</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Publishes a timestamped feedback value from analytics so simulation bridges can
+retrieve it collectively with <code class="docutils literal notranslate"><span class="pre">Bridge.get</span></code>.</p>
+<section id="id9">
+<h4>Arguments<a class="headerlink" href="#id9" title="Link to this heading">¶</a></h4>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">key</span></code></dt><dd><p>Hashable feedback key.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">value</span></code></dt><dd><p>Python object to store.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">timestep</span></code></dt><dd><p>Timestep associated with <code class="docutils literal notranslate"><span class="pre">value</span></code>. For a given key, feedback timesteps
+must be strictly increasing. Publishing the same timestep twice, or
+publishing an older timestep after a newer one, raises <code class="docutils literal notranslate"><span class="pre">ValueError</span></code>.
+Timesteps for a key must also be mutually comparable; otherwise the order
+check raises <code class="docutils literal notranslate"><span class="pre">TypeError</span></code>.</p>
+</dd>
+</dl>
+</section>
+<section id="id10">
+<h4>Behavior<a class="headerlink" href="#id10" title="Link to this heading">¶</a></h4>
+<p><code class="docutils literal notranslate"><span class="pre">set</span></code> ensures the analytics side is connected, then stores <code class="docutils literal notranslate"><span class="pre">(timestep,</span>
+<span class="pre">value)</span></code> on the head actor’s fixed-size feedback queue for <code class="docutils literal notranslate"><span class="pre">key</span></code>. The call
+waits for the head actor to accept the value, but simulation-side observation
+is still asynchronous because bridges poll/read feedback independently of
+callback execution.</p>
+</section>
+</section>
+</section>
+<section id="callback-data-types">
+<h2>Callback data types<a class="headerlink" href="#callback-data-types" title="Link to this heading">¶</a></h2>
+<section id="windowspec">
+<h3><code class="docutils literal notranslate"><span class="pre">WindowSpec</span></code><a class="headerlink" href="#windowspec" title="Link to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;temperature&quot;</span><span class="p">)</span>
+<span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;temperature&quot;</span><span class="p">,</span> <span class="n">window_size</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">WindowSpec</span></code> describes one callback input.</p>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">name</span></code></dt><dd><p>Array name. It must match <code class="docutils literal notranslate"><span class="pre">Bridge</span></code> metadata and <code class="docutils literal notranslate"><span class="pre">Bridge.send</span></code>.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">window_size</span></code></dt><dd><p>Number of recent timesteps to pass to the callback. <code class="docutils literal notranslate"><span class="pre">None</span></code> means only the
+latest array is passed. A positive integer creates a sliding window with up
+to that many entries.</p>
+</dd>
+</dl>
+<p>The runtime allocates internal queues large enough for the largest requested
+window per array across all registered callbacks.</p>
+</section>
+<section id="deisaarray">
+<h3><code class="docutils literal notranslate"><span class="pre">DeisaArray</span></code><a class="headerlink" href="#deisaarray" title="Link to this heading">¶</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">DeisaArray</span></code> is the object passed inside callback windows.</p>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">dask</span></code></dt><dd><p>A <code class="docutils literal notranslate"><span class="pre">dask.array.Array</span></code> representing the full distributed array for one
+timestep. Use normal Dask operations, then call <code class="docutils literal notranslate"><span class="pre">compute</span></code> or <code class="docutils literal notranslate"><span class="pre">persist</span></code>
+when you want execution.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">t</span></code></dt><dd><p>Integer timestep associated with the array.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">to_hdf5(fname,</span> <span class="pre">dataset)</span></code></dt><dd><p>Convenience method that writes this array to an HDF5 virtual dataset.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">to_zarr(...)</span></code></dt><dd><p>Convenience wrapper around <code class="docutils literal notranslate"><span class="pre">dask.array.to_zarr</span></code>. The array is persisted
+before writing.</p>
+</dd>
+</dl>
+</section>
+<section id="to-hdf5">
+<h3><code class="docutils literal notranslate"><span class="pre">to_hdf5</span></code><a class="headerlink" href="#to-hdf5" title="Link to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">to_hdf5</span><span class="p">(</span>
+    <span class="s2">&quot;state.h5&quot;</span><span class="p">,</span>
+    <span class="p">{</span>
+        <span class="s2">&quot;temperature&quot;</span><span class="p">:</span> <span class="n">temperature</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span>
+        <span class="s2">&quot;pressure&quot;</span><span class="p">:</span> <span class="n">pressure</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span>
+    <span class="p">},</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>Writes one or more <code class="docutils literal notranslate"><span class="pre">DeisaArray</span></code> objects to one HDF5 file using HDF5 virtual
+datasets. Chunk payloads are written to hidden chunk files named from the final
+file, dataset name, and chunk position; the final HDF5 file links those chunks
+through VDS. Dataset names with unusual filesystem characters may produce
+awkward chunk filenames, so simple dataset names are recommended.</p>
+</section>
+</section>
+<section id="execution-guarantees-and-assumptions">
+<h2>Execution guarantees and assumptions<a class="headerlink" href="#execution-guarantees-and-assumptions" title="Link to this heading">¶</a></h2>
+<dl class="simple">
+<dt>Array names</dt><dd><p>The same array name must be used in <code class="docutils literal notranslate"><span class="pre">arrays_metadata</span></code>, <code class="docutils literal notranslate"><span class="pre">Bridge.send</span></code>,
+and <code class="docutils literal notranslate"><span class="pre">WindowSpec</span></code>. Analytics callbacks receive keyword arguments with
+those names.</p>
+</dd>
+<dt>Participating ranks</dt><dd><p>Any rank that will ever send data must instantiate a <code class="docutils literal notranslate"><span class="pre">Bridge</span></code>. The
+participating world size is fixed at startup.</p>
+</dd>
+<dt>Master bridge</dt><dd><p><code class="docutils literal notranslate"><span class="pre">bridge_id=0</span></code> must exist. It is responsible for emitting the final
+sentinel in <code class="docutils literal notranslate"><span class="pre">Bridge.close</span></code>.</p>
+</dd>
+<dt>Timestep ordering</dt><dd><p>Timesteps must be sent in non-decreasing order. The system assumes it can
+process all arrays for timestep <code class="docutils literal notranslate"><span class="pre">i</span></code> before processing timestep <code class="docutils literal notranslate"><span class="pre">i+1</span></code>.</p>
+</dd>
+<dt>Window ordering</dt><dd><p>Callback windows are ordered oldest to newest. The most recent item is
+<code class="docutils literal notranslate"><span class="pre">window[-1]</span></code>.</p>
+</dd>
+<dt>Collective operations</dt><dd><p>Bridge construction with the default communicator and <code class="docutils literal notranslate"><span class="pre">Bridge.close</span></code> are
+collective over participating bridges. <code class="docutils literal notranslate"><span class="pre">Bridge.get</span></code> is also collective
+when a communicator is used because bridge <code class="docutils literal notranslate"><span class="pre">0</span></code> broadcasts the lookup
+result. All participating bridges must enter these operations in compatible
+order.</p>
+</dd>
+<dt>Feedback ordering</dt><dd><p><code class="docutils literal notranslate"><span class="pre">Deisa.set</span></code> stores timestamped feedback in per-key queues. For each key,
+feedback timesteps must be strictly increasing. <code class="docutils literal notranslate"><span class="pre">Bridge.get</span></code> returns
+<code class="docutils literal notranslate"><span class="pre">None</span></code> for missing values, and may miss values that are too old for the
+retained queue.</p>
+</dd>
+<dt>Data locality</dt><dd><p><code class="docutils literal notranslate"><span class="pre">Bridge.send</span></code> stores chunks in Ray’s object store under the local
+scheduling actor. Dask graphs are then scheduled by Ray, with optional
+experimental distributed scheduling controlled by project configuration.</p>
+</dd>
+</dl>
+</section>
+<section id="current-limitations">
+<h2>Current limitations<a class="headerlink" href="#current-limitations" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>Feedback is for small Python objects. Distributed-array feedback from
+analytics back to simulation is not part of the current user API.</p></li>
+<li><p>External storage for <code class="docutils literal notranslate"><span class="pre">Bridge.send(...,</span> <span class="pre">store_externally=True)</span></code> is not
+implemented.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Bridge.send</span></code> expects CPU <code class="docutils literal notranslate"><span class="pre">numpy.ndarray</span></code> inputs.</p></li>
+<li><p>The theoretical <code class="docutils literal notranslate"><span class="pre">deisa-core</span></code> API includes protocol methods such as
+<code class="docutils literal notranslate"><span class="pre">get_array</span></code>, <code class="docutils literal notranslate"><span class="pre">delete</span></code>, and <code class="docutils literal notranslate"><span class="pre">close</span></code> on the analytics object. Those are
+not the concrete user API of this Ray implementation today.</p></li>
+</ul>
+</section>
+<section id="minimal-end-to-end-shape">
+<h2>Minimal end-to-end shape<a class="headerlink" href="#minimal-end-to-end-shape" title="Link to this heading">¶</a></h2>
+<p>Simulation:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">bridge</span> <span class="o">=</span> <span class="n">Bridge</span><span class="p">(</span>
+    <span class="n">bridge_id</span><span class="o">=</span><span class="n">rank</span><span class="p">,</span>
+    <span class="n">arrays_metadata</span><span class="o">=</span><span class="p">{</span>
+        <span class="s2">&quot;temperature&quot;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">&quot;chunk_shape&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">),</span>
+            <span class="s2">&quot;nb_chunks_per_dim&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span>
+            <span class="s2">&quot;nb_chunks_of_node&quot;</span><span class="p">:</span> <span class="mi">4</span><span class="p">,</span>
+            <span class="s2">&quot;dtype&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span>
+            <span class="s2">&quot;chunk_position&quot;</span><span class="p">:</span> <span class="n">chunk_position</span><span class="p">,</span>
+        <span class="p">},</span>
+    <span class="p">},</span>
+    <span class="n">system_metadata</span><span class="o">=</span><span class="p">{</span>
+        <span class="s2">&quot;world_size&quot;</span><span class="p">:</span> <span class="n">world_size</span><span class="p">,</span>
+        <span class="s2">&quot;master_address&quot;</span><span class="p">:</span> <span class="s2">&quot;127.0.0.1&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;master_port&quot;</span><span class="p">:</span> <span class="mi">29500</span><span class="p">,</span>
+    <span class="p">},</span>
+<span class="p">)</span>
+
+<span class="k">for</span> <span class="n">timestep</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">):</span>
+    <span class="n">bridge</span><span class="o">.</span><span class="n">send</span><span class="p">(</span>
+        <span class="n">array_name</span><span class="o">=</span><span class="s2">&quot;temperature&quot;</span><span class="p">,</span>
+        <span class="n">chunk</span><span class="o">=</span><span class="n">make_temperature_chunk</span><span class="p">(</span><span class="n">timestep</span><span class="p">),</span>
+        <span class="n">timestep</span><span class="o">=</span><span class="n">timestep</span><span class="p">,</span>
+    <span class="p">)</span>
+
+<span class="n">bridge</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">timestep</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Analytics:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">deisa</span> <span class="o">=</span> <span class="n">Deisa</span><span class="p">()</span>
+
+<span class="nd">@deisa</span><span class="o">.</span><span class="n">callback</span><span class="p">(</span><span class="n">WindowSpec</span><span class="p">(</span><span class="s2">&quot;temperature&quot;</span><span class="p">,</span> <span class="n">window_size</span><span class="o">=</span><span class="mi">3</span><span class="p">))</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">analyze_temperature</span><span class="p">(</span><span class="n">temperature</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">]):</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">temperature</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="k">return</span>
+
+    <span class="n">newest</span> <span class="o">=</span> <span class="n">temperature</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">mean_value</span> <span class="o">=</span> <span class="n">newest</span><span class="o">.</span><span class="n">dask</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;timestep&quot;</span><span class="p">,</span> <span class="n">newest</span><span class="o">.</span><span class="n">t</span><span class="p">,</span> <span class="s2">&quot;mean&quot;</span><span class="p">,</span> <span class="n">mean_value</span><span class="p">)</span>
+
+<span class="n">deisa</span><span class="o">.</span><span class="n">execute_callbacks</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="tips.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">Tips</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="analytics.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">Analytics</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2025, Andres Bermeo Marinelli
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">User API</a><ul>
+<li><a class="reference internal" href="#main-imports">Main imports</a></li>
+<li><a class="reference internal" href="#simulation-side-api">Simulation-side API</a><ul>
+<li><a class="reference internal" href="#bridge"><code class="docutils literal notranslate"><span class="pre">Bridge</span></code></a><ul>
+<li><a class="reference internal" href="#arguments">Arguments</a></li>
+<li><a class="reference internal" href="#behavior">Behavior</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#bridge-send"><code class="docutils literal notranslate"><span class="pre">Bridge.send</span></code></a><ul>
+<li><a class="reference internal" href="#id1">Arguments</a></li>
+<li><a class="reference internal" href="#id2">Behavior</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#bridge-close"><code class="docutils literal notranslate"><span class="pre">Bridge.close</span></code></a></li>
+<li><a class="reference internal" href="#bridge-get"><code class="docutils literal notranslate"><span class="pre">Bridge.get</span></code></a><ul>
+<li><a class="reference internal" href="#id3">Arguments</a></li>
+<li><a class="reference internal" href="#id4">Behavior</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#analytics-side-api">Analytics-side API</a><ul>
+<li><a class="reference internal" href="#deisa"><code class="docutils literal notranslate"><span class="pre">Deisa</span></code></a><ul>
+<li><a class="reference internal" href="#id5">Arguments</a></li>
+<li><a class="reference internal" href="#id6">Behavior</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#deisa-register-callback"><code class="docutils literal notranslate"><span class="pre">Deisa.register_callback</span></code></a><ul>
+<li><a class="reference internal" href="#id7">Arguments</a></li>
+<li><a class="reference internal" href="#returns">Returns</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#deisa-callback"><code class="docutils literal notranslate"><span class="pre">Deisa.callback</span></code></a></li>
+<li><a class="reference internal" href="#deisa-execute-callbacks"><code class="docutils literal notranslate"><span class="pre">Deisa.execute_callbacks</span></code></a><ul>
+<li><a class="reference internal" href="#id8">Behavior</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#deisa-set"><code class="docutils literal notranslate"><span class="pre">Deisa.set</span></code></a><ul>
+<li><a class="reference internal" href="#id9">Arguments</a></li>
+<li><a class="reference internal" href="#id10">Behavior</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#callback-data-types">Callback data types</a><ul>
+<li><a class="reference internal" href="#windowspec"><code class="docutils literal notranslate"><span class="pre">WindowSpec</span></code></a></li>
+<li><a class="reference internal" href="#deisaarray"><code class="docutils literal notranslate"><span class="pre">DeisaArray</span></code></a></li>
+<li><a class="reference internal" href="#to-hdf5"><code class="docutils literal notranslate"><span class="pre">to_hdf5</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#execution-guarantees-and-assumptions">Execution guarantees and assumptions</a></li>
+<li><a class="reference internal" href="#current-limitations">Current limitations</a></li>
+<li><a class="reference internal" href="#minimal-end-to-end-shape">Minimal end-to-end shape</a></li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/scripts/furo.js?v=46bd48cc"></script>
+    </body>
+</html>
