@@ -261,6 +261,7 @@
     <span class="n">ActorID</span><span class="p">,</span>
     <span class="n">DeisaArray</span><span class="p">,</span>
     <span class="n">RayActorHandle</span><span class="p">,</span>
+    <span class="n">Timestep</span><span class="p">,</span>
     <span class="n">WindowSpec</span><span class="p">,</span>
     <span class="n">_CallbackConfig</span><span class="p">,</span>
 <span class="p">)</span>
@@ -295,6 +296,7 @@
         <span class="o">*</span><span class="p">,</span>
         <span class="n">ray_start</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[],</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">max_simulation_ahead</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+        <span class="n">feedback_queue_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1024</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Initialize handler state without touching Ray.</span>
@@ -320,6 +322,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">registered_callbacks</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">_CallbackConfig</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">queue_per_array</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">deque</span><span class="p">]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">max_simulation_ahead</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">max_simulation_ahead</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">feedback_queue_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">feedback_queue_size</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">has_new_timestep</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">bool</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">has_seen_array</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">bool</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">queue_per_array</span> <span class="o">=</span> <span class="p">{}</span>
@@ -330,21 +333,14 @@
 
 <span class="sd">        Notes</span>
 <span class="sd">        -----</span>
-<span class="sd">        Starts Ray (if needed), configures Dask to use the correct scheduler,</span>
-<span class="sd">        creates the head actor, and exchanges configuration so that</span>
-<span class="sd">        scheduling actors can register themselves.</span>
+<span class="sd">        Starts Ray (if needed), creates the head actor, and exchanges</span>
+<span class="sd">        configuration so that scheduling actors can register themselves.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_connected</span><span class="p">:</span>
             <span class="k">return</span>
 
         <span class="c1"># Side effects begin here (only once)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_ray_start</span><span class="p">()</span>
-
-        <span class="c1"># configure dask here if it must reflect actual cluster runtime</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_experimental_distributed_scheduling_enabled</span><span class="p">:</span>
-            <span class="n">dask</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">scheduler</span><span class="o">=</span><span class="n">deisa_ray_get</span><span class="p">,</span> <span class="n">shuffle</span><span class="o">=</span><span class="s2">&quot;tasks&quot;</span><span class="p">)</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">dask</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">scheduler</span><span class="o">=</span><span class="n">ray_dask_get</span><span class="p">,</span> <span class="n">shuffle</span><span class="o">=</span><span class="s2">&quot;tasks&quot;</span><span class="p">)</span>
 
         <span class="c1"># head is created</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_create_head_actor</span><span class="p">()</span>
@@ -356,6 +352,18 @@
         <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_connected</span> <span class="o">=</span> <span class="kc">True</span>
 
+    <span class="k">def</span><span class="w"> </span><span class="nf">_dask_config</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the Dask scheduler config needed while executing analytics callbacks.</span>
+
+<span class="sd">        The scheduler is intentionally scoped by callers with Dask&#39;s config</span>
+<span class="sd">        context manager. Leaving it set globally in the driver process leaks</span>
+<span class="sd">        into unrelated Dask computations in later tests or user code.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_experimental_distributed_scheduling_enabled</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">dask</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">scheduler</span><span class="o">=</span><span class="n">deisa_ray_get</span><span class="p">,</span> <span class="n">shuffle</span><span class="o">=</span><span class="s2">&quot;tasks&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">dask</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">scheduler</span><span class="o">=</span><span class="n">ray_dask_get</span><span class="p">,</span> <span class="n">shuffle</span><span class="o">=</span><span class="s2">&quot;tasks&quot;</span><span class="p">)</span>
+
     <span class="k">def</span><span class="w"> </span><span class="nf">_create_head_actor</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Instantiate the head actor that coordinates array delivery.</span>
@@ -366,7 +374,8 @@
 <span class="sd">        with a detached lifetime so that analytics can connect later.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">head</span> <span class="o">=</span> <span class="n">HeadNodeActor</span><span class="o">.</span><span class="n">options</span><span class="p">(</span><span class="o">**</span><span class="n">get_head_actor_options</span><span class="p">())</span><span class="o">.</span><span class="n">remote</span><span class="p">(</span>
-            <span class="n">max_simulation_ahead</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">max_simulation_ahead</span>
+            <span class="n">max_simulation_ahead</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">max_simulation_ahead</span><span class="p">,</span>
+            <span class="n">feedback_queue_size</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">feedback_queue_size</span><span class="p">,</span>
         <span class="p">)</span>
 
 <div class="viewcode-block" id="Deisa.callback">
@@ -514,97 +523,100 @@
         <span class="c1"># ensure connected to ray cluster</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_ensure_connected</span><span class="p">()</span>
 
-        <span class="c1"># signal analytics ready to start</span>
-        <span class="n">ray</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">head</span><span class="o">.</span><span class="n">set_analytics_ready_for_execution</span><span class="o">.</span><span class="n">remote</span><span class="p">())</span>
-        <span class="c1"># ray.get(self.head.wait_for_bridges_ready.remote())</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dask_config</span><span class="p">():</span>
+            <span class="c1"># signal analytics ready to start</span>
+            <span class="n">ray</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">head</span><span class="o">.</span><span class="n">set_analytics_ready_for_execution</span><span class="o">.</span><span class="n">remote</span><span class="p">())</span>
+            <span class="c1"># ray.get(self.head.wait_for_bridges_ready.remote())</span>
 
-        <span class="c1"># TODO: test</span>
-        <span class="c1"># raise error and kill analytics</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">registered_callbacks</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Please register at least one callback before calling execute_callbacks()&quot;</span><span class="p">)</span>
+            <span class="c1"># TODO: test</span>
+            <span class="c1"># raise error and kill analytics</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">registered_callbacks</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Please register at least one callback before calling execute_callbacks()&quot;</span><span class="p">)</span>
 
-        <span class="c1"># generate one queue per array which cleanly handles the window size</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">generate_queue_per_array</span><span class="p">()</span>
+            <span class="c1"># generate one queue per array which cleanly handles the window size</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">generate_queue_per_array</span><span class="p">()</span>
 
-        <span class="c1"># get first array to kickstart the process</span>
-        <span class="c1"># - Add to queue, mark as new timestep arrived</span>
-        <span class="n">name</span><span class="p">,</span> <span class="n">arr_timestep</span><span class="p">,</span> <span class="n">array</span> <span class="o">=</span> <span class="n">ray</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">head</span><span class="o">.</span><span class="n">get_next_array</span><span class="o">.</span><span class="n">remote</span><span class="p">())</span>
-        <span class="k">if</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;__deisa_last_iteration_array&quot;</span><span class="p">:</span>
-            <span class="k">return</span>
+            <span class="c1"># get first array to kickstart the process</span>
+            <span class="c1"># - Add to queue, mark as new timestep arrived</span>
+            <span class="n">name</span><span class="p">,</span> <span class="n">arr_timestep</span><span class="p">,</span> <span class="n">array</span> <span class="o">=</span> <span class="n">ray</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">head</span><span class="o">.</span><span class="n">get_next_array</span><span class="o">.</span><span class="n">remote</span><span class="p">())</span>
+            <span class="k">if</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;__deisa_last_iteration_array&quot;</span><span class="p">:</span>
+                <span class="k">return</span>
 
-        <span class="n">queue</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">queue_per_array</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">queue</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">queue</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">DeisaArray</span><span class="p">(</span><span class="n">dask</span><span class="o">=</span><span class="n">array</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="n">arr_timestep</span><span class="p">))</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">has_new_timestep</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">has_seen_array</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="n">queue</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">queue_per_array</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">queue</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">queue</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">DeisaArray</span><span class="p">(</span><span class="n">dask</span><span class="o">=</span><span class="n">array</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="n">arr_timestep</span><span class="p">))</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">has_new_timestep</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">has_seen_array</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
 
-        <span class="n">end_reached</span> <span class="o">=</span> <span class="kc">False</span>
-        <span class="k">while</span> <span class="ow">not</span> <span class="n">end_reached</span><span class="p">:</span>
-            <span class="c1"># inner while loop stops once a bigger timestep has been pushed to queue</span>
-            <span class="c1"># WARNING: Big assumption is that it is impossible for any array in timestep i+1 to be placed</span>
-            <span class="c1"># BEFORE timestep i. This is violated in embarrassingly parallel workflows where each rank can go ahead</span>
-            <span class="c1"># independently. Without this assumption, it would be much more complex to determine a good moment to analyze</span>
-            <span class="c1"># which callbacks should be called - as such, memory handling and flow execution become difficult to</span>
-            <span class="c1"># guarantee.</span>
-            <span class="n">current_timestep</span> <span class="o">=</span> <span class="n">arr_timestep</span>
-            <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
-                <span class="n">name</span><span class="p">,</span> <span class="n">arr_timestep</span><span class="p">,</span> <span class="n">array</span> <span class="o">=</span> <span class="n">ray</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">head</span><span class="o">.</span><span class="n">get_next_array</span><span class="o">.</span><span class="n">remote</span><span class="p">())</span>
-                <span class="c1"># guarantee sequential flow of data.</span>
-                <span class="c1"># TODO add test</span>
-                <span class="k">if</span> <span class="n">arr_timestep</span> <span class="o">&lt;</span> <span class="n">current_timestep</span><span class="p">:</span>
-                    <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
-                        <span class="sa">f</span><span class="s2">&quot;Logical flow of data was violated. Timestep </span><span class="si">{</span><span class="n">arr_timestep</span><span class="si">}</span><span class="s2"> sent after timestep </span><span class="si">{</span><span class="n">current_timestep</span><span class="si">}</span><span class="s2">. Exiting...&quot;</span>
-                    <span class="p">)</span>
-                <span class="k">if</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;__deisa_last_iteration_array&quot;</span><span class="p">:</span>
-                    <span class="n">end_reached</span> <span class="o">=</span> <span class="kc">True</span>
-                    <span class="k">break</span>
-                <span class="c1"># simulation has produced a higher timestep -&gt; process all arrays for current_timestep</span>
-                <span class="k">if</span> <span class="n">arr_timestep</span> <span class="o">&gt;</span> <span class="n">current_timestep</span><span class="p">:</span>
-                    <span class="k">break</span>
+            <span class="n">end_reached</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="k">while</span> <span class="ow">not</span> <span class="n">end_reached</span><span class="p">:</span>
+                <span class="c1"># inner while loop stops once a bigger timestep has been pushed to queue</span>
+                <span class="c1"># WARNING: Big assumption is that it is impossible for any array in timestep i+1 to be placed</span>
+                <span class="c1"># BEFORE timestep i. This is violated in embarrassingly parallel workflows where each rank can go ahead</span>
+                <span class="c1"># independently. Without this assumption, it would be much more complex to determine a good moment to analyze</span>
+                <span class="c1"># which callbacks should be called - as such, memory handling and flow execution become difficult to</span>
+                <span class="c1"># guarantee.</span>
+                <span class="n">current_timestep</span> <span class="o">=</span> <span class="n">arr_timestep</span>
+                <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+                    <span class="n">name</span><span class="p">,</span> <span class="n">arr_timestep</span><span class="p">,</span> <span class="n">array</span> <span class="o">=</span> <span class="n">ray</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">head</span><span class="o">.</span><span class="n">get_next_array</span><span class="o">.</span><span class="n">remote</span><span class="p">())</span>
+                    <span class="c1"># guarantee sequential flow of data.</span>
+                    <span class="c1"># TODO add test</span>
+                    <span class="k">if</span> <span class="n">arr_timestep</span> <span class="o">&lt;</span> <span class="n">current_timestep</span><span class="p">:</span>
+                        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                            <span class="sa">f</span><span class="s2">&quot;Logical flow of data was violated. Timestep </span><span class="si">{</span><span class="n">arr_timestep</span><span class="si">}</span><span class="s2"> sent after timestep </span><span class="si">{</span><span class="n">current_timestep</span><span class="si">}</span><span class="s2">. Exiting...&quot;</span>
+                        <span class="p">)</span>
+                    <span class="k">if</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;__deisa_last_iteration_array&quot;</span><span class="p">:</span>
+                        <span class="n">end_reached</span> <span class="o">=</span> <span class="kc">True</span>
+                        <span class="k">break</span>
+                    <span class="c1"># simulation has produced a higher timestep -&gt; process all arrays for current_timestep</span>
+                    <span class="k">if</span> <span class="n">arr_timestep</span> <span class="o">&gt;</span> <span class="n">current_timestep</span><span class="p">:</span>
+                        <span class="k">break</span>
 
-                <span class="n">queue</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">queue_per_array</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
-                <span class="k">if</span> <span class="n">queue</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-                    <span class="n">queue</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">DeisaArray</span><span class="p">(</span><span class="n">dask</span><span class="o">=</span><span class="n">array</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="n">arr_timestep</span><span class="p">))</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">has_new_timestep</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">has_seen_array</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+                    <span class="n">queue</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">queue_per_array</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">queue</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                        <span class="n">queue</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">DeisaArray</span><span class="p">(</span><span class="n">dask</span><span class="o">=</span><span class="n">array</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="n">arr_timestep</span><span class="p">))</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">has_new_timestep</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">has_seen_array</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
 
-            <span class="c1"># inspect what callbacks can be called</span>
-            <span class="k">for</span> <span class="n">cb_cfg</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">registered_callbacks</span><span class="p">:</span>
-                <span class="n">simulation_callback</span> <span class="o">=</span> <span class="n">cb_cfg</span><span class="o">.</span><span class="n">simulation_callback</span>
-                <span class="n">description_arrays_needed</span> <span class="o">=</span> <span class="n">cb_cfg</span><span class="o">.</span><span class="n">arrays_description</span>
-                <span class="n">exception_handler</span> <span class="o">=</span> <span class="n">cb_cfg</span><span class="o">.</span><span class="n">exception_handler</span>
-                <span class="n">when</span> <span class="o">=</span> <span class="n">cb_cfg</span><span class="o">.</span><span class="n">when</span>
+                <span class="c1"># inspect what callbacks can be called</span>
+                <span class="k">for</span> <span class="n">cb_cfg</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">registered_callbacks</span><span class="p">:</span>
+                    <span class="n">simulation_callback</span> <span class="o">=</span> <span class="n">cb_cfg</span><span class="o">.</span><span class="n">simulation_callback</span>
+                    <span class="n">description_arrays_needed</span> <span class="o">=</span> <span class="n">cb_cfg</span><span class="o">.</span><span class="n">arrays_description</span>
+                    <span class="n">exception_handler</span> <span class="o">=</span> <span class="n">cb_cfg</span><span class="o">.</span><span class="n">exception_handler</span>
+                    <span class="n">when</span> <span class="o">=</span> <span class="n">cb_cfg</span><span class="o">.</span><span class="n">when</span>
 
-                <span class="n">should_call</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">should_call</span><span class="p">(</span><span class="n">description_arrays_needed</span><span class="p">,</span> <span class="n">when</span><span class="p">)</span>
-                <span class="k">if</span> <span class="n">should_call</span><span class="p">:</span>
-                    <span class="c1"># Compute the arrays to pass to the callback</span>
-                    <span class="n">callback_args</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">]]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">determine_callback_args</span><span class="p">(</span><span class="n">description_arrays_needed</span><span class="p">)</span>
-                    <span class="k">try</span><span class="p">:</span>
-                        <span class="n">simulation_callback</span><span class="p">(</span><span class="o">**</span><span class="n">callback_args</span><span class="p">)</span>
-                    <span class="k">except</span> <span class="ne">TimeoutError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-                        <span class="k">raise</span> <span class="n">e</span>
-                    <span class="k">except</span> <span class="ne">AssertionError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-                        <span class="k">raise</span> <span class="n">e</span>
-                    <span class="k">except</span> <span class="ne">BaseException</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                    <span class="n">should_call</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">should_call</span><span class="p">(</span><span class="n">description_arrays_needed</span><span class="p">,</span> <span class="n">when</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">should_call</span><span class="p">:</span>
+                        <span class="c1"># Compute the arrays to pass to the callback</span>
+                        <span class="n">callback_args</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">DeisaArray</span><span class="p">]]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">determine_callback_args</span><span class="p">(</span>
+                            <span class="n">description_arrays_needed</span>
+                        <span class="p">)</span>
                         <span class="k">try</span><span class="p">:</span>
-                            <span class="n">exception_handler</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+                            <span class="n">simulation_callback</span><span class="p">(</span><span class="o">**</span><span class="n">callback_args</span><span class="p">)</span>
+                        <span class="k">except</span> <span class="ne">TimeoutError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                            <span class="k">raise</span> <span class="n">e</span>
+                        <span class="k">except</span> <span class="ne">AssertionError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                            <span class="k">raise</span> <span class="n">e</span>
                         <span class="k">except</span> <span class="ne">BaseException</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-                            <span class="n">_default_exception_handler</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+                            <span class="k">try</span><span class="p">:</span>
+                                <span class="n">exception_handler</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+                            <span class="k">except</span> <span class="ne">BaseException</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                                <span class="n">_default_exception_handler</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
 
-                    <span class="k">del</span> <span class="n">callback_args</span>
-                    <span class="n">gc</span><span class="o">.</span><span class="n">collect</span><span class="p">()</span>
+                        <span class="k">del</span> <span class="n">callback_args</span>
+                        <span class="n">gc</span><span class="o">.</span><span class="n">collect</span><span class="p">()</span>
 
-            <span class="c1"># set all new timesteps to be false</span>
-            <span class="k">for</span> <span class="n">queue</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">has_new_timestep</span><span class="p">:</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">has_new_timestep</span><span class="p">[</span><span class="n">queue</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
+                <span class="c1"># set all new timesteps to be false</span>
+                <span class="k">for</span> <span class="n">queue</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">has_new_timestep</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">has_new_timestep</span><span class="p">[</span><span class="n">queue</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
 
-            <span class="c1"># add the first &quot;bigger&quot; timestep back into queue and set new_timestep flag</span>
-            <span class="k">if</span> <span class="ow">not</span> <span class="n">end_reached</span><span class="p">:</span>
-                <span class="n">queue</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">queue_per_array</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
-                <span class="k">if</span> <span class="n">queue</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-                    <span class="n">queue</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">DeisaArray</span><span class="p">(</span><span class="n">dask</span><span class="o">=</span><span class="n">array</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="n">arr_timestep</span><span class="p">))</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">has_new_timestep</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">has_seen_array</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span></div>
+                <span class="c1"># add the first &quot;bigger&quot; timestep back into queue and set new_timestep flag</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">end_reached</span><span class="p">:</span>
+                    <span class="n">queue</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">queue_per_array</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">queue</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                        <span class="n">queue</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">DeisaArray</span><span class="p">(</span><span class="n">dask</span><span class="o">=</span><span class="n">array</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="n">arr_timestep</span><span class="p">))</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">has_new_timestep</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">has_seen_array</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span></div>
 
 
 <div class="viewcode-block" id="Deisa.determine_callback_args">
@@ -661,44 +673,38 @@
             <span class="k">return</span> <span class="nb">all</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">has_seen_array</span><span class="p">[</span><span class="n">n</span><span class="p">]</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">names</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">any</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">has_new_timestep</span><span class="p">[</span><span class="n">n</span><span class="p">]</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">names</span><span class="p">)</span></div>
 
 
-    <span class="c1"># TODO add persist</span>
 <div class="viewcode-block" id="Deisa.set">
 <a class="viewcode-back" href="../../../deisa.ray.window_handler.html#deisa.ray.window_handler.Deisa.set">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">set</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="n">Hashable</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">chunked</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">persist</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">key</span><span class="p">:</span> <span class="n">Hashable</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="n">timestep</span><span class="p">:</span> <span class="n">Timestep</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Broadcast a feedback value to all scheduling actors.</span>
+<span class="sd">        Publish a feedback value for bridges.</span>
 
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
 <span class="sd">        key : Hashable</span>
 <span class="sd">            Identifier for the shared value.</span>
 <span class="sd">        value : Any</span>
-<span class="sd">            Value to distribute.</span>
-<span class="sd">        chunked : bool, optional</span>
-<span class="sd">            Placeholder for future distributed-array feedback. Only ``False``</span>
-<span class="sd">            is supported today. Default is ``False``.</span>
-<span class="sd">        persist : bool, optional</span>
-<span class="sd">            Whether the value should survive the next retrieval.</span>
-<span class="sd">            Defaults to ``False``.</span>
+<span class="sd">            Value to store.</span>
+<span class="sd">        timestep : Hashable</span>
+<span class="sd">            Timestep associated with ``value``.</span>
 
 <span class="sd">        Notes</span>
 <span class="sd">        -----</span>
-<span class="sd">        The method lazily fetches node actors once and uses fire-and-forget</span>
-<span class="sd">        remote calls; callers should not assume synchronous delivery.</span>
+<span class="sd">        Timestamped values are stored in a fixed-size queue on the head actor.</span>
+<span class="sd">        For a given key, timesteps must be strictly increasing; publishing the</span>
+<span class="sd">        same timestep twice or publishing an older timestep raises</span>
+<span class="sd">        :class:`ValueError`.</span>
+<span class="sd">        Bridges retrieve them collectively with</span>
+<span class="sd">        ``bridge.get(&quot;foo&quot;, timestep=t)``.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="c1"># TODO test</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">node_actors</span><span class="p">:</span>
-            <span class="c1"># retrieve node actors at least once</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">node_actors</span> <span class="o">=</span> <span class="n">ray</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">head</span><span class="o">.</span><span class="n">list_scheduling_actors</span><span class="o">.</span><span class="n">remote</span><span class="p">())</span>
-
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">chunked</span><span class="p">:</span>
-            <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">handle</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">node_actors</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-                <span class="c1"># set the value inside each node actor</span>
-                <span class="c1"># TODO: does it need to be blocking?</span>
-                <span class="n">handle</span><span class="o">.</span><span class="n">set</span><span class="o">.</span><span class="n">remote</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">chunked</span><span class="p">,</span> <span class="n">persist</span><span class="p">)</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="c1"># TODO: implement chunked version</span>
-            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_ensure_connected</span><span class="p">()</span>
+        <span class="n">ray</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">head</span><span class="o">.</span><span class="n">set_feedback</span><span class="o">.</span><span class="n">remote</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">timestep</span><span class="p">,</span> <span class="n">value</span><span class="p">))</span></div>
 </div>
 
 </pre></div>

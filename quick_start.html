@@ -431,6 +431,51 @@ access its timestep.</p>
 </pre></div>
 </div>
 </section>
+<section id="feedback-from-analytics-to-simulation">
+<h2>Feedback from analytics to simulation<a class="headerlink" href="#feedback-from-analytics-to-simulation" title="Link to this heading">¶</a></h2>
+<p>Analytics callbacks can publish small timestamped feedback values that the
+simulation can retrieve collectively through the bridges.</p>
+<p>On the analytics side, call <code class="docutils literal notranslate"><span class="pre">Deisa.set</span></code> with a key, value, and timestep:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">summary_callback</span><span class="p">(</span><span class="n">temperature_window</span><span class="p">):</span>
+    <span class="n">latest</span> <span class="o">=</span> <span class="n">temperature_window</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">mean_value</span> <span class="o">=</span> <span class="n">latest</span><span class="o">.</span><span class="n">dask</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">mean_value</span> <span class="o">&gt;</span> <span class="mi">10</span><span class="p">:</span>
+        <span class="n">deisa</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;cooling_factor&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">timestep</span><span class="o">=</span><span class="n">latest</span><span class="o">.</span><span class="n">t</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>For a given key, feedback timesteps must be published in strictly increasing
+order. Publishing the same timestep twice or publishing an older timestep raises
+<code class="docutils literal notranslate"><span class="pre">ValueError</span></code>.</p>
+<p>On the simulation side, every bridge must call <code class="docutils literal notranslate"><span class="pre">Bridge.get</span></code> in the same order
+for a given key and timestep. Bridge <code class="docutils literal notranslate"><span class="pre">0</span></code> checks the global feedback queue and
+broadcasts the result to the other bridges. If the value is not available, all
+bridges receive <code class="docutils literal notranslate"><span class="pre">None</span></code>. <code class="docutils literal notranslate"><span class="pre">Bridge.get</span></code> does not accept a <code class="docutils literal notranslate"><span class="pre">default</span></code> value;
+apply any simulation-side fallback after the call.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">factor</span> <span class="o">=</span> <span class="n">bridge</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;cooling_factor&quot;</span><span class="p">,</span> <span class="n">timestep</span><span class="o">=</span><span class="n">t</span><span class="p">)</span>
+<span class="k">if</span> <span class="n">factor</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="n">factor</span> <span class="o">=</span> <span class="mf">1.0</span>
+</pre></div>
+</div>
+<p>Calling <code class="docutils literal notranslate"><span class="pre">Bridge.get(&quot;cooling_factor&quot;)</span></code> without a timestep returns the
+retained feedback queue for that key as a list of <code class="docutils literal notranslate"><span class="pre">(timestep,</span> <span class="pre">value)</span></code> pairs,
+or <code class="docutils literal notranslate"><span class="pre">None</span></code> if no feedback has been published for the key.</p>
+<p>Feedback is meant for timesteps where the simulation can still react. Analytics
+callbacks are evaluated once DEISA has seen a later timestep, or the simulation
+close sentinel, so feedback for the final simulated timestep may only become
+visible during shutdown. Simulations should not rely on reacting to analytics
+events detected at the last timestep.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Feedback delivery is asynchronous and is not reproducible run to run. The
+feedback queue may be populated at slightly different times, and bridges may
+read it at slightly different times, so the timestep at which the simulation
+observes an analytics event can vary. Simulation correctness should not
+depend on exactly when a feedback event is detected. Instead, simulation code
+should decide how to react whenever a signal becomes available. If tight,
+deterministic coupling is required, consider using a code coupler instead.</p>
+</div>
+</section>
 <section id="where-to-go-next">
 <h2>Where to go next<a class="headerlink" href="#where-to-go-next" title="Link to this heading">¶</a></h2>
 <ul class="simple">
@@ -505,6 +550,7 @@ access its timestep.</p>
 <li><a class="reference internal" href="#simulation-quick-snippet">Simulation quick snippet</a></li>
 <li><a class="reference internal" href="#analytics-quick-snippet">Analytics quick snippet</a></li>
 <li><a class="reference internal" href="#using-windowspec-with-a-sliding-window">Using <code class="docutils literal notranslate"><span class="pre">WindowSpec</span></code> with a sliding window</a></li>
+<li><a class="reference internal" href="#feedback-from-analytics-to-simulation">Feedback from analytics to simulation</a></li>
 <li><a class="reference internal" href="#where-to-go-next">Where to go next</a></li>
 </ul>
 </li>
