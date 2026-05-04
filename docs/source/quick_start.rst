@@ -196,6 +196,59 @@ access its timestep.
         )
         midpoint_estimate.compute()
 
+Feedback from analytics to simulation
+-------------------------------------
+
+Analytics callbacks can publish small timestamped feedback values that the
+simulation can retrieve collectively through the bridges.
+
+On the analytics side, call ``Deisa.set`` with a key, value, and timestep:
+
+.. code-block:: python
+
+    def summary_callback(temperature_window):
+        latest = temperature_window[-1]
+        mean_value = latest.dask.mean().compute()
+
+        if mean_value > 10:
+            deisa.set("cooling_factor", value=0.5, timestep=latest.t)
+
+For a given key, feedback timesteps must be published in strictly increasing
+order. Publishing the same timestep twice or publishing an older timestep raises
+``ValueError``.
+
+On the simulation side, every bridge must call ``Bridge.get`` in the same order
+for a given key and timestep. Bridge ``0`` checks the global feedback queue and
+broadcasts the result to the other bridges. If the value is not available, all
+bridges receive ``None``. ``Bridge.get`` does not accept a ``default`` value;
+apply any simulation-side fallback after the call.
+
+.. code-block:: python
+
+    factor = bridge.get("cooling_factor", timestep=t)
+    if factor is None:
+        factor = 1.0
+
+Calling ``Bridge.get("cooling_factor")`` without a timestep returns the
+retained feedback queue for that key as a list of ``(timestep, value)`` pairs,
+or ``None`` if no feedback has been published for the key.
+
+Feedback is meant for timesteps where the simulation can still react. Analytics
+callbacks are evaluated once DEISA has seen a later timestep, or the simulation
+close sentinel, so feedback for the final simulated timestep may only become
+visible during shutdown. Simulations should not rely on reacting to analytics
+events detected at the last timestep.
+
+.. warning::
+
+    Feedback delivery is asynchronous and is not reproducible run to run. The
+    feedback queue may be populated at slightly different times, and bridges may
+    read it at slightly different times, so the timestep at which the simulation
+    observes an analytics event can vary. Simulation correctness should not
+    depend on exactly when a feedback event is detected. Instead, simulation code
+    should decide how to react whenever a signal becomes available. If tight,
+    deterministic coupling is required, consider using a code coupler instead.
+
 Where to go next
 ----------------
 
