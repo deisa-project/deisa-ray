@@ -15,12 +15,12 @@ NB_ITERATIONS = 5
 
 @ray.remote(num_cpus=0, max_retries=0)
 def head_script() -> None:
-    from deisa.ray.types import DeisaArray, WindowSpec
+    from deisa.ray.types import DeisaArray, Window
     from deisa.ray.window_handler import Deisa
 
     d = Deisa()
 
-    @d.register(WindowSpec("array"))
+    @d.register(Window("array"))
     def simulation_callback(array: list[DeisaArray]):
         x = array[0].sum().compute()
         assert x == 10 * array[0].t

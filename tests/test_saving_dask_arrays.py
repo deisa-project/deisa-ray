@@ -26,7 +26,7 @@ def test_dask_save_hdf5(fname, enable_distributed_scheduling, ray_cluster) -> No
     def head_script(fname, enable_distributed_scheduling) -> None:
         """The head node checks that the values are correct"""
         from deisa.ray.window_handler import Deisa
-        from deisa.ray.types import WindowSpec
+        from deisa.ray.types import Window
 
         import deisa.ray as deisa
 
@@ -40,7 +40,7 @@ def test_dask_save_hdf5(fname, enable_distributed_scheduling, ray_cluster) -> No
 
         d.register_callback(
             simulation_callback,
-            [WindowSpec("array")],
+            [Window("array")],
         )
         d.execute_callbacks()
 
@@ -103,7 +103,7 @@ def test_dask_save_several_timesteps_hdf5(fname, enable_distributed_scheduling, 
     def head_script(fname, enable_distributed_scheduling) -> None:
         """The head node checks that the values are correct"""
         from deisa.ray.window_handler import Deisa
-        from deisa.ray.types import WindowSpec
+        from deisa.ray.types import Window
 
         import deisa.ray as deisa
 
@@ -116,7 +116,7 @@ def test_dask_save_several_timesteps_hdf5(fname, enable_distributed_scheduling, 
 
         d.register_callback(
             simulation_callback,
-            [WindowSpec("array")],
+            [Window("array")],
         )
         d.execute_callbacks()
 
@@ -177,7 +177,7 @@ def test_dask_save_several_arrays_hdf5(fname, enable_distributed_scheduling, ray
     def head_script(fname, enable_distributed_scheduling) -> None:
         """The head node checks that the values are correct"""
         from deisa.ray.window_handler import Deisa
-        from deisa.ray.types import WindowSpec, to_hdf5
+        from deisa.ray.types import Window, to_hdf5
 
         import deisa.ray as deisa
 
@@ -191,7 +191,7 @@ def test_dask_save_several_arrays_hdf5(fname, enable_distributed_scheduling, ray
 
         d.register_callback(
             simulation_callback,
-            [WindowSpec("a"), WindowSpec("b")],
+            [Window("a"), Window("b")],
         )
         d.execute_callbacks()
 
@@ -262,7 +262,7 @@ def test_dask_save_zarr(fname, enable_distributed_scheduling, ray_cluster) -> No
     def head_script(fname, enable_distributed_scheduling) -> None:
         """The head node checks that the values are correct"""
         from deisa.ray.window_handler import Deisa
-        from deisa.ray.types import WindowSpec
+        from deisa.ray.types import Window
 
         import deisa.ray as deisa
 
@@ -277,7 +277,7 @@ def test_dask_save_zarr(fname, enable_distributed_scheduling, ray_cluster) -> No
 
         d.register_callback(
             simulation_callback,
-            [WindowSpec("array")],
+            [Window("array")],
         )
         d.execute_callbacks()
 
@@ -335,7 +335,7 @@ def test_dask_save_netcdf_xarray(fname, enable_distributed_scheduling, ray_clust
     def head_script(fname, enable_distributed_scheduling) -> None:
         """The head node checks that the values are correct"""
         from deisa.ray.window_handler import Deisa
-        from deisa.ray.types import WindowSpec
+        from deisa.ray.types import Window
 
         import deisa.ray as deisa
         import xarray as xr
@@ -352,7 +352,7 @@ def test_dask_save_netcdf_xarray(fname, enable_distributed_scheduling, ray_clust
 
         d.register_callback(
             simulation_callback,
-            [WindowSpec("array")],
+            [Window("array")],
         )
         d.execute_callbacks()
 

@@ -175,7 +175,7 @@ class ChunkRef:
 
 
 @dataclass
-class WindowSpec:
+class Window:
     """
     Description of an array with optional windowing support.
 
@@ -413,7 +413,7 @@ def to_hdf5(fname: str, sources: dict[str, DeisaArray]) -> None:
 @dataclass
 class _CallbackConfig:
     simulation_callback: Callable
-    arrays_description: list[WindowSpec]
+    arrays_description: list[Window]
     exception_handler: Callable
     when: Literal["AND", "OR"]
 

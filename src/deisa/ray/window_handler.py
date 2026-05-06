@@ -17,7 +17,7 @@ from deisa.ray.types import (
     DeisaArray,
     RayActorHandle,
     Timestep,
-    WindowSpec,
+    Window,
     _CallbackConfig,
 )
 from deisa.ray.utils import get_head_actor_options
@@ -154,7 +154,7 @@ class Deisa:
 
         Parameters
         ----------
-        *window_specs : WindowSpec
+        *window_specs : Window
             Array descriptions the callback should receive.
         exception_handler : Optional[Callable], optional
             Handler invoked when the user callback raises. Defaults to
@@ -178,7 +178,7 @@ class Deisa:
     def register_callback(
         self,
         simulation_callback: Callable,
-        arrays_spec: list[WindowSpec],
+        arrays_spec: list[Window],
         exception_handler: Optional[Callable] = None,
         when: Literal["AND", "OR"] = "AND",
     ) -> Callable:
@@ -190,7 +190,7 @@ class Deisa:
         simulation_callback : Callable
             Function to run for each iteration; receives arrays as kwargs
             and ``timestep``.
-        arrays_spec : list[WindowSpec]
+        arrays_spec : list[Window]
             Descriptions of arrays to stream to the callback (with optional
             sliding windows).
             Maximum iterations to execute. Default is a large sentinel.
@@ -375,7 +375,7 @@ class Deisa:
 
         Parameters
         ----------
-        description_of_arrays_needed : Sequence[WindowSpec]
+        description_of_arrays_needed : Sequence[Window]
             Array descriptions requested by the callback.
 
         Returns
@@ -400,7 +400,7 @@ class Deisa:
 
         Parameters
         ----------
-        description_of_arrays_needed : Sequence[WindowSpec]
+        description_of_arrays_needed : Sequence[Window]
             Array descriptions governing the callback.
         when : Literal["AND", "OR"]
             Execution mode specifying whether all arrays or any array must have

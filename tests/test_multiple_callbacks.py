@@ -11,7 +11,7 @@ NB_ITERATIONS = 5
 def head_script(enable_distributed_scheduling, dim_sq) -> None:
     """The head node checks that the values are correct"""
     from deisa.ray.window_handler import Deisa
-    from deisa.ray.types import WindowSpec
+    from deisa.ray.types import Window
     import deisa.ray as deisa
 
     deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
@@ -33,15 +33,15 @@ def head_script(enable_distributed_scheduling, dim_sq) -> None:
 
     d.register_callback(
         simulation_callback1,
-        [WindowSpec("array")],
+        [Window("array")],
     )
     d.register_callback(
         simulation_callback2,
-        [WindowSpec("array1")],
+        [Window("array1")],
     )
     d.register_callback(
         simulation_callback3,
-        [WindowSpec("array"), WindowSpec("array1")],
+        [Window("array"), Window("array1")],
     )
     d.execute_callbacks()
 
@@ -81,24 +81,24 @@ def test_multiple_callbacks(enable_distributed_scheduling: bool, ray_cluster) ->
 def head_script2(enable_distributed_scheduling, dim_sq) -> None:
     """The head node checks that the values are correct"""
     from deisa.ray.window_handler import Deisa
-    from deisa.ray.types import WindowSpec
+    from deisa.ray.types import Window
     import deisa.ray as deisa
 
     deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
 
     d = Deisa()
 
-    @d.register(WindowSpec("array"))
+    @d.register(Window("array"))
     def simulation_callback1(array: list[DeisaArray]):
         x = array[0].sum().compute()
         assert x == (dim_sq * (dim_sq + 1) / 2) * array[0].t
 
-    @d.register(WindowSpec("array1"))
+    @d.register(Window("array1"))
     def simulation_callback2(array1: list[DeisaArray]):
         x = array1[0].sum().compute()
         assert x == (dim_sq * (dim_sq + 1) / 2) * array1[0].t
 
-    @d.register(WindowSpec("array"), WindowSpec("array1"))
+    @d.register(Window("array"), Window("array1"))
     def simulation_callback3(array: list[DeisaArray], array1: list[DeisaArray]):
         x = array[0].sum().compute()
         y = array1[0].sum().compute()

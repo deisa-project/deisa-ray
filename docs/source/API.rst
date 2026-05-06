@@ -18,7 +18,7 @@ DEISA. For a distributed array at a given timestep, all bridges that own chunks
 of that array must share their local chunk for the same timestep before DEISA
 can assemble the full Dask array seen by analytics.
 
-Callbacks see those shares through a sliding window. A ``WindowSpec`` with
+Callbacks see those shares through a sliding window. A ``Window`` with
 ``window_size=N`` gives the callback up to the most recent ``N`` shared
 timesteps for that array, ordered oldest to newest. This is what lets analysis
 code combine data across time, for example comparing the newest field with the
@@ -41,7 +41,7 @@ Main imports
 
     from deisa.ray.bridge import Bridge
     from deisa.ray.window_handler import Deisa
-    from deisa.ray.types import DeisaArray, WindowSpec, to_hdf5
+    from deisa.ray.types import DeisaArray, Window, to_hdf5
 
 Simulation-side API
 -------------------
@@ -145,7 +145,7 @@ Arguments
 
 ``array_name``
     Name of the array. It must match a key in ``arrays_metadata`` and the
-    analytics-side ``WindowSpec`` name.
+    analytics-side ``Window`` name.
 
 ``chunk``
     A ``numpy.ndarray`` containing this bridge's local chunk. If the simulation
@@ -281,7 +281,7 @@ happen lazily when registering callbacks or executing them.
 
     deisa.register_callback(
         summary,
-        [WindowSpec("temperature", window_size=3)],
+        [Window("temperature", window_size=3)],
         when="AND",
     )
 
@@ -291,13 +291,13 @@ Arguments
 """""""""
 
 ``simulation_callback``
-    Callable that receives keyword arguments named after each ``WindowSpec``.
+    Callable that receives keyword arguments named after each ``Window``.
     Each argument is a ``list[DeisaArray]``. For ergonomic callbacks, choose
     array names that are valid Python parameter names, or write the callback to
     accept ``**kwargs``.
 
 ``arrays_spec``
-    List of ``WindowSpec`` objects describing which arrays the callback needs
+    List of ``Window`` objects describing which arrays the callback needs
     and how many timesteps should be kept for each array.
 
 ``exception_handler``
@@ -323,11 +323,11 @@ and by code that wants to keep the callable.
 
 .. code-block:: python
 
-    @deisa.register(WindowSpec("temperature"), WindowSpec("pressure"), when="OR")
+    @deisa.register(Window("temperature"), Window("pressure"), when="OR")
     def compare(temperature: list[DeisaArray], pressure: list[DeisaArray]):
         ...
 
-Decorator form of ``register_callback``. It accepts ``WindowSpec`` objects as
+Decorator form of ``register_callback``. It accepts ``Window`` objects as
 positional arguments and the same ``exception_handler`` and ``when`` keyword
 arguments.
 
@@ -393,15 +393,15 @@ callback execution.
 Callback data types
 -------------------
 
-``WindowSpec``
+``Window``
 ^^^^^^^^^^^^^^
 
 .. code-block:: python
 
-    WindowSpec("temperature")
-    WindowSpec("temperature", window_size=3)
+    Window("temperature")
+    Window("temperature", window_size=3)
 
-``WindowSpec`` describes one callback input.
+``Window`` describes one callback input.
 
 ``name``
     Array name. It must match ``Bridge`` metadata and ``Bridge.send``.
@@ -458,7 +458,7 @@ Execution guarantees and assumptions
 
 Array names
     The same array name must be used in ``arrays_metadata``, ``Bridge.send``,
-    and ``WindowSpec``. Analytics callbacks receive keyword arguments with
+    and ``Window``. Analytics callbacks receive keyword arguments with
     those names.
 
 Participating ranks
@@ -547,7 +547,7 @@ Analytics:
 
     deisa = Deisa()
 
-    @deisa.register(WindowSpec("temperature", window_size=3))
+    @deisa.register(Window("temperature", window_size=3))
     def analyze_temperature(temperature: list[DeisaArray]):
         if len(temperature) < 3:
             return

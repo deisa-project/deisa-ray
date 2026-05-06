@@ -13,7 +13,7 @@ NB_ITERATIONS = 5
 def head_script(partitioning_strategy: str) -> None:
     """The head node checks that the values are correct"""
     from deisa.ray.window_handler import Deisa
-    from deisa.ray.types import WindowSpec
+    from deisa.ray.types import Window
 
     import deisa.ray as deisa
 
@@ -30,7 +30,7 @@ def head_script(partitioning_strategy: str) -> None:
 
     d.register_callback(
         simulation_callback,
-        [WindowSpec("array")],
+        [Window("array")],
     )
     d.execute_callbacks()
 

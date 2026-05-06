@@ -32,13 +32,13 @@ def test_typical(nb_nodes: int, enable_distributed_scheduling: bool, ray_cluster
     def head_script(enable_distributed_scheduling) -> None:
         """The head node checks that the values are correct"""
         from deisa.ray.window_handler import Deisa
-        from deisa.ray.types import WindowSpec
+        from deisa.ray.types import Window
         import deisa.ray as deisa
 
         deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
         d = Deisa()
 
-        @d.register(WindowSpec("A"), WindowSpec("B"))
+        @d.register(Window("A"), Window("B"))
         def simulation_callback(A: list[DeisaArray], B: list[DeisaArray]):
             x = A[0].sum().compute()
             y = B[0].sum().compute()
@@ -86,13 +86,13 @@ def test_rank_ahead(nb_nodes: int, enable_distributed_scheduling: bool, ray_clus
     def head_script(enable_distributed_scheduling) -> None:
         """The head node checks that the values are correct"""
         from deisa.ray.window_handler import Deisa
-        from deisa.ray.types import WindowSpec
+        from deisa.ray.types import Window
         import deisa.ray as deisa
 
         deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
         d = Deisa()
 
-        @d.register(WindowSpec("A"))
+        @d.register(Window("A"))
         def simulation_callback(A: list[DeisaArray]):
             x = A[0].sum().compute()
             assert x == 3 * A[0].t
@@ -140,13 +140,13 @@ def test_out_of_sync(nb_nodes: int, enable_distributed_scheduling: bool, ray_clu
     def head_script(enable_distributed_scheduling) -> None:
         """The head node checks that the values are correct"""
         from deisa.ray.window_handler import Deisa
-        from deisa.ray.types import WindowSpec
+        from deisa.ray.types import Window
         import deisa.ray as deisa
 
         deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
         d = Deisa()
 
-        @d.register(WindowSpec("A"), WindowSpec("B"))
+        @d.register(Window("A"), Window("B"))
         def simulation_callback(A: list[DeisaArray], B: list[DeisaArray]):
             x = A[0].sum().compute()
             y = B[0].sum().compute()
@@ -212,13 +212,13 @@ def test_out_of_sync(nb_nodes: int, enable_distributed_scheduling: bool, ray_clu
 #     def head_script(enable_distributed_scheduling) -> None:
 #         """The head node checks that the values are correct"""
 #         from deisa.ray.window_handler import Deisa
-#         from deisa.ray.types import WindowSpec
+#         from deisa.ray.types import Window
 #         import deisa.ray as deisa
 #
 #         deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
 #         d = Deisa()
 #
-#         @d.register(WindowSpec("A"), WindowSpec("B"))
+#         @d.register(Window("A"), Window("B"))
 #         def simulation_callback(A: list[DeisaArray], B: list[DeisaArray]):
 #             x = A[0].sum().compute()
 #             y = B[0].sum().compute()

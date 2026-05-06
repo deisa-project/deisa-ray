@@ -28,8 +28,8 @@ Analytics side
 
 - Analytics run on a Ray head node. Dask arrays are backed by Ray tasks.
 - You register callbacks with ``Deisa`` and then execute them.
-- Callback arguments are lists of ``DeisaArray`` objects. The length of the list is the "window size", defined when creating a ``WindowSpec``.
-- The array name in ``WindowSpec`` must match the bridge metadata name,
+- Callback arguments are lists of ``DeisaArray`` objects. The length of the list is the "window size", defined when creating a ``Window``.
+- The array name in ``Window`` must match the bridge metadata name,
   otherwise the callback will not run for that array.
 - The window list is time-ordered and only reflects the timesteps that were
   actually sent by the simulation.
@@ -106,7 +106,7 @@ standard Dask array methods directly, and ``DeisaArray.t`` is the timestep.
 .. code-block:: python
 
     from deisa.ray.window_handler import Deisa
-    from deisa.ray.types import WindowSpec
+    from deisa.ray.types import Window
 
     deisa = Deisa()
 
@@ -117,7 +117,7 @@ standard Dask array methods directly, and ``DeisaArray.t`` is the timestep.
 
     deisa.register_callback(
         summary_callback,
-        [WindowSpec("temperature", window_size=3)],
+        [Window("temperature", window_size=3)],
     )
 
     deisa.execute_callbacks()
@@ -135,7 +135,7 @@ Template:
 
     deisa.register_callback(
         my_callback,
-        [WindowSpec("temperature"), WindowSpec("pressure")],
+        [Window("temperature"), Window("pressure")],
         when="AND",  # or "OR"
     )
 
@@ -145,21 +145,21 @@ You can also use the decorator form for a shorter registration pattern:
 
     d = Deisa()
 
-    @d.register(WindowSpec("temperature"), WindowSpec("pressure"), when="OR")
+    @d.register(Window("temperature"), Window("pressure"), when="OR")
     def callback(temperature: list[DeisaArray], pressure: list[DeisaArray]):
         ...
 
-Using ``WindowSpec`` with a sliding window
+Using ``Window`` with a sliding window
 ------------------------------------------
 
 To keep the last three timesteps of an array available inside a callback, use a
-``WindowSpec`` with ``window_size=3``:
+``Window`` with ``window_size=3``:
 
 .. code-block:: python
 
-    from deisa.ray.types import WindowSpec
+    from deisa.ray.types import Window
 
-    temperature_spec = WindowSpec("temperature", window_size=3)
+    temperature_spec = Window("temperature", window_size=3)
 
 The callback argument for that window spec will contain up to the three most
 recent arrays sent by the simulation. During the first two iterations, the list

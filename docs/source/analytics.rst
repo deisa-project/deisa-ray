@@ -1,7 +1,7 @@
 Analytics
 =========
 
-In callback examples, the name passed to ``WindowSpec`` is also the keyword
+In callback examples, the name passed to ``Window`` is also the keyword
 argument name used when DEISA calls the callback. Each argument is a
 ``list[DeisaArray]`` ordered from oldest to newest; with no explicit
 ``window_size`` the list contains only the latest shared timestep.
@@ -12,11 +12,11 @@ Simple example
 .. code-block:: python
 
     from deisa.ray.window_handler import Deisa
-    from deisa.ray.types import DeisaArray, WindowSpec
+    from deisa.ray.types import DeisaArray, Window
 
     d = Deisa()
 
-    @d.register(WindowSpec("temperature"))
+    @d.register(Window("temperature"))
     def summarize_temperature(temperature: list[DeisaArray]):
         mean_temperature = temperature[0].mean().compute()
         print("Mean temperature:", mean_temperature)
@@ -29,11 +29,11 @@ Several arrays
 .. code-block:: python
 
     from deisa.ray.window_handler import Deisa
-    from deisa.ray.types import DeisaArray, WindowSpec
+    from deisa.ray.types import DeisaArray, Window
 
     d = Deisa()
 
-    @d.register(WindowSpec("temperature"), WindowSpec("pressure"))
+    @d.register(Window("temperature"), Window("pressure"))
     def compare_state(
         temperature: list[DeisaArray],
         pressure: list[DeisaArray],
@@ -87,7 +87,7 @@ callback is not called in either ``AND`` or ``OR`` mode.
 .. code-block:: text
 
     Callback inputs:
-        WindowSpec("temperature"), WindowSpec("pressure"), WindowSpec("velocity")
+        Window("temperature"), Window("pressure"), Window("velocity")
 
     timestep being analyzed      new shares seen          when="AND"        when="OR"
     t = 1                        temperature, pressure,   run               run
@@ -125,11 +125,11 @@ any operation that needs a minimum number of timesteps.
 .. code-block:: python
 
     from deisa.ray.window_handler import Deisa
-    from deisa.ray.types import DeisaArray, WindowSpec
+    from deisa.ray.types import DeisaArray, Window
 
     d = Deisa()
 
-    @d.register(WindowSpec("temperature", window_size=5))
+    @d.register(Window("temperature", window_size=5))
     def estimate_temperature_change(temperature: list[DeisaArray]):
         latest_mean = temperature[-1].mean().compute()
         print("mean temperature:", latest_mean)
@@ -162,11 +162,11 @@ Dask's ``persist`` is supported:
 
     import dask.array as da
     from deisa.ray.window_handler import Deisa
-    from deisa.ray.types import DeisaArray, WindowSpec
+    from deisa.ray.types import DeisaArray, Window
 
     d = Deisa()
 
-    @d.register(WindowSpec("vorticity"))
+    @d.register(Window("vorticity"))
     def track_vorticity(vorticity: list[DeisaArray]):
         total_vorticity = vorticity[0].sum().persist()
 
@@ -185,11 +185,11 @@ Saving to HDF5
 .. code-block:: python
 
     from deisa.ray.window_handler import Deisa
-    from deisa.ray.types import DeisaArray, WindowSpec
+    from deisa.ray.types import DeisaArray, Window
 
     d = Deisa()
 
-    @d.register(WindowSpec("temperature"))
+    @d.register(Window("temperature"))
     def save_hotspot_temperature(temperature: list[DeisaArray]):
         if temperature[0].t == 5:
             temperature[0].to_hdf5("interesting-event.h5", "temperature")
@@ -201,12 +201,12 @@ If you want to save several arrays into the same HDF5 file, use
 
 .. code-block:: python
 
-    from deisa.ray.types import DeisaArray, WindowSpec, to_hdf5
+    from deisa.ray.types import DeisaArray, Window, to_hdf5
     from deisa.ray.window_handler import Deisa
 
     d = Deisa()
 
-    @d.register(WindowSpec("temperature"), WindowSpec("pressure"))
+    @d.register(Window("temperature"), Window("pressure"))
     def save_state_snapshot(
         temperature: list[DeisaArray],
         pressure: list[DeisaArray],
@@ -232,11 +232,11 @@ underlying Dask array:
 
     import xarray as xr
     from deisa.ray.window_handler import Deisa
-    from deisa.ray.types import DeisaArray, WindowSpec
+    from deisa.ray.types import DeisaArray, Window
 
     d = Deisa()
 
-    @d.register(WindowSpec("temperature"))
+    @d.register(Window("temperature"))
     def inspect_temperature_field(temperature: list[DeisaArray]):
         temperature_da = xr.DataArray(
             temperature[0],
@@ -259,11 +259,11 @@ One convenient pattern is to convert the ``DeisaArray`` to an
 
     import xarray as xr
     from deisa.ray.window_handler import Deisa
-    from deisa.ray.types import DeisaArray, WindowSpec
+    from deisa.ray.types import DeisaArray, Window
 
     d = Deisa()
 
-    @d.register(WindowSpec("temperature"))
+    @d.register(Window("temperature"))
     def save_temperature_netcdf(temperature: list[DeisaArray]):
         if temperature[0].t == 5:
             xarray_da = xr.DataArray(

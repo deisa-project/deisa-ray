@@ -59,7 +59,7 @@ def strange_worker(
 def head_script(enable_distributed_scheduling, nb_nodes):
     """The head node checks that the values are correct"""
     from deisa.ray.window_handler import Deisa
-    from deisa.ray.types import WindowSpec
+    from deisa.ray.types import Window
     import deisa.ray as deisa
 
     deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
@@ -68,12 +68,12 @@ def head_script(enable_distributed_scheduling, nb_nodes):
     or_count = 0
     and_count = 0
 
-    @d.register(WindowSpec("array1"), WindowSpec("array2"), when="OR")
+    @d.register(Window("array1"), Window("array2"), when="OR")
     def cb_or(array1: list[DeisaArray], array2: list[DeisaArray]):
         nonlocal or_count
         or_count += 1
 
-    @d.register(WindowSpec("array1"), WindowSpec("array2"), when="AND")
+    @d.register(Window("array1"), Window("array2"), when="AND")
     def cb_and(array1: list[DeisaArray], array2: list[DeisaArray]):
         nonlocal and_count
         and_count += 1

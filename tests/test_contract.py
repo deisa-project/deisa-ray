@@ -75,7 +75,7 @@ def test_sim_start_first_and_analytics_can_start_after_x_secs(ray_multinode_clus
     )
     def head_script() -> bool:
         """The head node checks that the values are correct"""
-        from deisa.ray.types import WindowSpec
+        from deisa.ray.types import Window
         from deisa.ray.window_handler import Deisa
 
         d = Deisa()
@@ -85,7 +85,7 @@ def test_sim_start_first_and_analytics_can_start_after_x_secs(ray_multinode_clus
 
         d.register_callback(
             simulation_callback,
-            [WindowSpec("array")],
+            [Window("array")],
         )
         d.execute_callbacks()
         return True
@@ -162,7 +162,7 @@ def test_analytics_start_first_and_sim_can_start_after_x_secs(ray_multinode_clus
     )
     def head_script() -> bool:
         """The head node checks that the values are correct"""
-        from deisa.ray.types import WindowSpec
+        from deisa.ray.types import Window
         from deisa.ray.window_handler import Deisa
 
         d = Deisa()
@@ -172,7 +172,7 @@ def test_analytics_start_first_and_sim_can_start_after_x_secs(ray_multinode_clus
 
         d.register_callback(
             simulation_callback,
-            [WindowSpec("array")],
+            [Window("array")],
         )
         d.execute_callbacks()
         return True
@@ -247,7 +247,7 @@ def test_sim_raise_if_not_enough_bridges_connect(ray_multinode_cluster):
         )
         def head_script() -> bool:
             """The head node checks that the values are correct"""
-            from deisa.ray.types import WindowSpec
+            from deisa.ray.types import Window
             from deisa.ray.window_handler import Deisa
 
             d = Deisa()
@@ -257,7 +257,7 @@ def test_sim_raise_if_not_enough_bridges_connect(ray_multinode_cluster):
 
             d.register_callback(
                 simulation_callback,
-                [WindowSpec("array")],
+                [Window("array")],
             )
             d.execute_callbacks()
             return True

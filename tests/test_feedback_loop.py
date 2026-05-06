@@ -150,7 +150,7 @@ def test_feedback_set_does_not_leak_dask_scheduler(ray_cluster) -> None:  # noqa
 
 @ray.remote(max_retries=0)
 def feedback_head() -> bool:
-    from deisa.ray.types import DeisaArray, WindowSpec
+    from deisa.ray.types import DeisaArray, Window
     from deisa.ray.window_handler import Deisa
 
     deisa = Deisa(feedback_queue_size=2)
@@ -162,7 +162,7 @@ def feedback_head() -> bool:
         if latest.t == 1:
             deisa.set(key="foo", value=latest.t, timestep=latest.t)
 
-    deisa.register_callback(callback, [WindowSpec("array")])
+    deisa.register_callback(callback, [Window("array")])
     deisa.execute_callbacks()
     return True
 
