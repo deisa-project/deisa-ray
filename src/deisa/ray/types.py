@@ -202,10 +202,16 @@ class WindowSpec:
     window_size: int | None = None
 
 
-@dataclass(frozen=True)
-class DeisaArray:
-    dask: da.Array
-    t: int
+class DeisaArray(da.Array):
+    def __new__(cls, dask, name, chunks, t: int, dtype=None, meta=None, shape=None):
+        return super().__new__(cls, dask, name, chunks, dtype=dtype, meta=meta, shape=shape)
+
+    def __init__(self, dask, name, chunks, t: int, dtype=None, meta=None, shape=None):
+        self.t = t
+
+    @property
+    def timestep(self) -> int:
+        return self.t
 
     def to_zarr(
         self, url, component=None, storage_options=None, region=None, compute=True, return_stored=False, mode="a"
@@ -222,7 +228,7 @@ class DeisaArray:
 
         full_path = pathlib.Path(url).expanduser().resolve()
         return da.to_zarr(
-            self.dask.persist(),
+            self.persist(),
             full_path,
             component=component,
             storage_options=storage_options,
@@ -380,7 +386,7 @@ def to_hdf5(fname: str, sources: dict[str, DeisaArray]) -> None:
     for dataset, deisa_array in sources.items():
         # dask.to_delayed() be able to have a reference to the chunks
         # and to be able to iterate through them.
-        delayed_grid = deisa_array.dask.to_delayed()
+        delayed_grid = deisa_array.to_delayed()
 
         for block_id in np.ndindex(delayed_grid.shape):
             chunk = delayed_grid[block_id]
@@ -395,10 +401,10 @@ def to_hdf5(fname: str, sources: dict[str, DeisaArray]) -> None:
         create_vds(
             full_path,
             dataset,
-            deisa_array.dask.chunksize,
-            deisa_array.dask.shape,
-            deisa_array.dask.numblocks,
-            deisa_array.dask.dtype,
+            deisa_array.chunksize,
+            deisa_array.shape,
+            deisa_array.numblocks,
+            deisa_array.dtype,
         )
 
     dask.compute(*writing_tasks)
@@ -666,11 +672,12 @@ class DaskArrayData:
 
         dsk = HighLevelGraph.from_collections(dask_name, graph, dependencies=())
 
-        full_array = da.Array(
+        full_array = DeisaArray(
             dsk,
             dask_name,
             chunks=self.chunks_size,
             dtype=self.dtype,
+            t=timestep,
         )
 
         return full_array
