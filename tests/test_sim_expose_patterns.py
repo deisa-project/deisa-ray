@@ -38,7 +38,7 @@ def test_typical(nb_nodes: int, enable_distributed_scheduling: bool, ray_cluster
         deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
         d = Deisa()
 
-        @d.callback(WindowSpec("A"), WindowSpec("B"))
+        @d.register(WindowSpec("A"), WindowSpec("B"))
         def simulation_callback(A: list[DeisaArray], B: list[DeisaArray]):
             x = A[0].sum().compute()
             y = B[0].sum().compute()
@@ -92,7 +92,7 @@ def test_rank_ahead(nb_nodes: int, enable_distributed_scheduling: bool, ray_clus
         deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
         d = Deisa()
 
-        @d.callback(WindowSpec("A"))
+        @d.register(WindowSpec("A"))
         def simulation_callback(A: list[DeisaArray]):
             x = A[0].sum().compute()
             assert x == 3 * A[0].t
@@ -146,7 +146,7 @@ def test_out_of_sync(nb_nodes: int, enable_distributed_scheduling: bool, ray_clu
         deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
         d = Deisa()
 
-        @d.callback(WindowSpec("A"), WindowSpec("B"))
+        @d.register(WindowSpec("A"), WindowSpec("B"))
         def simulation_callback(A: list[DeisaArray], B: list[DeisaArray]):
             x = A[0].sum().compute()
             y = B[0].sum().compute()
@@ -218,7 +218,7 @@ def test_out_of_sync(nb_nodes: int, enable_distributed_scheduling: bool, ray_clu
 #         deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
 #         d = Deisa()
 #
-#         @d.callback(WindowSpec("A"), WindowSpec("B"))
+#         @d.register(WindowSpec("A"), WindowSpec("B"))
 #         def simulation_callback(A: list[DeisaArray], B: list[DeisaArray]):
 #             x = A[0].sum().compute()
 #             y = B[0].sum().compute()

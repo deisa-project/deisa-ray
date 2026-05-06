@@ -145,7 +145,7 @@ You can also use the decorator form for a shorter registration pattern:
 
     d = Deisa()
 
-    @d.callback(WindowSpec("temperature"), WindowSpec("pressure"), when="OR")
+    @d.register(WindowSpec("temperature"), WindowSpec("pressure"), when="OR")
     def callback(temperature: list[DeisaArray], pressure: list[DeisaArray]):
         ...
 

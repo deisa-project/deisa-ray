@@ -143,7 +143,7 @@ class Deisa:
             feedback_queue_size=self.feedback_queue_size,
         )
 
-    def callback(
+    def register(
         self,
         *window_specs,
         exception_handler: Optional[Callable] = None,

@@ -68,12 +68,12 @@ def head_script(enable_distributed_scheduling, nb_nodes):
     or_count = 0
     and_count = 0
 
-    @d.callback(WindowSpec("array1"), WindowSpec("array2"), when="OR")
+    @d.register(WindowSpec("array1"), WindowSpec("array2"), when="OR")
     def cb_or(array1: list[DeisaArray], array2: list[DeisaArray]):
         nonlocal or_count
         or_count += 1
 
-    @d.callback(WindowSpec("array1"), WindowSpec("array2"), when="AND")
+    @d.register(WindowSpec("array1"), WindowSpec("array2"), when="AND")
     def cb_and(array1: list[DeisaArray], array2: list[DeisaArray]):
         nonlocal and_count
         and_count += 1

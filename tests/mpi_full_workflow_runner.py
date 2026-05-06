@@ -20,7 +20,7 @@ def head_script() -> None:
 
     d = Deisa()
 
-    @d.callback(WindowSpec("array"))
+    @d.register(WindowSpec("array"))
     def simulation_callback(array: list[DeisaArray]):
         x = array[0].sum().compute()
         assert x == 10 * array[0].t

@@ -16,7 +16,7 @@ Simple example
 
     d = Deisa()
 
-    @d.callback(WindowSpec("temperature"))
+    @d.register(WindowSpec("temperature"))
     def summarize_temperature(temperature: list[DeisaArray]):
         mean_temperature = temperature[0].mean().compute()
         print("Mean temperature:", mean_temperature)
@@ -33,7 +33,7 @@ Several arrays
 
     d = Deisa()
 
-    @d.callback(WindowSpec("temperature"), WindowSpec("pressure"))
+    @d.register(WindowSpec("temperature"), WindowSpec("pressure"))
     def compare_state(
         temperature: list[DeisaArray],
         pressure: list[DeisaArray],
@@ -129,7 +129,7 @@ any operation that needs a minimum number of timesteps.
 
     d = Deisa()
 
-    @d.callback(WindowSpec("temperature", window_size=5))
+    @d.register(WindowSpec("temperature", window_size=5))
     def estimate_temperature_change(temperature: list[DeisaArray]):
         latest_mean = temperature[-1].mean().compute()
         print("mean temperature:", latest_mean)
@@ -166,7 +166,7 @@ Dask's ``persist`` is supported:
 
     d = Deisa()
 
-    @d.callback(WindowSpec("vorticity"))
+    @d.register(WindowSpec("vorticity"))
     def track_vorticity(vorticity: list[DeisaArray]):
         total_vorticity = vorticity[0].sum().persist()
 
@@ -189,7 +189,7 @@ Saving to HDF5
 
     d = Deisa()
 
-    @d.callback(WindowSpec("temperature"))
+    @d.register(WindowSpec("temperature"))
     def save_hotspot_temperature(temperature: list[DeisaArray]):
         if temperature[0].t == 5:
             temperature[0].to_hdf5("interesting-event.h5", "temperature")
@@ -206,7 +206,7 @@ If you want to save several arrays into the same HDF5 file, use
 
     d = Deisa()
 
-    @d.callback(WindowSpec("temperature"), WindowSpec("pressure"))
+    @d.register(WindowSpec("temperature"), WindowSpec("pressure"))
     def save_state_snapshot(
         temperature: list[DeisaArray],
         pressure: list[DeisaArray],
@@ -236,7 +236,7 @@ underlying Dask array:
 
     d = Deisa()
 
-    @d.callback(WindowSpec("temperature"))
+    @d.register(WindowSpec("temperature"))
     def inspect_temperature_field(temperature: list[DeisaArray]):
         temperature_da = xr.DataArray(
             temperature[0],
@@ -263,7 +263,7 @@ One convenient pattern is to convert the ``DeisaArray`` to an
 
     d = Deisa()
 
-    @d.callback(WindowSpec("temperature"))
+    @d.register(WindowSpec("temperature"))
     def save_temperature_netcdf(temperature: list[DeisaArray]):
         if temperature[0].t == 5:
             xarray_da = xr.DataArray(

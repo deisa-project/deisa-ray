@@ -318,12 +318,12 @@ Returns
 Returns the original callback so the method can be used by decorator helpers
 and by code that wants to keep the callable.
 
-``Deisa.callback``
+``Deisa.register``
 ^^^^^^^^^^^^^^^^^^
 
 .. code-block:: python
 
-    @deisa.callback(WindowSpec("temperature"), WindowSpec("pressure"), when="OR")
+    @deisa.register(WindowSpec("temperature"), WindowSpec("pressure"), when="OR")
     def compare(temperature: list[DeisaArray], pressure: list[DeisaArray]):
         ...
 
@@ -547,7 +547,7 @@ Analytics:
 
     deisa = Deisa()
 
-    @deisa.callback(WindowSpec("temperature", window_size=3))
+    @deisa.register(WindowSpec("temperature", window_size=3))
     def analyze_temperature(temperature: list[DeisaArray]):
         if len(temperature) < 3:
             return
