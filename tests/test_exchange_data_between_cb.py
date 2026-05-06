@@ -25,20 +25,20 @@ def head_script(enable_distributed_scheduling) -> None:
     vars = Shared_variables()
 
     def simulation_callback1(array: list[DeisaArray]):
-        x = array[0].dask.sum().compute()
+        x = array[0].sum().compute()
         assert x == 10 * array[0].t
         if array[0].t == 5:
             vars.sum = x
 
     def simulation_callback2(array1: list[DeisaArray]):
-        x = array1[0].dask.sum().compute()
+        x = array1[0].sum().compute()
         assert x == 10 * array1[0].t
         if array1[0].t == 8:
             vars.sum = vars.sum + x
 
     def simulation_callback3(array: list[DeisaArray], array1: list[DeisaArray]):
-        x = array[0].dask.sum().compute()
-        y = array1[0].dask.sum().compute()
+        x = array[0].sum().compute()
+        y = array1[0].sum().compute()
         assert x == 10 * array[0].t and y == 10 * array1[0].t
         if array1[0].t > 8:
             assert vars.sum == 130

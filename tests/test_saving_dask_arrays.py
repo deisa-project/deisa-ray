@@ -346,7 +346,7 @@ def test_dask_save_netcdf_xarray(fname, enable_distributed_scheduling, ray_clust
 
         def simulation_callback(array: list[DeisaArray]):
             if array[0].t == 5:
-                xarray_da = xr.DataArray(array[0].dask, dims=["x", "y"], name="data").compute()
+                xarray_da = xr.DataArray(array[0], dims=["x", "y"], name="data").compute()
 
                 xarray_da.to_netcdf(fname)
 

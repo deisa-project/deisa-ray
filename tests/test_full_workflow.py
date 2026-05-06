@@ -19,7 +19,7 @@ def head_script(enable_distributed_scheduling, nb_nodes) -> None:
     d = Deisa()
 
     def simulation_callback(array: list[DeisaArray]):
-        x = array[0].dask.mean().compute()
+        x = array[0].mean().compute()
         assert x == (10 * array[0].t) / 4
 
     d.register_callback(

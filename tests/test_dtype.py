@@ -19,7 +19,7 @@ def head_script(enable_distributed_scheduling) -> None:
     d = Deisa()
 
     def simulation_callback(array: list[DeisaArray]):
-        assert array[0].dask.dtype == np.int8
+        assert array[0].dtype == np.int8
 
     d.register_callback(
         simulation_callback,

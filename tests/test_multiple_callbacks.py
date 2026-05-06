@@ -19,16 +19,16 @@ def head_script(enable_distributed_scheduling, dim_sq) -> None:
     d = Deisa()
 
     def simulation_callback1(array: list[DeisaArray]):
-        x = array[0].dask.sum().compute()
+        x = array[0].sum().compute()
         assert x == (dim_sq * (dim_sq + 1) / 2) * array[0].t
 
     def simulation_callback2(array1: list[DeisaArray]):
-        x = array1[0].dask.sum().compute()
+        x = array1[0].sum().compute()
         assert x == (dim_sq * (dim_sq + 1) / 2) * array1[0].t
 
     def simulation_callback3(array: list[DeisaArray], array1: list[DeisaArray]):
-        x = array[0].dask.sum().compute()
-        y = array1[0].dask.sum().compute()
+        x = array[0].sum().compute()
+        y = array1[0].sum().compute()
         assert x == (dim_sq * (dim_sq + 1) / 2) * array[0].t and y == (dim_sq * (dim_sq + 1) / 2) * array1[0].t
 
     d.register_callback(
@@ -90,18 +90,18 @@ def head_script2(enable_distributed_scheduling, dim_sq) -> None:
 
     @d.callback(WindowSpec("array"))
     def simulation_callback1(array: list[DeisaArray]):
-        x = array[0].dask.sum().compute()
+        x = array[0].sum().compute()
         assert x == (dim_sq * (dim_sq + 1) / 2) * array[0].t
 
     @d.callback(WindowSpec("array1"))
     def simulation_callback2(array1: list[DeisaArray]):
-        x = array1[0].dask.sum().compute()
+        x = array1[0].sum().compute()
         assert x == (dim_sq * (dim_sq + 1) / 2) * array1[0].t
 
     @d.callback(WindowSpec("array"), WindowSpec("array1"))
     def simulation_callback3(array: list[DeisaArray], array1: list[DeisaArray]):
-        x = array[0].dask.sum().compute()
-        y = array1[0].dask.sum().compute()
+        x = array[0].sum().compute()
+        y = array1[0].sum().compute()
         assert x == (dim_sq * (dim_sq + 1) / 2) * array[0].t and y == (dim_sq * (dim_sq + 1) / 2) * array1[0].t
 
     d.execute_callbacks()

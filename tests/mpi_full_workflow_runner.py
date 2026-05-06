@@ -22,7 +22,7 @@ def head_script() -> None:
 
     @d.callback(WindowSpec("array"))
     def simulation_callback(array: list[DeisaArray]):
-        x = array[0].dask.sum().compute()
+        x = array[0].sum().compute()
         assert x == 10 * array[0].t
 
     d.execute_callbacks()

@@ -23,12 +23,12 @@ def head_script(enable_distributed_scheduling) -> None:
             assert len(array) == 1
             return
 
-        assert array[0].dask.sum().compute() == 10 * array[0].t
-        assert array[1].dask.sum().compute() == 10 * array[1].t
+        assert array[0].sum().compute() == 10 * array[0].t
+        assert array[1].sum().compute() == 10 * array[1].t
 
         # Test a computation where the two arrays are used at the same time.
         # This checks that they are defined with different names.
-        assert (array[1].dask - array[0].dask).sum().compute() == 10
+        assert (array[1] - array[0]).sum().compute() == 10
 
     d.register_callback(
         simulation_callback,

@@ -4,6 +4,7 @@ import logging
 from typing import Any, Callable, Hashable, List, Optional, Literal
 
 import dask
+import dask.array as da
 import ray
 from ray.util.dask import ray_dask_get
 
@@ -33,6 +34,18 @@ def _ray_start_impl() -> None:
     """
     if not ray.is_initialized():
         ray.init(address="auto", log_to_driver=False, logging_level=logging.ERROR)
+
+
+def _with_timestep(array: da.Array, timestep: Timestep) -> DeisaArray:
+    return DeisaArray(
+        array.dask,
+        array.name,
+        array.chunks,
+        dtype=array.dtype,
+        meta=getattr(array, "_meta", None),
+        shape=array.shape,
+        t=timestep,
+    )
 
 
 class Deisa:
@@ -282,7 +295,7 @@ class Deisa:
 
             queue = self.queue_per_array.get(name)
             if queue is not None:
-                queue.append(DeisaArray(dask=array, t=arr_timestep))
+                queue.append(_with_timestep(array, arr_timestep))
                 self.has_new_timestep[name] = True
                 self.has_seen_array[name] = True
 
@@ -312,7 +325,7 @@ class Deisa:
 
                     queue = self.queue_per_array.get(name)
                     if queue is not None:
-                        queue.append(DeisaArray(dask=array, t=arr_timestep))
+                        queue.append(_with_timestep(array, arr_timestep))
                         self.has_new_timestep[name] = True
                         self.has_seen_array[name] = True
 
@@ -352,7 +365,7 @@ class Deisa:
                 if not end_reached:
                     queue = self.queue_per_array.get(name)
                     if queue is not None:
-                        queue.append(DeisaArray(dask=array, t=arr_timestep))
+                        queue.append(_with_timestep(array, arr_timestep))
                         self.has_new_timestep[name] = True
                         self.has_seen_array[name] = True
 

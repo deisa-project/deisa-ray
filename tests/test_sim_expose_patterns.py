@@ -40,8 +40,8 @@ def test_typical(nb_nodes: int, enable_distributed_scheduling: bool, ray_cluster
 
         @d.callback(WindowSpec("A"), WindowSpec("B"))
         def simulation_callback(A: list[DeisaArray], B: list[DeisaArray]):
-            x = A[0].dask.sum().compute()
-            y = B[0].dask.sum().compute()
+            x = A[0].sum().compute()
+            y = B[0].sum().compute()
             assert x == A[0].t
             assert y == B[0].t
 
@@ -94,7 +94,7 @@ def test_rank_ahead(nb_nodes: int, enable_distributed_scheduling: bool, ray_clus
 
         @d.callback(WindowSpec("A"))
         def simulation_callback(A: list[DeisaArray]):
-            x = A[0].dask.sum().compute()
+            x = A[0].sum().compute()
             assert x == 3 * A[0].t
 
         d.execute_callbacks()
@@ -148,8 +148,8 @@ def test_out_of_sync(nb_nodes: int, enable_distributed_scheduling: bool, ray_clu
 
         @d.callback(WindowSpec("A"), WindowSpec("B"))
         def simulation_callback(A: list[DeisaArray], B: list[DeisaArray]):
-            x = A[0].dask.sum().compute()
-            y = B[0].dask.sum().compute()
+            x = A[0].sum().compute()
+            y = B[0].sum().compute()
             assert x == 3 * A[0].t
             assert y == 3 * B[0].t
 
@@ -220,8 +220,8 @@ def test_out_of_sync(nb_nodes: int, enable_distributed_scheduling: bool, ray_clu
 #
 #         @d.callback(WindowSpec("A"), WindowSpec("B"))
 #         def simulation_callback(A: list[DeisaArray], B: list[DeisaArray]):
-#             x = A[0].dask.sum().compute()
-#             y = B[0].dask.sum().compute()
+#             x = A[0].sum().compute()
+#             y = B[0].sum().compute()
 #             assert x == 3 * A[0].t
 #             assert y == 7 * B[0].t
 #

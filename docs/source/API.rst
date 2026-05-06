@@ -277,7 +277,7 @@ happen lazily when registering callbacks or executing them.
 
     def summary(temperature: list[DeisaArray]):
         latest = temperature[-1]
-        print(latest.t, latest.dask.mean().compute())
+        print(latest.t, latest.mean().compute())
 
     deisa.register_callback(
         summary,
@@ -553,7 +553,7 @@ Analytics:
             return
 
         newest = temperature[-1]
-        mean_value = newest.dask.mean().compute()
+        mean_value = newest.mean().compute()
         print("timestep", newest.t, "mean", mean_value)
 
     deisa.execute_callbacks()

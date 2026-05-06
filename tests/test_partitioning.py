@@ -22,7 +22,7 @@ def head_script(partitioning_strategy: str) -> None:
     d = Deisa()
 
     def simulation_callback(array: list[DeisaArray]):
-        x = array[0].dask.sum().compute(deisa_ray_partitioning_strategy=partitioning_strategy)
+        x = array[0].sum().compute(deisa_ray_partitioning_strategy=partitioning_strategy)
         assert x == 10 * array[0].t
 
         # Test with a full Dask computation

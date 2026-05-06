@@ -23,7 +23,7 @@ def head_script(enable_distributed_scheduling) -> None:
         if len(array) == 1:
             assert array[0].t == START_ITERATION
 
-        array[0].dask.compute()
+        array[0].compute()
 
     d.register_callback(
         simulation_callback,

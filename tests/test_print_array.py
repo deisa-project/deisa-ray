@@ -21,7 +21,7 @@ def head_script(enable_distributed_scheduling) -> None:
     d = Deisa()
 
     def simulation_callback(array: list[DeisaArray]):
-        x = array[0].dask.compute()
+        x = array[0].compute()
         print(f"ARRAY PRINTED = {x}", flush=True)
 
         arr = array[0].t * np.array([[1, 2], [3, 4]])

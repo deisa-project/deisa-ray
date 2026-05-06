@@ -22,9 +22,9 @@ def head_script(enable_distributed_scheduling) -> None:
 
     def simulation_callback(array: list[DeisaArray]):
         # This is the standard dask task graph
-        assert len(array[0].dask.sum().dask) == 9
+        assert len(array[0].sum().dask) == 9
 
-        x = array[0].dask.sum().persist()
+        x = array[0].sum().persist()
 
         # We still have a dask array
         assert isinstance(x, da.Array)

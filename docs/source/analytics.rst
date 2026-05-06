@@ -18,7 +18,7 @@ Simple example
 
     @d.callback(WindowSpec("temperature"))
     def summarize_temperature(temperature: list[DeisaArray]):
-        mean_temperature = temperature[0].dask.mean().compute()
+        mean_temperature = temperature[0].mean().compute()
         print("Mean temperature:", mean_temperature)
 
     d.execute_callbacks()
@@ -39,7 +39,7 @@ Several arrays
         pressure: list[DeisaArray],
     ):
         thermal_pressure_balance = (
-            temperature[0].dask - pressure[0].dask
+            temperature[0] - pressure[0]
         ).mean().compute()
         print("thermal-pressure balance:", thermal_pressure_balance)
 
@@ -131,7 +131,7 @@ any operation that needs a minimum number of timesteps.
 
     @d.callback(WindowSpec("temperature", window_size=5))
     def estimate_temperature_change(temperature: list[DeisaArray]):
-        latest_mean = temperature[-1].dask.mean().compute()
+        latest_mean = temperature[-1].mean().compute()
         print("mean temperature:", latest_mean)
 
         if len(temperature) >= 3:
@@ -139,7 +139,7 @@ any operation that needs a minimum number of timesteps.
             middle = temperature[-2]
             oldest = temperature[-3]
             three_point_rate = (
-                newest.dask - oldest.dask
+                newest - oldest
             ) / (newest.t - oldest.t)
             print("three-point mean dT/dt:", three_point_rate.mean().compute())
 
@@ -147,7 +147,7 @@ any operation that needs a minimum number of timesteps.
             return
 
         five_point_average = sum(
-            timestep.dask for timestep in temperature
+            timestep for timestep in temperature
         ) / 5
         print("five-point average:", five_point_average.mean().compute())
 
@@ -168,7 +168,7 @@ Dask's ``persist`` is supported:
 
     @d.callback(WindowSpec("vorticity"))
     def track_vorticity(vorticity: list[DeisaArray]):
-        total_vorticity = vorticity[0].dask.sum().persist()
+        total_vorticity = vorticity[0].sum().persist()
 
         # The result is still a Dask array, but the sum is computing in the background.
         assert isinstance(total_vorticity, da.Array)
@@ -239,7 +239,7 @@ underlying Dask array:
     @d.callback(WindowSpec("temperature"))
     def inspect_temperature_field(temperature: list[DeisaArray]):
         temperature_da = xr.DataArray(
-            temperature[0].dask,
+            temperature[0],
             dims=["x", "y"],
             name="temperature",
         )
@@ -267,7 +267,7 @@ One convenient pattern is to convert the ``DeisaArray`` to an
     def save_temperature_netcdf(temperature: list[DeisaArray]):
         if temperature[0].t == 5:
             xarray_da = xr.DataArray(
-                temperature[0].dask,
+                temperature[0],
                 dims=["x", "y"],
                 name="temperature",
             ).compute()

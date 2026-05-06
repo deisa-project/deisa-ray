@@ -22,7 +22,7 @@ def head_script(enable_distributed_scheduling, assert_error: bool = False) -> No
 
     # TODO : modify assert to test the actual error handler
     def simulation_callback(array: list[DeisaArray]):
-        array[0].dask.compute()
+        array[0].compute()
         if assert_error:
             assert False
 

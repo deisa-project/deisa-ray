@@ -100,8 +100,8 @@ The simulation creates one ``Bridge`` per participating rank and sends chunks.
 Analytics quick snippet
 -----------------------
 
-Define the analytics callback using Dask operations. ``DeisaArray.dask`` gives
-access to standard Dask array methods, and ``DeisaArray.t`` is the timestep.
+Define the analytics callback using Dask operations. ``DeisaArray`` provides
+standard Dask array methods directly, and ``DeisaArray.t`` is the timestep.
 
 .. code-block:: python
 
@@ -112,7 +112,7 @@ access to standard Dask array methods, and ``DeisaArray.t`` is the timestep.
 
     def summary_callback(temperature_window):
         latest = temperature_window[-1]
-        mean_value = latest.dask.mean().compute()
+        mean_value = latest.mean().compute()
         print(f"t={latest.t} mean={mean_value}")
 
     deisa.register_callback(
@@ -174,7 +174,7 @@ that needs three timesteps requires ``window_size=3``.
 
 The list is ordered from oldest to newest: the oldest array is at the
 beginning, and the most recent array is at the end. Each entry is a
-``DeisaArray`` object, so use ``.dask`` to access the Dask array and ``.t`` to
+``DeisaArray`` object, so use the object directly as the Dask array and ``.t`` to
 access its timestep.
 
 .. code-block:: python
@@ -188,7 +188,7 @@ access its timestep.
         newest = temperature_window[-1]
 
         midpoint_estimate = (
-            oldest.dask + middle.dask + newest.dask
+            oldest + middle + newest
         ) / 3
 
         print(
@@ -208,7 +208,7 @@ On the analytics side, call ``Deisa.set`` with a key, value, and timestep:
 
     def summary_callback(temperature_window):
         latest = temperature_window[-1]
-        mean_value = latest.dask.mean().compute()
+        mean_value = latest.mean().compute()
 
         if mean_value > 10:
             deisa.set("cooling_factor", value=0.5, timestep=latest.t)
