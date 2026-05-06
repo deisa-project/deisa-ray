@@ -81,7 +81,7 @@ def simple_worker(
         time.sleep(_sleep_intra_send)
         for array_described in list(arrays_md.keys()):
             chunk = i * array
-            client.send(array_name=array_described, chunk=chunk, timestep=i, chunked=True)
+            client.send(array_name=array_described, chunk=chunk, timestep=i)
 
     client.close(timestep=nb_iterations)
 
@@ -122,7 +122,7 @@ def simple_worker_error_test(
     for i in range(nb_iterations):
         chunk = i * array
         if i == nb_iterations // 2:
-            client.send(array_name="error", chunk=chunk, timestep=i, chunked=True)
+            client.send(array_name="error", chunk=chunk, timestep=i)
         else:
-            client.send(array_name=array_name, chunk=chunk, timestep=i, chunked=True)
+            client.send(array_name=array_name, chunk=chunk, timestep=i)
     client.close(timestep=nb_iterations)

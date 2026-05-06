@@ -299,8 +299,6 @@ class Bridge:
         array_name: str,
         chunk: np.ndarray,
         timestep: int,
-        chunked: bool = True,
-        store_externally: bool = False,
         test_mode: bool = False,
     ) -> None:
         """
@@ -318,12 +316,6 @@ class Bridge:
             The chunk of data to be sent to the analytics.
         timestep : int
             The timestep index for this chunk of data.
-        chunked : bool, optional
-            Whether the chunk was produced by the internal chunking logic.
-            Currently reserved for future use. Default is True.
-        store_externally : bool, optional
-            If True, the data is stored externally. Not implemented yet.
-            Default is False.
         test_mode : bool, optional
             Reserved flag for future testing or validation hooks. Currently
             ignored. Default is False.
@@ -353,8 +345,6 @@ class Bridge:
                 array_name=array_name,
                 chunk_ref=[ref],
                 timestep=timestep,
-                chunked=True,
-                store_externally=store_externally,
             )  # type: ignore
             # Wait until the data is processed before returning to the simulation
             ray.get(future)
@@ -370,7 +360,6 @@ class Bridge:
         self,
         *,
         timestep: int,
-        store_externally: bool = False,
     ) -> int:
         """
         Close the bridge by signaling analytics that the simulation finished.
@@ -379,8 +368,6 @@ class Bridge:
         ----------
         timestep : int
             The timestep index corresponding to the sentinel chunk.
-        store_externally : bool, optional
-            Reserved for future external storage handling. Default is False.
 
         Returns
         -------
@@ -396,8 +383,6 @@ class Bridge:
                     array_name="__deisa_last_iteration_array",
                     chunk_ref=[ref],
                     timestep=timestep,
-                    chunked=True,
-                    store_externally=store_externally,
                 )  # type: ignore
                 ray.get(future)
                 logger.info("Bridge %s closed at timestep %s", self.bridge_id, timestep)

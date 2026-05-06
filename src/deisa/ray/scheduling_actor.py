@@ -29,7 +29,7 @@ class NodeActorBase:
     - Collecting chunks of arrays sent by simulation nodes (via :class:`Bridge`)
     - Registering its owned chunks with the head node
     - Providing a small key/value channel (``set``, ``get``, ``delete``) for
-      non-chunked feedback between analytics and simulation.
+      feedback between analytics and simulation.
 
     The :class:`SchedulingActor` subclass adds graph-scheduling behaviour on
     top of this base functionality.
@@ -51,9 +51,9 @@ class NodeActorBase:
     partial_arrays : AsyncDict[str, PartialArray]
         Per-array containers that capture metadata and chunk references owned
         by this node actor.
-    feedback_non_chunked : dict
-        Dictionary for storing non-chunked feedback values shared between
-        analytics and simulation.
+    feedback : dict
+        Dictionary for storing feedback values shared between analytics and
+        simulation.
     """
 
     async def __init__(self, actor_id: int, arrays_metadata: Dict[str, Dict] = {}) -> None:
@@ -83,11 +83,11 @@ class NodeActorBase:
         # TODO: I think these two responsabilities could be separated.
         self.partial_arrays: AsyncDict[str, PartialArray] = AsyncDict()
 
-        # For non-chunked feedback between analytics and simulation
-        self.feedback_non_chunked: Dict[Hashable, Any] = {}
+        # For feedback between analytics and simulation
+        self.feedback: Dict[Hashable, Any] = {}
         self.should_persist: Dict[Hashable, bool] = {}
 
-    def set(self, *args, key: Hashable, value: Any, chunked: bool = False, persist: bool, **kwargs) -> None:
+    def set(self, *, key: Hashable, value: Any, persist: bool) -> None:
         """
         Store a feedback value shared between analytics and simulation.
 
@@ -97,30 +97,18 @@ class NodeActorBase:
             Identifier for the feedback value.
         value : Any
             Value to store.
-        chunked : bool, optional
-            Placeholder for future chunked feedback support. Must remain
-            ``False`` today. Default is ``False``.
         persist : bool
             Whether the stored value should survive the next ``get`` call.
             ``True`` retains the value until explicitly deleted.
-
-        Notes
-        -----
-        The ``*args`` and ``**kwargs`` parameters are accepted for forward
-        compatibility with future signatures but are currently unused.
         """
-        if not chunked:
-            self.feedback_non_chunked[key] = value
-            self.should_persist[key] = persist
-        else:
-            # TODO: implement chunked version
-            raise NotImplementedError()
+
+        self.feedback[key] = value
+        self.should_persist[key] = persist
 
     def get(
         self,
         key,
         default=None,
-        chunked=False,
     ) -> Any:
         """
         Retrieve a feedback value previously stored with :meth:`set`.
@@ -131,34 +119,23 @@ class NodeActorBase:
             Identifier of the requested value.
         default : Any, optional
             Value returned when ``key`` is not present. Default is ``None``.
-        chunked : bool, optional
-            Placeholder for chunked feedback retrieval. Must remain
-            ``False`` today. Default is ``False``.
 
         Returns
         -------
         Any
             Stored value or ``default`` if missing.
 
-        Raises
-        ------
-        NotImplementedError
-            Chunked feedback retrieval is not yet implemented.
         """
-        val = self.feedback_non_chunked.get(key, default)
+        val = self.feedback.get(key, default)
         persist = self.should_persist.get(key, False)
-        if not chunked:
-            if not persist:
-                self.delete(key=key)
-            return val
-        else:
-            raise NotImplementedError()
+        if not persist:
+            self.delete(key=key)
+        return val
 
     def delete(
         self,
-        *args,
+        *,
         key: Hashable,
-        **kwargs,
     ) -> None:
         """
         Delete a feedback value if present.
@@ -166,13 +143,13 @@ class NodeActorBase:
         Parameters
         ----------
         key : Hashable
-            Identifier to remove from the non-chunked feedback store.
+            Identifier to remove from the feedback store.
 
         Notes
         -----
         Missing keys are ignored to keep the call idempotent.
         """
-        self.feedback_non_chunked.pop(key, None)
+        self.feedback.pop(key, None)
         self.should_persist.pop(key, None)
 
     def _create_or_retrieve_partial_array(self, array_name: str, nb_chunks_of_node: int) -> PartialArray:
@@ -287,9 +264,6 @@ class NodeActorBase:
         array_name: str,
         chunk_ref: list[ray.ObjectRef],
         timestep: int,
-        chunked: bool = True,
-        *args,
-        **kwargs,
     ) -> None:
         """
         Add a chunk of data to this node actor.
@@ -309,10 +283,6 @@ class NodeActorBase:
             data. The extra list level is kept for Dask compatibility.
         timestep : int
             Timestep index the chunk belongs to.
-        chunked : bool, optional
-            Reserved for future multi-chunk sends. Must remain ``True`` for
-            the current workflow. Default is ``True``.
-
         Returns
         -------
         None

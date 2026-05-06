@@ -154,14 +154,6 @@ Arguments
 ``timestep``
     Integer timestep for the chunk.
 
-``chunked``
-    Reserved for future use. The current implementation always sends chunked
-    data through the distributed-array path.
-
-``store_externally``
-    Reserved for future external storage support. It is passed through the
-    internal actor layer but external storage is not implemented yet.
-
 ``test_mode``
     Reserved test hook and currently ignored.
 
@@ -500,8 +492,6 @@ Current limitations
 
 - Feedback is for small Python objects. Distributed-array feedback from
   analytics back to simulation is not part of the current user API.
-- External storage for ``Bridge.send(..., store_externally=True)`` is not
-  implemented.
 - ``Bridge.send`` expects CPU ``numpy.ndarray`` inputs.
 - The theoretical ``deisa-core`` API includes protocol methods such as
   ``get_array``, ``delete``, and ``close`` on the analytics object. Those are

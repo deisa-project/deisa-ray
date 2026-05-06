@@ -52,18 +52,18 @@ def strange_worker(
     for i in range(start_iteration, nb_iterations // 2):
         for array_described in list(arrays_md.keys()):
             chunk = i * array
-            client.send(array_name=array_described, chunk=chunk, timestep=i, chunked=True)
+            client.send(array_name=array_described, chunk=chunk, timestep=i)
     mid_t = i
     # skip 2 iterations
     i += 3
     for array_described in list(arrays_md.keys()):
         chunk = i * array
-        client.send(array_name=array_described, chunk=chunk, timestep=i, chunked=True)
+        client.send(array_name=array_described, chunk=chunk, timestep=i)
     # send rest from mid_t (duplicating a step but doesnt matter)
     for i in range(mid_t, nb_iterations):
         for array_described in list(arrays_md.keys()):
             chunk = i * array
-            client.send(array_name=array_described, chunk=chunk, timestep=i, chunked=True)
+            client.send(array_name=array_described, chunk=chunk, timestep=i)
     client.close(timestep=nb_iterations)
 
 

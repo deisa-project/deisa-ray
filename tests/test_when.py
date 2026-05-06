@@ -48,10 +48,10 @@ def strange_worker(
     for i in range(nb_iterations):
         if i % 2 == 0:
             chunk = i * array
-            client.send(array_name=array_names[0], chunk=chunk, timestep=i, chunked=True)
+            client.send(array_name=array_names[0], chunk=chunk, timestep=i)
         if i % 2 == 1:
             chunk = i * array
-            client.send(array_name=array_names[1], chunk=chunk, timestep=i, chunked=True)
+            client.send(array_name=array_names[1], chunk=chunk, timestep=i)
     client.close(timestep=nb_iterations)
 
 
