@@ -86,12 +86,11 @@ class Deisa:
         self._connected = False
         self.node_actors: dict[ActorID, RayActorHandle] = {}
         self.registered_callbacks: list[_CallbackConfig] = []
-        self.queue_per_array: dict[str, deque]
         self.max_simulation_ahead: int = max_simulation_ahead
         self.feedback_queue_size: int = feedback_queue_size
         self.has_new_timestep: dict[str, bool] = defaultdict(bool)
         self.has_seen_array: dict[str, bool] = defaultdict(bool)
-        self.queue_per_array = {}
+        self.queue_per_array: dict[str, deque]= {}
 
     def _ensure_connected(self) -> None:
         """
