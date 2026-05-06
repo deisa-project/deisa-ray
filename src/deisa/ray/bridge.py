@@ -20,6 +20,7 @@ from deisa.ray.comm import init_gloo_comm, normalize_comm
 from deisa.ray.validate import _validate_arrays_meta, _validate_system_meta
 from deisa.ray.utils import get_node_actor_options
 import torch.distributed as dist
+import sys
 
 logger = logging.getLogger(__name__)
 
@@ -361,6 +362,9 @@ class Bridge:
             raise e
         except Exception as e:
             _default_exception_handler(e)
+
+    def __del__(self):
+        self.close(sys.maxsize)
 
     def close(
         self,
