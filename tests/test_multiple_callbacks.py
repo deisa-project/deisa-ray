@@ -33,15 +33,15 @@ def head_script(enable_distributed_scheduling, dim_sq) -> None:
 
     d.register_callback(
         simulation_callback1,
-        [Window("array")],
+        *[Window("array")],
     )
     d.register_callback(
         simulation_callback2,
-        [Window("array1")],
+        *[Window("array1")],
     )
     d.register_callback(
         simulation_callback3,
-        [Window("array"), Window("array1")],
+        *[Window("array"), Window("array1")],
     )
     d.execute_callbacks()
 

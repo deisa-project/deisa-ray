@@ -100,7 +100,7 @@ def test_actor_placement(enable_distributed_scheduling, ray_multinode_cluster):
 
         d.register_callback(
             simulation_callback,
-            [Window("array")],
+            *[Window("array")],
         )
 
     # submit head script (analogous to submitting analytics to head node)

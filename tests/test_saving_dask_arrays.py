@@ -40,7 +40,7 @@ def test_dask_save_hdf5(fname, enable_distributed_scheduling, ray_cluster) -> No
 
         d.register_callback(
             simulation_callback,
-            [Window("array")],
+            *[Window("array")],
         )
         d.execute_callbacks()
 
@@ -116,7 +116,7 @@ def test_dask_save_several_timesteps_hdf5(fname, enable_distributed_scheduling, 
 
         d.register_callback(
             simulation_callback,
-            [Window("array")],
+            *[Window("array")],
         )
         d.execute_callbacks()
 
@@ -191,7 +191,7 @@ def test_dask_save_several_arrays_hdf5(fname, enable_distributed_scheduling, ray
 
         d.register_callback(
             simulation_callback,
-            [Window("a"), Window("b")],
+            *[Window("a"), Window("b")],
         )
         d.execute_callbacks()
 
@@ -277,7 +277,7 @@ def test_dask_save_zarr(fname, enable_distributed_scheduling, ray_cluster) -> No
 
         d.register_callback(
             simulation_callback,
-            [Window("array")],
+            *[Window("array")],
         )
         d.execute_callbacks()
 
@@ -352,7 +352,7 @@ def test_dask_save_netcdf_xarray(fname, enable_distributed_scheduling, ray_clust
 
         d.register_callback(
             simulation_callback,
-            [Window("array")],
+            *[Window("array")],
         )
         d.execute_callbacks()
 

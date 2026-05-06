@@ -30,7 +30,7 @@ def head_script(partitioning_strategy: str) -> None:
 
     d.register_callback(
         simulation_callback,
-        [Window("array")],
+        *[Window("array")],
     )
     d.execute_callbacks()
 

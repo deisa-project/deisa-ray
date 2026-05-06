@@ -186,7 +186,7 @@ class Window:
     window_size : int or None, optional
         If specified, creates a sliding window of arrays for this array name.
         The window will contain the last `window_size` timesteps. If None,
-        only the current timestep array is provided. Default is None.
+        only the current timestep array is provided. Default is 1.
 
     Examples
     --------
@@ -199,7 +199,10 @@ class Window:
     """
 
     name: str
-    window_size: int | None = None
+    window_size: int | None = 1
+
+
+type CallbackArgs = Window | str
 
 
 class DeisaArray(da.Array):

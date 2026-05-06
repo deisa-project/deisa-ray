@@ -37,7 +37,7 @@ def head_script(enable_distributed_scheduling) -> None:
 
     d.register_callback(
         simulation_callback,
-        [
+        *[
             Window("a", window_size=2),
             Window("b", window_size=1),
         ],

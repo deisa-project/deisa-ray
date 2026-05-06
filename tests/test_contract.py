@@ -85,7 +85,7 @@ def test_sim_start_first_and_analytics_can_start_after_x_secs(ray_multinode_clus
 
         d.register_callback(
             simulation_callback,
-            [Window("array")],
+            *[Window("array")],
         )
         d.execute_callbacks()
         return True
@@ -172,7 +172,7 @@ def test_analytics_start_first_and_sim_can_start_after_x_secs(ray_multinode_clus
 
         d.register_callback(
             simulation_callback,
-            [Window("array")],
+            *[Window("array")],
         )
         d.execute_callbacks()
         return True
@@ -257,7 +257,7 @@ def test_sim_raise_if_not_enough_bridges_connect(ray_multinode_cluster):
 
             d.register_callback(
                 simulation_callback,
-                [Window("array")],
+                *[Window("array")],
             )
             d.execute_callbacks()
             return True

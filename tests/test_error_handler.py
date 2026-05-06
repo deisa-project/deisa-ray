@@ -28,7 +28,7 @@ def head_script(enable_distributed_scheduling, assert_error: bool = False) -> No
 
     d.register_callback(
         simulation_callback,
-        [Window("array")],
+        *[Window("array")],
     )
     d.execute_callbacks()
 

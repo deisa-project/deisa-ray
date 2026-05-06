@@ -162,7 +162,7 @@ def feedback_head() -> bool:
         if latest.t == 1:
             deisa.set(key="foo", value=latest.t, timestep=latest.t)
 
-    deisa.register_callback(callback, [Window("array")])
+    deisa.register_callback(callback, *[Window("array")])
     deisa.execute_callbacks()
     return True
 

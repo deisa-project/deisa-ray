@@ -18,6 +18,7 @@ from deisa.ray.types import (
     RayActorHandle,
     Timestep,
     Window,
+    CallbackArgs,
     _CallbackConfig,
 )
 from deisa.ray.utils import get_head_actor_options
@@ -145,7 +146,7 @@ class Deisa:
 
     def register(
         self,
-        *window_specs,
+        *callback_args: CallbackArgs,
         exception_handler: Optional[Callable] = None,
         when: Literal["AND", "OR"] = "AND",
     ):
@@ -154,7 +155,7 @@ class Deisa:
 
         Parameters
         ----------
-        *window_specs : Window
+        *callback_args : CallbackArgs
             Array descriptions the callback should receive.
         exception_handler : Optional[Callable], optional
             Handler invoked when the user callback raises. Defaults to
@@ -171,14 +172,19 @@ class Deisa:
         """
 
         def deco(fn):
-            return self.register_callback(fn, list(window_specs), exception_handler, when)
+            return self.register_callback(
+                fn,
+                *callback_args,
+                exception_handler=exception_handler,
+                when=when,
+            )
 
         return deco
 
     def register_callback(
         self,
         simulation_callback: Callable,
-        arrays_spec: list[Window],
+        *callback_args: CallbackArgs,
         exception_handler: Optional[Callable] = None,
         when: Literal["AND", "OR"] = "AND",
     ) -> Callable:
@@ -190,7 +196,7 @@ class Deisa:
         simulation_callback : Callable
             Function to run for each iteration; receives arrays as kwargs
             and ``timestep``.
-        arrays_spec : list[Window]
+        *callback_args : CallbackArgs
             Descriptions of arrays to stream to the callback (with optional
             sliding windows).
             Maximum iterations to execute. Default is a large sentinel.
@@ -207,6 +213,13 @@ class Deisa:
         Callable
             The original callback, allowing decorator-style usage.
         """
+        arrays_spec = []
+        for callback_arg in callback_args:
+            if isinstance(callback_arg, Window):
+                arrays_spec.append(callback_arg)
+            elif isinstance(callback_arg, str):
+                arrays_spec.append(Window(callback_arg, window_size=1))
+
         self._ensure_connected()  # connect + handshake before accepting callbacks
         cfg = _CallbackConfig(
             simulation_callback=simulation_callback,
