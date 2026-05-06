@@ -229,25 +229,6 @@ class Deisa:
         self.registered_callbacks.append(cfg)
         return simulation_callback
 
-    def unregister_callback(
-        self,
-        simulation_callback: Callable,
-    ) -> None:
-        """
-        Unregister a previously registered simulation callback.
-
-        Parameters
-        ----------
-        simulation_callback : Callable
-            Callback to remove from the registry.
-
-        Raises
-        ------
-        NotImplementedError
-            Always, as the feature has not been implemented yet.
-        """
-        raise NotImplementedError("method not yet implemented.")
-
     def generate_queue_per_array(self):
         """
         Prepare per-array queues that respect declared window sizes.
