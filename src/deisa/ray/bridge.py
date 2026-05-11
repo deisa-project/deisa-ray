@@ -180,6 +180,7 @@ class Bridge:
         """
         self.bridge_id = bridge_id
         self._init_retries = _init_retries
+        self._closed = False
 
         self.arrays_metadata = _validate_arrays_meta(arrays_metadata)
         comm = normalize_comm(comm)
@@ -358,7 +359,6 @@ class Bridge:
 
     def close(
         self,
-        *,
         timestep: int,
     ) -> int:
         """
@@ -374,6 +374,10 @@ class Bridge:
         int
             The final timestep after the sentinel chunk is known by the node actor.
         """
+        if self._closed:
+            return timestep
+        self._closed = True
+
         self.comm.barrier()
         if self.bridge_id == 0:
             try:

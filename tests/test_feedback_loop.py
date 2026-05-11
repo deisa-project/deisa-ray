@@ -67,6 +67,7 @@ def test_bridge_zero_queries_head_actor_directly(monkeypatch) -> None:
     bridge.comm = NoOpComm()
     bridge.head_actor = _RecordingHeadActor()
     bridge.node_actor = _FailingNodeActor()
+    bridge._closed = False
 
     def fake_ray_get(object_ref):
         assert object_ref == "head-feedback-ref"
