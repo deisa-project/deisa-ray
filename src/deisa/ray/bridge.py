@@ -21,6 +21,7 @@ from deisa.ray.validate import _validate_arrays_meta, _validate_system_meta
 from deisa.ray.utils import get_node_actor_options
 import torch.distributed as dist
 import sys
+from deisa.core import validate_arrays_metadata
 
 logger = logging.getLogger(__name__)
 
