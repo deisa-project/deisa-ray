@@ -45,7 +45,6 @@ def main() -> None:
         "array": {
             "chunk_shape": (1, 1),
             "nb_chunks_per_dim": (2, 2),
-            "nb_chunks_of_node": world_size,
             "dtype": np.int32,
             "chunk_position": (rank // 2, rank % 2),
         }

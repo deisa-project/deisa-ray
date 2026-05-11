@@ -17,10 +17,14 @@ def pick_free_port():
 # @pytest.fixture(scope = "session")
 @pytest.fixture()
 def ray_cluster():
-    """Start a Ray cluster for this test"""
+    if ray.is_initialized():
+        ray.shutdown()
     ray.init()
-    yield ray.get_runtime_context().gcs_address
-    ray.shutdown()
+    try:
+        yield ray.get_runtime_context().gcs_address
+    finally:
+        if ray.is_initialized():
+            ray.shutdown()
 
 
 def wait_for_head_node() -> None:
@@ -40,7 +44,6 @@ def simple_worker(
     rank: int,
     position: tuple[int, ...],
     chunks_per_dim: tuple[int, ...],
-    nb_chunks_of_node: int,
     chunk_size: tuple[int, ...],
     nb_iterations: int,
     nb_nodes: int,
@@ -65,7 +68,6 @@ def simple_worker(
         name: {
             "chunk_shape": chunk_size,
             "nb_chunks_per_dim": chunks_per_dim,
-            "nb_chunks_of_node": nb_chunks_of_node,
             "dtype": dtype,
             "chunk_position": position,
         }
@@ -92,7 +94,6 @@ def simple_worker_error_test(
     rank: int,
     position: tuple[int, ...],
     chunks_per_dim: tuple[int, ...],
-    nb_chunks_of_node: int,
     chunk_size: tuple[int, ...],
     nb_iterations: int,
     nb_nodes: int,
@@ -109,7 +110,6 @@ def simple_worker_error_test(
         array_name: {
             "chunk_shape": chunk_size,
             "nb_chunks_per_dim": chunks_per_dim,
-            "nb_chunks_of_node": nb_chunks_of_node,
             "dtype": dtype,
             "chunk_position": position,
         }

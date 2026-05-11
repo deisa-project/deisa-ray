@@ -177,7 +177,6 @@ def feedback_worker(*, rank: int, port: int) -> tuple[int, str, int]:
         "array": {
             "chunk_shape": (1,),
             "nb_chunks_per_dim": (2,),
-            "nb_chunks_of_node": 1,
             "dtype": np.int32,
             "chunk_position": (rank,),
         }

@@ -38,7 +38,6 @@ def test_dtype(enable_distributed_scheduling, ray_cluster) -> None:  # noqa: F81
         rank=0,
         position=(0,),
         chunks_per_dim=(1,),
-        nb_chunks_of_node=1,
         chunk_size=(1,),
         nb_iterations=1,
         node_id="node",

@@ -84,11 +84,6 @@ Arguments
         shape is approximately ``chunk_shape * nb_chunks_per_dim`` dimension by
         dimension.
 
-    ``nb_chunks_of_node``
-        Number of chunks for this array expected on the current scheduling
-        actor. This is the local completeness count used before forwarding an
-        array timestep.
-
     ``dtype``
         NumPy dtype, or a value accepted by ``numpy.dtype``.
 
@@ -510,7 +505,6 @@ Simulation:
             "temperature": {
                 "chunk_shape": (64, 64),
                 "nb_chunks_per_dim": (4, 4),
-                "nb_chunks_of_node": 4,
                 "dtype": np.float64,
                 "chunk_position": chunk_position,
             },

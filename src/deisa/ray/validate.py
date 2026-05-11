@@ -80,7 +80,6 @@ def _validate_single_array_metadata(
 
         - ``chunk_shape``: sequence of positive ints
         - ``nb_chunks_per_dim``: sequence of positive ints
-        - ``nb_chunks_of_node``: positive int
         - ``dtype``: NumPy dtype or anything accepted by ``np.dtype``
         - ``chunk_position``: sequence of ints of same length as
           ``chunk_shape``
@@ -114,21 +113,6 @@ def _validate_single_array_metadata(
             f"sequence of positive ints, got {nb_chunks_per_dim!r}"
         )
     normalized_meta["nb_chunks_per_dim"] = nb_chunks_per_dim
-
-    # nb_chunks_of_node: positive int
-    try:
-        nb_chunks_of_node = int(meta["nb_chunks_of_node"])
-    except (TypeError, ValueError):
-        raise TypeError(
-            f"arrays_metadata['{name}']['nb_chunks_of_node'] must be a positive int, "
-            f"got {type(meta['nb_chunks_of_node']).__name__}"
-        )
-    if nb_chunks_of_node <= 0:
-        raise TypeError(
-            f"arrays_metadata['{name}']['nb_chunks_of_node'] must be a positive int, "
-            f"got {type(meta['nb_chunks_of_node']).__name__}"
-        )
-    normalized_meta["nb_chunks_of_node"] = nb_chunks_of_node
 
     # chunk_position: sequence of ints of same length as chunk_shape
     chunk_position = _normalize_int_sequence(
@@ -177,7 +161,6 @@ def _validate_arrays_meta(
     required_keys = {
         "chunk_shape",
         "nb_chunks_per_dim",
-        "nb_chunks_of_node",
         "dtype",
         "chunk_position",
     }
@@ -197,6 +180,10 @@ def _validate_arrays_meta(
         missing = required_keys - meta.keys()
         if missing:
             raise ValueError(f"arrays_metadata['{array_name}'] is missing required keys: {missing}")
+
+        extra = meta.keys() - required_keys
+        if extra:
+            raise ValueError(f"arrays_metadata['{array_name}'] has unknown keys: {extra}")
 
         validated[array_name] = _validate_single_array_metadata(array_name, meta)
 

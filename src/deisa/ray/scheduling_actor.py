@@ -72,7 +72,6 @@ class NodeActorBase:
         Registers the actor with the head node immediately so it can start
         receiving metadata and chunk notifications.
         """
-        self.nb_chunks_of_node: dict[str, int] = {}
         self.actor_id = actor_id
         self.actor_handle = ray.get_runtime_context().current_actor
 
@@ -86,8 +85,13 @@ class NodeActorBase:
         # For feedback between analytics and simulation
         self.feedback: Dict[Hashable, Any] = {}
         self.should_persist: Dict[Hashable, bool] = {}
+        self.is_finalized = False
+        self.finalization_lock = asyncio.Lock()
+        self.local_chunks: dict[str, int] = {}
+        self.nb_chunks_per_dim: dict[str, tuple[int, ...]] = {}
+        self.dtype_per_array: dict[str, np.dtype] = {}
 
-    def _create_or_retrieve_partial_array(self, array_name: str, nb_chunks_of_node: int) -> PartialArray:
+    def _create_or_retrieve_partial_array(self, array_name: str) -> PartialArray:
         """
         Return the partial-array container for ``array_name``, creating it if missing.
 
@@ -95,9 +99,6 @@ class NodeActorBase:
         ----------
         array_name : str
             Name of the array being assembled on this node.
-        nb_chunks_of_node : int
-            Number of chunks contributed by this node. Stored on the actor for
-            later sanity checks when receiving payloads.
 
         Returns
         -------
@@ -106,72 +107,60 @@ class NodeActorBase:
         """
         if array_name not in self.partial_arrays:
             self.partial_arrays[array_name] = PartialArray()
-            self.nb_chunks_of_node[array_name] = nb_chunks_of_node
+            self.local_chunks[array_name] = 0
         return self.partial_arrays[array_name]
-
-    async def register_chunk_meta(
+    
+    def register_chunk_meta(
         self,
         bridge_id: int,
         array_name: str,
         chunk_shape,
         nb_chunks_per_dim,
-        nb_chunks_of_node: int,
         dtype,
         chunk_position,
     ) -> None:
-        """
-        Register chunk metadata contributed by a bridge on this node.
-
-        Parameters
-        ----------
-        bridge_id : int
-            Identifier of the bridge sending the chunk.
-        array_name : str
-            Name of the array being populated.
-        chunk_shape : tuple[int, ...]
-            Shape of the chunk owned by this bridge.
-        nb_chunks_per_dim : tuple[int, ...]
-            Number of chunks per dimension in the global decomposition.
-        nb_chunks_of_node : int
-            Number of chunks contributed by this node for the array.
-        dtype : Any
-            NumPy dtype of the chunk.
-        chunk_position : tuple[int, ...]
-            Position of this chunk in the global grid.
-
-        Notes
-        -----
-        Once all bridges on the node have registered, the node actor forwards
-        the consolidated metadata to the head actor and toggles the per-array
-        event so concurrent callers can proceed. Until that point additional
-        callers block on ``ready_event``.
-        """
-        await self.head.wait_until_analytics_ready.remote()
-
-        partial_array = self._create_or_retrieve_partial_array(array_name, nb_chunks_of_node)
+        partial_array = self._create_or_retrieve_partial_array(array_name)
 
         # add metadata for this array
         partial_array.chunks_contained_meta.add((bridge_id, chunk_position, chunk_shape))
         partial_array.bid_to_pos[bridge_id] = chunk_position
 
-        # Technically, no race conditions should happen since its calls to the same actor method
-        # happen synchrnously (in ray). Since the method is async, it will run the method one a at
-        # a time, and give control to async runtime when it encounters await below.
-        # HOWEVER - with certain implementation of MPI, there have been problems here.
-        if len(partial_array.chunks_contained_meta) == nb_chunks_of_node:
-            await self.head.register_partial_array.options(enable_task_events=False).remote(
-                self.actor_id,
-                array_name,
-                dtype,
-                # TODO I could figure this out from the global size and the chunk shape
-                nb_chunks_per_dim,
-                list(partial_array.chunks_contained_meta),
-            )
-            # per array async event
-            partial_array.ready_event.set()
-            partial_array.ready_event.clear()
-        else:
-            await partial_array.ready_event.wait()
+        # increase the counter of chunks of the node for this array. 
+        self.local_chunks[array_name] += 1
+        # TODO remove dirty fix just to make args work in call below
+        self.nb_chunks_per_dim[array_name] = nb_chunks_per_dim
+        self.dtype_per_array[array_name] = dtype
+
+    # TODO this call should happen one time (even though it is called once by each bridge)
+    # it also should be blocking in the sense that all bridges should call it, but only the first one should trigger the registration with the head actor, 
+    # and all other bridges in the meantime should wait for the registration to be done without proceeding further.
+    async def finalize_registration(
+        self,
+    ) -> None:
+        if self.is_finalized:
+            return
+
+        async with self.finalization_lock:
+            if self.is_finalized:
+                return
+
+            await self.head.wait_until_analytics_ready.remote()
+
+            for name, partial_array in self.partial_arrays._data.items():
+                # since this method is called after barrier, we are sure all the chunks have been registered.
+                local_chunks = self.local_chunks[name]
+                assert  len(partial_array.chunks_contained_meta) == local_chunks,  \
+                "Sanity check failed: number of registered chunks does not match expected count for this node."
+
+                await self.head.register_partial_array.options(enable_task_events=False).remote(
+                    self.actor_id,
+                    name,
+                    self.dtype_per_array[name],
+                    # TODO I could figure this out from the global size and the chunk shape
+                    self.nb_chunks_per_dim[name],
+                    list(partial_array.chunks_contained_meta),
+                )
+            self.is_finalized = True
 
     def ready(self) -> None:
         """
@@ -257,7 +246,7 @@ class NodeActorBase:
         chunk_ref: ray.ObjectRef = chunk_ref[0]
         array_timestep.local_chunks[bridge_id] = chunk_ref
 
-        if len(array_timestep.local_chunks) == self.nb_chunks_of_node[array_name]:
+        if len(array_timestep.local_chunks) == self.local_chunks[array_name]:
             pos_to_ref: dict[tuple, ray.ObjectRef] = {}
 
             for bridge_id, ref in array_timestep.local_chunks._data.items():

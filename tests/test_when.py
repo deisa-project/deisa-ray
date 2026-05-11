@@ -15,7 +15,6 @@ def strange_worker(
     rank: int,
     position: tuple[int, ...],
     chunks_per_dim: tuple[int, ...],
-    nb_chunks_of_node: int,
     chunk_size: tuple[int, ...],
     nb_iterations: int,
     nb_nodes: int,
@@ -34,7 +33,6 @@ def strange_worker(
         name: {
             "chunk_shape": chunk_size,
             "nb_chunks_per_dim": chunks_per_dim,
-            "nb_chunks_of_node": nb_chunks_of_node,
             "dtype": dtype,
             "chunk_position": position,
         }
@@ -112,7 +110,6 @@ def test_and_or_analytics_works_correctly(nb_nodes: int, enable_distributed_sche
                 rank=rank,
                 position=(rank // 2, rank % 2),
                 chunks_per_dim=(2, 2),
-                nb_chunks_of_node=4 // nb_nodes,
                 chunk_size=(1, 1),
                 nb_iterations=NB_ITERATIONS,
                 node_id=f"node_{rank % nb_nodes}",

@@ -56,7 +56,6 @@ def test_memory_release(enable_distributed_scheduling, ray_spilling_cluster: str
         rank=0,
         position=(0, 0),
         chunks_per_dim=(1, 1),
-        nb_chunks_of_node=1,
         chunk_size=(1024, 1024),
         nb_iterations=NB_ITERATIONS,
         nb_nodes=1,

@@ -73,7 +73,6 @@ The simulation creates one ``Bridge`` per participating rank and sends chunks.
             # how many chunks in each dimension
             "nb_chunks_per_dim": (4, 4),
             # how many chunks / bridges per node
-            "nb_chunks_of_node": 4,
             # dype
             "dtype": np.float64,
             # the coordinates of the chunk block in 

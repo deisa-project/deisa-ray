@@ -16,6 +16,9 @@ class StubSchedulingActor:
     async def register_chunk_meta(self, *args, **kwargs):
         return True
 
+    async def finalize_registration(self, *args, **kwargs):
+        return True
+
     async def register_chunk(self, *args, **kwargs):
         # No-op; we don't test add_chunk here
         return True

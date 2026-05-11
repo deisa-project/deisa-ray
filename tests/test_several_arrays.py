@@ -58,7 +58,6 @@ def test_several_arrays(enable_distributed_scheduling, ray_cluster) -> None:  # 
                 rank=rank,
                 position=(rank // 2, rank % 2),
                 chunks_per_dim=(2, 2),
-                nb_chunks_of_node=1,
                 chunk_size=(1, 1),
                 nb_iterations=NB_ITERATIONS,
                 node_id=f"node_{rank}",

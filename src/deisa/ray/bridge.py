@@ -88,7 +88,6 @@ class Bridge:
             "temperature": {
                 "chunk_shape": (10, 10),
                 "nb_chunks_per_dim": (4, 4),
-                "nb_chunks_of_node": 1,
                 "dtype": np.float64,
                 "chunk_position": (0, 0),
             }
@@ -197,7 +196,6 @@ class Bridge:
             self.arrays_metadata["__deisa_last_iteration_array"] = {
                 "chunk_shape": (1, 1),
                 "nb_chunks_per_dim": (1, 1),
-                "nb_chunks_of_node": 1,
                 "dtype": np.int16,
                 "chunk_position": (0, 0),
             }
@@ -251,7 +249,7 @@ class Bridge:
         # create node actor
         self._create_node_actor(scheduling_actor_cls, node_actor_options)
         self.head_actor: RayActorHandle | None = None
-        # exchange meta with node actor
+        # exchange meta with node actor (blocking call)
         self._exchange_chunks_meta_with_node_actor()
         # make sure node actor is ready
         ray.get(self.node_actor.ready.remote())
@@ -265,6 +263,10 @@ class Bridge:
         # 3. all bridges have connected
         # 4. all node actors have been created
         # 5. all node actors have received description of arrays_md
+
+        # ray method calls are sequential on same actor
+        ray.get(self.node_actor.finalize_registration.remote())
+
 
     def _exchange_chunks_meta_with_node_actor(self):
         """
@@ -285,7 +287,6 @@ class Bridge:
                     array_name=array_name,
                     chunk_shape=meta["chunk_shape"],
                     nb_chunks_per_dim=meta["nb_chunks_per_dim"],
-                    nb_chunks_of_node=meta["nb_chunks_of_node"],
                     dtype=meta["dtype"],
                     # local info of array specific to bridge
                     bridge_id=self.bridge_id,
