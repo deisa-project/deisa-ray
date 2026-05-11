@@ -21,7 +21,6 @@ from deisa.ray.validate import _validate_arrays_meta, _validate_system_meta
 from deisa.ray.utils import get_node_actor_options
 import torch.distributed as dist
 import sys
-from deisa.core import validate_arrays_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -87,8 +86,8 @@ class Bridge:
 
         arrays_metadata = {
             "temperature": {
+                "global_shape": (40, 40),
                 "chunk_shape": (10, 10),
-                "nb_chunks_per_dim": (4, 4),
                 "chunk_position": (0, 0),
             }
         }
@@ -194,8 +193,8 @@ class Bridge:
         self.system_metadata = _validate_system_meta(system_metadata) if system_metadata is not None else None
         if self.bridge_id == 0:
             self.arrays_metadata["__deisa_last_iteration_array"] = {
+                "global_shape": (1, 1),
                 "chunk_shape": (1, 1),
-                "nb_chunks_per_dim": (1, 1),
                 "chunk_position": (0, 0),
             }
         self._comm_timeout = 120 if _comm_timeout is None else int(_comm_timeout)
@@ -285,7 +284,7 @@ class Bridge:
                     # global info of array (same across bridges)
                     array_name=array_name,
                     chunk_shape=meta["chunk_shape"],
-                    nb_chunks_per_dim=meta["nb_chunks_per_dim"],
+                    global_shape=meta["global_shape"],
                     # local info of array specific to bridge
                     bridge_id=self.bridge_id,
                     chunk_position=meta["chunk_position"],

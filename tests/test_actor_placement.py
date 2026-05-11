@@ -119,8 +119,8 @@ def test_actor_placement(enable_distributed_scheduling, ray_multinode_cluster):
     def make_client_and_return_ids():
         arrays_md = {
             "array": {
+                "global_shape": (1, 1),
                 "chunk_shape": (1, 1),
-                "nb_chunks_per_dim": (1, 1),
                 "chunk_position": (0, 0),
             }
         }

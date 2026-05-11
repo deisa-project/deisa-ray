@@ -78,8 +78,8 @@ def _validate_single_array_metadata(
     meta : Mapping[str, Any]
         Metadata for this array. Must contain at least:
 
+        - ``global_shape``: sequence of positive ints
         - ``chunk_shape``: sequence of positive ints
-        - ``nb_chunks_per_dim``: sequence of positive ints
         - ``chunk_position``: sequence of ints of same length as
           ``chunk_shape``
 
@@ -92,6 +92,14 @@ def _validate_single_array_metadata(
     """
     normalized_meta = dict(meta)
 
+    # global_shape: tuple/list/1d ndarray of positive ints
+    global_shape = _normalize_int_sequence(meta["global_shape"], field_name="global_shape", array_name=name)
+    if not all(n > 0 for n in global_shape):
+        raise TypeError(
+            f"arrays_metadata['{name}']['global_shape'] must be a sequence of positive ints, got {global_shape!r}"
+        )
+    normalized_meta["global_shape"] = global_shape
+
     # chunk_shape: tuple/list/1d ndarray of positive ints
     chunk_shape = _normalize_int_sequence(meta["chunk_shape"], field_name="chunk_shape", array_name=name)
     if not all(n > 0 for n in chunk_shape):
@@ -100,18 +108,15 @@ def _validate_single_array_metadata(
         )
     normalized_meta["chunk_shape"] = chunk_shape
 
-    # nb_chunks_per_dim: same pattern
-    nb_chunks_per_dim = _normalize_int_sequence(
-        meta["nb_chunks_per_dim"],
-        field_name="nb_chunks_per_dim",
-        array_name=name,
-    )
-    if not all(n > 0 for n in nb_chunks_per_dim):
-        raise TypeError(
-            f"arrays_metadata['{name}']['nb_chunks_per_dim'] must be a "
-            f"sequence of positive ints, got {nb_chunks_per_dim!r}"
+    if len(global_shape) != len(chunk_shape):
+        raise ValueError(f"arrays_metadata['{name}']['global_shape'] must have the same length as 'chunk_shape'")
+
+    if any(global_dim % chunk_dim != 0 for global_dim, chunk_dim in zip(global_shape, chunk_shape)):
+        raise ValueError(
+            f"arrays_metadata['{name}']['global_shape'] must be evenly divisible by 'chunk_shape'"
         )
-    normalized_meta["nb_chunks_per_dim"] = nb_chunks_per_dim
+
+    nb_chunks_per_dim = tuple(global_dim // chunk_dim for global_dim, chunk_dim in zip(global_shape, chunk_shape))
 
     # chunk_position: sequence of ints of same length as chunk_shape
     chunk_position = _normalize_int_sequence(
@@ -158,8 +163,8 @@ def _validate_arrays_meta(
         raise TypeError(f"arrays_metadata must be a mapping from str to dict, got {type(arrays_metadata).__name__}")
 
     required_keys = {
+        "global_shape",
         "chunk_shape",
-        "nb_chunks_per_dim",
         "chunk_position",
     }
 

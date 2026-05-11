@@ -114,7 +114,7 @@ class NodeActorBase:
         bridge_id: int,
         array_name: str,
         chunk_shape,
-        nb_chunks_per_dim,
+        global_shape,
         chunk_position,
     ) -> None:
         partial_array = self._create_or_retrieve_partial_array(array_name)
@@ -123,10 +123,13 @@ class NodeActorBase:
         partial_array.chunks_contained_meta.add((bridge_id, chunk_position, chunk_shape))
         partial_array.bid_to_pos[bridge_id] = chunk_position
 
-        # increase the counter of chunks of the node for this array. 
+        # increase the counter of chunks of the node for this array.
         self.local_chunks[array_name] += 1
-        # TODO remove dirty fix just to make args work in call below
-        self.nb_chunks_per_dim[array_name] = nb_chunks_per_dim
+        nb_chunks_per_dim = tuple(global_dim // chunk_dim for global_dim, chunk_dim in zip(global_shape, chunk_shape))
+        if array_name in self.nb_chunks_per_dim:
+            assert self.nb_chunks_per_dim[array_name] == nb_chunks_per_dim
+        else:
+            self.nb_chunks_per_dim[array_name] = nb_chunks_per_dim
 
     # TODO this call should happen one time (even though it is called once by each bridge)
     # it also should be blocking in the sense that all bridges should call it, but only the first one should trigger the registration with the head actor, 

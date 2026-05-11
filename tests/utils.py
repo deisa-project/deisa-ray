@@ -66,8 +66,8 @@ def simple_worker(
     sys_md = {"world_size": nb_nodes, "master_address": "127.0.0.1", "master_port": port}
     arrays_md = {
         name: {
+            "global_shape": tuple(n * c for n, c in zip(chunks_per_dim, chunk_size)),
             "chunk_shape": chunk_size,
-            "nb_chunks_per_dim": chunks_per_dim,
             "chunk_position": position,
         }
         for name in array_name
@@ -107,8 +107,8 @@ def simple_worker_error_test(
     sys_md = {"world_size": nb_nodes, "master_address": "127.0.0.1", "master_port": port}
     arrays_md = {
         array_name: {
+            "global_shape": tuple(n * c for n, c in zip(chunks_per_dim, chunk_size)),
             "chunk_shape": chunk_size,
-            "nb_chunks_per_dim": chunks_per_dim,
             "chunk_position": position,
         }
     }

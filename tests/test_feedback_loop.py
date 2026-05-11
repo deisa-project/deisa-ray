@@ -175,8 +175,8 @@ def feedback_worker(*, rank: int, port: int) -> tuple[int, str, int]:
     sys_md = {"world_size": 2, "master_address": "127.0.0.1", "master_port": port}
     arrays_md = {
         "array": {
+            "global_shape": (2,),
             "chunk_shape": (1,),
-            "nb_chunks_per_dim": (2,),
             "chunk_position": (rank,),
         }
     }

@@ -11,6 +11,7 @@ from deisa.ray.types import RayActorHandle
 from tests.stubs import StubSchedulingActor
 from deisa.ray.bridge import Bridge
 from deisa.ray.comm import MPICommAdapter, NoOpComm, TorchDistComm
+from deisa.ray.validate import _validate_arrays_meta
 from tests.utils import pick_free_port
 
 
@@ -27,8 +28,8 @@ def _actor_names_by_prefix(prefix="sched-"):
 
 arrays_md = {
     "array": {
+        "global_shape": (1, 1),
         "chunk_shape": (1, 1),
-        "nb_chunks_per_dim": (1, 1),
         "chunk_position": (0, 0),
     }
 }
@@ -161,8 +162,8 @@ def test_init_normalizes_list_chunk_metadata(ray_cluster):
     sys_md = {"world_size": 1, "master_address": "127.0.0.1", "master_port": port}
     list_arrays_md = {
         "array": {
+            "global_shape": [1, 1],
             "chunk_shape": [1, 1],
-            "nb_chunks_per_dim": [1, 1],
             "chunk_position": [0, 0],
         }
     }
@@ -176,8 +177,9 @@ def test_init_normalizes_list_chunk_metadata(ray_cluster):
         scheduling_actor_cls=StubSchedulingActor,
     )
 
+    assert c.arrays_metadata["array"]["global_shape"] == (1, 1)
     assert c.arrays_metadata["array"]["chunk_shape"] == (1, 1)
-    assert c.arrays_metadata["array"]["nb_chunks_per_dim"] == (1, 1)
+    assert "nb_chunks_per_dim" not in c.arrays_metadata["array"]
     assert c.arrays_metadata["array"]["chunk_position"] == (0, 0)
 
 
@@ -187,8 +189,8 @@ def test_init_normalizes_ndarray_chunk_metadata(ray_cluster):
     sys_md = {"world_size": 1, "master_address": "127.0.0.1", "master_port": port}
     ndarray_arrays_md = {
         "array": {
+            "global_shape": np.array([1, 1], dtype=np.int64),
             "chunk_shape": np.array([1, 1], dtype=np.int64),
-            "nb_chunks_per_dim": np.array([1, 1], dtype=np.int64),
             "chunk_position": np.array([0, 0], dtype=np.int64),
         }
     }
@@ -202,9 +204,36 @@ def test_init_normalizes_ndarray_chunk_metadata(ray_cluster):
         scheduling_actor_cls=StubSchedulingActor,
     )
 
+    assert c.arrays_metadata["array"]["global_shape"] == (1, 1)
     assert c.arrays_metadata["array"]["chunk_shape"] == (1, 1)
-    assert c.arrays_metadata["array"]["nb_chunks_per_dim"] == (1, 1)
+    assert "nb_chunks_per_dim" not in c.arrays_metadata["array"]
     assert c.arrays_metadata["array"]["chunk_position"] == (0, 0)
+
+
+def test_arrays_metadata_requires_global_shape_instead_of_nb_chunks_per_dim():
+    old_arrays_md = {
+        "array": {
+            "chunk_shape": (1, 1),
+            "nb_chunks_per_dim": (1, 1),
+            "chunk_position": (0, 0),
+        }
+    }
+
+    with pytest.raises(ValueError, match="missing required keys: .*global_shape"):
+        _validate_arrays_meta(old_arrays_md)
+
+
+def test_arrays_metadata_global_shape_must_match_chunk_grid():
+    arrays_md = {
+        "array": {
+            "global_shape": (3, 2),
+            "chunk_shape": (2, 1),
+            "chunk_position": (0, 0),
+        }
+    }
+
+    with pytest.raises(ValueError, match="evenly divisible"):
+        _validate_arrays_meta(arrays_md)
 
 
 def test_close_returns_timestep_and_logs(ray_cluster, caplog):

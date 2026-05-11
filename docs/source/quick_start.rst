@@ -68,13 +68,10 @@ The simulation creates one ``Bridge`` per participating rank and sends chunks.
     # descriptio of arrays being shared
     arrays_md = {
         "temperature": {
+            # shape of the full distributed array
+            "global_shape": (256, 256),
             # shape of the chunk
             "chunk_shape": (64, 64),
-            # how many chunks in each dimension
-            "nb_chunks_per_dim": (4, 4),
-            # how many chunks / bridges per node
-            # dype
-            "dtype": np.float64,
             # the coordinates of the chunk block in 
             # the global distributed array
             "chunk_position": (0, 0),
