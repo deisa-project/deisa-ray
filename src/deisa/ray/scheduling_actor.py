@@ -89,7 +89,6 @@ class NodeActorBase:
         self.finalization_lock = asyncio.Lock()
         self.local_chunks: dict[str, int] = {}
         self.nb_chunks_per_dim: dict[str, tuple[int, ...]] = {}
-        self.dtype_per_array: dict[str, np.dtype] = {}
 
     def _create_or_retrieve_partial_array(self, array_name: str) -> PartialArray:
         """
@@ -116,7 +115,6 @@ class NodeActorBase:
         array_name: str,
         chunk_shape,
         nb_chunks_per_dim,
-        dtype,
         chunk_position,
     ) -> None:
         partial_array = self._create_or_retrieve_partial_array(array_name)
@@ -129,7 +127,6 @@ class NodeActorBase:
         self.local_chunks[array_name] += 1
         # TODO remove dirty fix just to make args work in call below
         self.nb_chunks_per_dim[array_name] = nb_chunks_per_dim
-        self.dtype_per_array[array_name] = dtype
 
     # TODO this call should happen one time (even though it is called once by each bridge)
     # it also should be blocking in the sense that all bridges should call it, but only the first one should trigger the registration with the head actor, 
@@ -155,7 +152,6 @@ class NodeActorBase:
                 await self.head.register_partial_array.options(enable_task_events=False).remote(
                     self.actor_id,
                     name,
-                    self.dtype_per_array[name],
                     # TODO I could figure this out from the global size and the chunk shape
                     self.nb_chunks_per_dim[name],
                     list(partial_array.chunks_contained_meta),
@@ -187,6 +183,7 @@ class NodeActorBase:
         bridge_id: int,
         array_name: str,
         chunk_ref: list[ray.ObjectRef],
+        dtype,
         timestep: int,
     ) -> None:
         """
@@ -205,6 +202,8 @@ class NodeActorBase:
         chunk_ref : list[ray.ObjectRef]
             Single-element list containing the Ray ObjectRef to the chunk
             data. The extra list level is kept for Dask compatibility.
+        dtype : np.dtype
+            NumPy dtype read from the chunk before it was stored in Ray.
         timestep : int
             Timestep index the chunk belongs to.
         Returns
@@ -245,9 +244,14 @@ class NodeActorBase:
 
         chunk_ref: ray.ObjectRef = chunk_ref[0]
         array_timestep.local_chunks[bridge_id] = chunk_ref
+        if array_timestep.dtype is None:
+            array_timestep.dtype = dtype
+        else:
+            assert array_timestep.dtype == dtype
 
         if len(array_timestep.local_chunks) == self.local_chunks[array_name]:
             pos_to_ref: dict[tuple, ray.ObjectRef] = {}
+            assert array_timestep.dtype is not None
 
             for bridge_id, ref in array_timestep.local_chunks._data.items():
                 assert isinstance(ref, ray.ObjectRef)
@@ -258,7 +262,7 @@ class NodeActorBase:
 
             # TODO rename
             await self.head.chunks_ready.options(enable_task_events=False).remote(
-                array_name, timestep, pos_to_ref, self.actor_id
+                array_name, timestep, pos_to_ref, self.actor_id, array_timestep.dtype
             )
 
             array_timestep.chunks_ready_event.set()

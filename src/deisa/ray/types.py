@@ -41,6 +41,8 @@ class ArrayPerTimestep:
         Mapping of ``bridge_id`` to the double ObjectRef for that chunk. Once
         forwarded to the head actor the value is replaced with pickled bytes
         to free memory.
+    dtype : np.dtype or None
+        Dtype shared by all chunks received for this array timestep.
     """
 
     def __init__(self):
@@ -50,6 +52,7 @@ class ArrayPerTimestep:
 
         # {bridgeID: chunk}
         self.local_chunks: AsyncDict[int, ray.ObjectRef | bytes] = AsyncDict()
+        self.dtype: np.dtype | None = None
 
 
 class PartialArray:
@@ -448,9 +451,8 @@ class DaskArrayData:
     chunks_size : list[list[int | None]] or None
         For each dimension, the size of chunks in that dimension. None
         values indicate unknown chunk sizes.
-    dtype : np.dtype or None
-        The numpy dtype of the array chunks. Set when first chunk owner
-        is registered.
+    dtype_by_timestep : dict[Timestep, np.dtype]
+        NumPy dtype for each timestep, set when chunk data arrives.
     position_to_node_actorID : dict[tuple[int, ...], int]
         Mapping from chunk position to the scheduling actor responsible
         for that chunk.
@@ -489,8 +491,8 @@ class DaskArrayData:
         # For each dimension, the size of the chunks in this dimension
         self.chunks_size: list[list[int | None]] | None = None
 
-        # Type of the numpy arrays
-        self.dtype: np.dtype | None = None
+        # Type of the numpy arrays, scoped to each timestep.
+        self.dtype_by_timestep: dict[Timestep, np.dtype] = {}
 
         # ID of the scheduling actor in charge of the chunk at each position
         self.position_to_node_actorID: dict[tuple[int, ...], int] = {}
@@ -512,7 +514,6 @@ class DaskArrayData:
     def update_meta(
         self,
         nb_chunks_per_dim: tuple[int, ...],
-        dtype: np.dtype,
         position: tuple[int, ...],
         size: tuple[int, ...],
         node_actor_id: int,
@@ -523,14 +524,12 @@ class DaskArrayData:
 
         This method records which scheduling actor is responsible for a chunk
         and updates the array metadata. If this is the first chunk registered,
-        it initializes the array dimensions and dtype.
+        it initializes the array dimensions.
 
         Parameters
         ----------
         nb_chunks_per_dim : tuple[int, ...]
             Number of chunks per dimension in the array decomposition.
-        dtype : np.dtype
-            The numpy dtype of the chunk.
         position : tuple[int, ...]
             The position of the chunk in the array decomposition.
         size : tuple[int, ...]
@@ -544,19 +543,16 @@ class DaskArrayData:
         ------
         AssertionError
             If the chunk position is out of bounds, or if subsequent chunks
-            have inconsistent dimensions, dtype, or sizes compared to the
-            first chunk.
+            have inconsistent dimensions or sizes compared to the first chunk.
         """
         # TODO should be done just once
         if self.nb_chunks_per_dim is None:
             self.nb_chunks_per_dim = nb_chunks_per_dim
             self.nb_chunks = math.prod(nb_chunks_per_dim)
 
-            self.dtype = dtype
             self.chunks_size = [[None for _ in range(n)] for n in nb_chunks_per_dim]
         else:
             assert self.nb_chunks_per_dim == nb_chunks_per_dim
-            assert self.dtype == dtype
             assert self.chunks_size is not None
 
         # TODO this actually should be done each time
@@ -568,6 +564,12 @@ class DaskArrayData:
                 self.chunks_size[i][pos] = size[i]
             else:
                 assert self.chunks_size[i][pos] == size[i]
+
+    def update_dtype(self, timestep: Timestep, dtype: np.dtype) -> None:
+        if timestep not in self.dtype_by_timestep:
+            self.dtype_by_timestep[timestep] = dtype
+        else:
+            assert self.dtype_by_timestep[timestep] == dtype
 
     def add_chunk_ref(
         self, chunk_ref: ray.ObjectRef, timestep: Timestep, pos_to_ref: dict[tuple, ray.ObjectRef]
@@ -646,10 +648,12 @@ class DaskArrayData:
         """
         assert len(self.position_to_node_actorID) == self.nb_chunks
         assert self.nb_chunks is not None and self.nb_chunks_per_dim is not None
+        assert timestep in self.dtype_by_timestep
 
         # We need to add the timestep since the same name can be used several times for different
         # timesteps
         dask_name = f"{self.name}_{timestep}"
+        dtype = self.dtype_by_timestep.pop(timestep)
 
         del self.chunk_refs[timestep]
 
@@ -679,7 +683,7 @@ class DaskArrayData:
             dsk,
             dask_name,
             chunks=self.chunks_size,
-            dtype=self.dtype,
+            dtype=dtype,
             t=timestep,
         )
 

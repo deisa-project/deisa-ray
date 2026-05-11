@@ -68,7 +68,6 @@ def simple_worker(
         name: {
             "chunk_shape": chunk_size,
             "nb_chunks_per_dim": chunks_per_dim,
-            "dtype": dtype,
             "chunk_position": position,
         }
         for name in array_name
@@ -110,7 +109,6 @@ def simple_worker_error_test(
         array_name: {
             "chunk_shape": chunk_size,
             "nb_chunks_per_dim": chunks_per_dim,
-            "dtype": dtype,
             "chunk_position": position,
         }
     }

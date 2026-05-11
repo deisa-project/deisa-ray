@@ -29,7 +29,6 @@ arrays_md = {
     "array": {
         "chunk_shape": (1, 1),
         "nb_chunks_per_dim": (1, 1),
-        "dtype": np.int32,
         "chunk_position": (0, 0),
     }
 }
@@ -164,7 +163,6 @@ def test_init_normalizes_list_chunk_metadata(ray_cluster):
         "array": {
             "chunk_shape": [1, 1],
             "nb_chunks_per_dim": [1, 1],
-            "dtype": np.int32,
             "chunk_position": [0, 0],
         }
     }
@@ -191,7 +189,6 @@ def test_init_normalizes_ndarray_chunk_metadata(ray_cluster):
         "array": {
             "chunk_shape": np.array([1, 1], dtype=np.int64),
             "nb_chunks_per_dim": np.array([1, 1], dtype=np.int64),
-            "dtype": np.int32,
             "chunk_position": np.array([0, 0], dtype=np.int64),
         }
     }

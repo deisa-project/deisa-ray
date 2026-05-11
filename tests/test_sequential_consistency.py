@@ -37,7 +37,6 @@ def strange_worker(
         name: {
             "chunk_shape": chunk_size,
             "nb_chunks_per_dim": chunks_per_dim,
-            "dtype": dtype,
             "chunk_position": position,
         }
         for name in array_name

@@ -80,7 +80,6 @@ def _validate_single_array_metadata(
 
         - ``chunk_shape``: sequence of positive ints
         - ``nb_chunks_per_dim``: sequence of positive ints
-        - ``dtype``: NumPy dtype or anything accepted by ``np.dtype``
         - ``chunk_position``: sequence of ints of same length as
           ``chunk_shape``
 
@@ -161,7 +160,6 @@ def _validate_arrays_meta(
     required_keys = {
         "chunk_shape",
         "nb_chunks_per_dim",
-        "dtype",
         "chunk_position",
     }
 

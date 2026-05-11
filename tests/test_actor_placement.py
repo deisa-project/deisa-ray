@@ -121,7 +121,6 @@ def test_actor_placement(enable_distributed_scheduling, ray_multinode_cluster):
             "array": {
                 "chunk_shape": (1, 1),
                 "nb_chunks_per_dim": (1, 1),
-                "dtype": np.int32,
                 "chunk_position": (0, 0),
             }
         }

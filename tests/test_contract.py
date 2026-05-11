@@ -99,7 +99,6 @@ def test_sim_start_first_and_analytics_can_start_after_x_secs(ray_multinode_clus
             "array": {
                 "chunk_shape": (1, 1),
                 "nb_chunks_per_dim": (2, 2),
-                "dtype": np.int32,
                 "chunk_position": chunk_pos,
             }
         }
@@ -185,7 +184,6 @@ def test_analytics_start_first_and_sim_can_start_after_x_secs(ray_multinode_clus
             "array": {
                 "chunk_shape": (1, 1),
                 "nb_chunks_per_dim": (2, 2),
-                "dtype": np.int32,
                 "chunk_position": chunk_pos,
             }
         }
@@ -268,7 +266,6 @@ def test_sim_raise_if_not_enough_bridges_connect(ray_multinode_cluster):
                 "array": {
                     "chunk_shape": (1, 1),
                     "nb_chunks_per_dim": (2, 2),
-                    "dtype": np.int32,
                     "chunk_position": chunk_pos,
                 }
             }

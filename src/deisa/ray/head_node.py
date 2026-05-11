@@ -147,7 +147,6 @@ class HeadNodeActor:
         self,
         actor_id_who_owns: int,
         array_name: str,
-        dtype: np.dtype,
         nb_chunks_per_dim: tuple[int, ...],
         chunks_meta: list[tuple[int, tuple[int, ...], tuple[int, ...]]],  # [(chunk position, chunk size), ...]
     ):
@@ -160,8 +159,6 @@ class HeadNodeActor:
             Scheduling actor ID that owns the provided chunks.
         array_name : str
             Name of the array being registered.
-        dtype : np.dtype
-            NumPy dtype for all chunks owned by the actor.
         nb_chunks_per_dim : tuple[int, ...]
             Global chunk grid shape (number of chunks per dimension).
         chunks_meta : list[tuple[int, tuple[int, ...], tuple[int, ...]]]
@@ -186,7 +183,7 @@ class HeadNodeActor:
         # TODO missing check that analytics and sim have required/set same name of arrays, otherwise array is created and nothing happens
 
         for bridge_id, position, size in chunks_meta:
-            array.update_meta(nb_chunks_per_dim, dtype, position, size, actor_id_who_owns, bridge_id)
+            array.update_meta(nb_chunks_per_dim, position, size, actor_id_who_owns, bridge_id)
 
     def exchange_config(self, config: dict) -> None:
         """
@@ -281,7 +278,12 @@ class HeadNodeActor:
         return False, None
 
     async def chunks_ready(
-        self, array_name: str, timestep: Timestep, pos_to_ref: dict[tuple, ray.ObjectRef], actor_id: str
+        self,
+        array_name: str,
+        timestep: Timestep,
+        pos_to_ref: dict[tuple, ray.ObjectRef],
+        actor_id: str,
+        dtype: np.dtype,
     ) -> None:
         """
         Receive chunk references for a timestep and enqueue the full array when complete.
@@ -311,6 +313,7 @@ class HeadNodeActor:
         semaphore is released when analytics later consume the array.
         """
         array = self.registered_arrays[array_name]
+        array.update_dtype(timestep, dtype)
         semaphore = self.semaphore_per_array[array_name]
         created_event = self.new_array_created[array_name]
 

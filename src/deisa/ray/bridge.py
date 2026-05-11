@@ -89,7 +89,6 @@ class Bridge:
             "temperature": {
                 "chunk_shape": (10, 10),
                 "nb_chunks_per_dim": (4, 4),
-                "dtype": np.float64,
                 "chunk_position": (0, 0),
             }
         }
@@ -197,7 +196,6 @@ class Bridge:
             self.arrays_metadata["__deisa_last_iteration_array"] = {
                 "chunk_shape": (1, 1),
                 "nb_chunks_per_dim": (1, 1),
-                "dtype": np.int16,
                 "chunk_position": (0, 0),
             }
         self._comm_timeout = 120 if _comm_timeout is None else int(_comm_timeout)
@@ -288,7 +286,6 @@ class Bridge:
                     array_name=array_name,
                     chunk_shape=meta["chunk_shape"],
                     nb_chunks_per_dim=meta["nb_chunks_per_dim"],
-                    dtype=meta["dtype"],
                     # local info of array specific to bridge
                     bridge_id=self.bridge_id,
                     chunk_position=meta["chunk_position"],
@@ -341,12 +338,14 @@ class Bridge:
             Blocks until the node actor processes the chunk.
         """
         try:
+            chunk_dtype = chunk.dtype
             # Setting the owner allows keeping the reference when the simulation script terminates.
             ref = ray.put(chunk, _owner=self.node_actor)
             future: ray.ObjectRef = self.node_actor.add_chunk.remote(
                 bridge_id=self.bridge_id,
                 array_name=array_name,
                 chunk_ref=[ref],
+                dtype=chunk_dtype,
                 timestep=timestep,
             )  # type: ignore
             # Wait until the data is processed before returning to the simulation
@@ -383,11 +382,14 @@ class Bridge:
         self.comm.barrier()
         if self.bridge_id == 0:
             try:
-                ref = ray.put(0, _owner=self.node_actor)
+                chunk = np.asarray(0)
+                chunk_dtype = chunk.dtype
+                ref = ray.put(chunk, _owner=self.node_actor)
                 future: ray.ObjectRef = self.node_actor.add_chunk.remote(
                     bridge_id=self.bridge_id,
                     array_name="__deisa_last_iteration_array",
                     chunk_ref=[ref],
+                    dtype=chunk_dtype,
                     timestep=timestep,
                 )  # type: ignore
                 ray.get(future)
