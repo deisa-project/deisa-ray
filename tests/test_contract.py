@@ -103,18 +103,16 @@ def test_sim_start_first_and_analytics_can_start_after_x_secs(ray_multinode_clus
             }
         }
 
-        sys_md = {"world_size": 4, "master_address": "127.0.0.1", "master_port": port}
         try:
             comm = init_gloo_comm(
-                sys_md["world_size"],
+                4,
                 rank,
-                sys_md["master_address"],
-                sys_md["master_port"],
+                "127.0.0.1",
+                port,
             )
             b = Bridge(
                 arrays_metadata=arrays_md,
                 comm=comm,
-                system_metadata=sys_md,
                 _node_id=None,
             )  # type:ignore
             b.close(timestep=0)
@@ -195,18 +193,16 @@ def test_analytics_start_first_and_sim_can_start_after_x_secs(ray_multinode_clus
             }
         }
 
-        sys_md = {"world_size": 4, "master_address": "127.0.0.1", "master_port": port}
         try:
             comm = init_gloo_comm(
-                sys_md["world_size"],
+                4,
                 rank,
-                sys_md["master_address"],
-                sys_md["master_port"],
+                "127.0.0.1",
+                port,
             )
             b = Bridge(
                 arrays_metadata=arrays_md,
                 comm=comm,
-                system_metadata=sys_md,
                 _node_id=None,
             )  # type:ignore
             b.close(timestep=0)
@@ -283,19 +279,17 @@ def test_sim_raise_if_not_enough_bridges_connect(ray_multinode_cluster):
                     "chunk_position": chunk_pos,
                 }
             }
-            sys_md = {"world_size": 4, "master_address": "127.0.0.1", "master_port": port}
             try:
                 comm = init_gloo_comm(
-                    sys_md["world_size"],
+                    4,
                     rank,
-                    sys_md["master_address"],
-                    sys_md["master_port"],
+                    "127.0.0.1",
+                    port,
                     timeout_s=10,
                 )
                 b = Bridge(
                     arrays_metadata=arrays_md,
                     comm=comm,
-                    system_metadata=sys_md,
                     _node_id=None,
                 )  # type:ignore
                 b.close(timestep=0)

@@ -7,7 +7,7 @@ from deisa.ray.comm import NoOpComm
 from ray.util.state import list_actors
 from deisa.ray.types import DeisaArray
 from ray.cluster_utils import Cluster
-from tests.utils import wait_for_head_node, pick_free_port
+from tests.utils import wait_for_head_node
 
 
 @pytest.fixture
@@ -125,12 +125,9 @@ def test_actor_placement(enable_distributed_scheduling, ray_multinode_cluster):
             }
         }
 
-        port = pick_free_port()
-        sys_md = {"world_size": 1, "master_address": "127.0.0.1", "master_port": port}
         c = Bridge(
             arrays_metadata=arrays_md,
             comm=NoOpComm(0, 1),
-            system_metadata=sys_md,
             _node_id=None,
             scheduling_actor_cls=StubSchedulingActor,
         )  # type:ignore

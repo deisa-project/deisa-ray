@@ -40,30 +40,6 @@ def _normalize_int_sequence(value: Any, *, field_name: str, array_name: str) -> 
     raise TypeError(f"arrays_metadata['{array_name}']['{field_name}'] must be a sequence of ints, got {value!r}")
 
 
-def _validate_system_meta(system_meta: Mapping[str, Any]) -> dict[str, Any]:
-    """
-    Validate and normalize the ``system_metadata`` argument.
-
-    Parameters
-    ----------
-    system_meta : Mapping[str, Any]
-        User-provided system-level metadata.
-
-    Returns
-    -------
-    dict[str, Any]
-        A shallow-copied version of the input mapping.
-
-    Raises
-    ------
-    TypeError
-        If ``system_meta`` is not a mapping.
-    """
-    if not isinstance(system_meta, Mapping):
-        raise TypeError(f"system_metadata must be a mapping, got {type(system_meta).__name__}")
-    return dict(system_meta)
-
-
 def _validate_single_array_metadata(
     name: str,
     meta: Mapping[str, Any],

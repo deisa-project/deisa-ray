@@ -50,7 +50,6 @@ def main() -> None:
     bridge = Bridge(
         arrays_metadata=arrays_md,
         comm=mpi_comm,
-        system_metadata=None,
         _node_id="mpi-node",
     )
 

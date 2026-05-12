@@ -28,11 +28,11 @@ The simulation and analytics may start in either order. The runtime uses Ray
 actors to rendezvous, collect chunks, build Dask arrays, and execute Dask graphs
 close to the data.
 
-Bridges also use a communicator to coordinate with each other. By default,
-``deisa-ray`` creates a Gloo communicator from ``system_metadata``, but
-applications that already run under MPI can pass an MPI communicator instead.
-That communicator is used for fast, efficient bridge-to-bridge coordination,
-including barriers and feedback broadcasts.
+Bridges also use a communicator to coordinate with each other. Applications
+that already run under MPI can pass an MPI communicator directly; otherwise
+they can create a Gloo communicator with ``deisa.ray.comm.init_gloo_comm``
+before constructing the bridge. That communicator is used for fast, efficient
+bridge-to-bridge coordination, including barriers and feedback broadcasts.
 
 Main imports
 ------------
@@ -56,15 +56,14 @@ Simulation-side API
     from deisa.ray.comm import init_gloo_comm
 
     comm = init_gloo_comm(
-        system_metadata["world_size"],
+        world_size,
         rank,
-        system_metadata["master_address"],
-        system_metadata["master_port"],
+        master_address,
+        master_port,
     )
     bridge = Bridge(
         arrays_metadata=arrays_metadata,
         comm=comm,
-        system_metadata=system_metadata,
     )
 
 Each rank that will ever send data must create a ``Bridge``. The
@@ -96,9 +95,6 @@ Arguments
         Position of this bridge's chunk in the global chunk grid. It must have
         the same dimensionality as ``chunk_shape`` and each index must be within
         ``nb_chunks_per_dim``.
-
-``system_metadata``
-    Optional descriptive metadata for the simulation system.
 
 ``comm``
     Required communicator implementing ``deisa.core.ICommunicator``. A raw
@@ -510,11 +506,6 @@ Simulation:
             },
         },
         comm=comm,
-        system_metadata={
-            "world_size": world_size,
-            "master_address": "127.0.0.1",
-            "master_port": 29500,
-        },
     )
 
     for timestep in range(10):

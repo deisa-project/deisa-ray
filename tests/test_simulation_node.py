@@ -37,12 +37,9 @@ arrays_md = {
 
 def test_init(ray_cluster):
     fake_node_id = "FAKE-NODE-1"
-    port = pick_free_port()
-    sys_md = {"world_size": 1, "master_address": "127.0.0.1", "master_port": port}
     c = Bridge(
         arrays_metadata=arrays_md,
         comm=NoOpComm(0, 1),
-        system_metadata=sys_md,
         _node_id=fake_node_id,
         scheduling_actor_cls=StubSchedulingActor,
     )
@@ -54,22 +51,20 @@ def test_init(ray_cluster):
 def test_init_with_explicit_gloo_comm(ray_cluster):
     fake_node_id = "FAKE-NODE-GLOO"
     port = pick_free_port()
-    sys_md = {"world_size": 1, "master_address": "127.0.0.1", "master_port": port}
 
     if dist.is_initialized():
         dist.destroy_process_group()
 
     try:
         comm = init_gloo_comm(
-            sys_md["world_size"],
+            1,
             0,
-            sys_md["master_address"],
-            sys_md["master_port"],
+            "127.0.0.1",
+            port,
         )
         c = Bridge(
             arrays_metadata=arrays_md,
             comm=comm,
-            system_metadata=sys_md,
             _node_id=fake_node_id,
             scheduling_actor_cls=StubSchedulingActor,
         )
@@ -81,14 +76,13 @@ def test_init_with_explicit_gloo_comm(ray_cluster):
             dist.destroy_process_group()
 
 
-def test_init_raises_when_comm_and_system_metadata_are_none(ray_cluster):
-    fake_node_id = "FAKE-NODE-NO-COMM-NO-SYS-MD"
+def test_init_raises_when_comm_is_none(ray_cluster):
+    fake_node_id = "FAKE-NODE-NO-COMM"
 
     with pytest.raises(ValueError, match="comm is required"):
         Bridge(
             arrays_metadata=arrays_md,
             comm=None,
-            system_metadata=None,
             _node_id=fake_node_id,
             scheduling_actor_cls=StubSchedulingActor,
         )
@@ -115,7 +109,6 @@ def test_init_with_mpi_comm_adapter(ray_cluster):
     c = Bridge(
         arrays_metadata=arrays_md,
         comm=mpi_comm,
-        system_metadata=None,
         _node_id=fake_node_id,
         scheduling_actor_cls=StubSchedulingActor,
     )
@@ -135,7 +128,6 @@ def test_init_with_raw_mpi_comm(ray_cluster):
     c = Bridge(
         arrays_metadata=arrays_md,
         comm=MPI.COMM_SELF,
-        system_metadata=None,
         _node_id=fake_node_id,
         scheduling_actor_cls=StubSchedulingActor,
     )
@@ -147,8 +139,6 @@ def test_init_with_raw_mpi_comm(ray_cluster):
 
 def test_init_normalizes_list_chunk_metadata(ray_cluster):
     fake_node_id = "FAKE-NODE-LIST-META"
-    port = pick_free_port()
-    sys_md = {"world_size": 1, "master_address": "127.0.0.1", "master_port": port}
     list_arrays_md = {
         "array": {
             "global_shape": [1, 1],
@@ -160,7 +150,6 @@ def test_init_normalizes_list_chunk_metadata(ray_cluster):
     c = Bridge(
         arrays_metadata=list_arrays_md,
         comm=NoOpComm(0, 1),
-        system_metadata=sys_md,
         _node_id=fake_node_id,
         scheduling_actor_cls=StubSchedulingActor,
     )
@@ -173,8 +162,6 @@ def test_init_normalizes_list_chunk_metadata(ray_cluster):
 
 def test_init_normalizes_ndarray_chunk_metadata(ray_cluster):
     fake_node_id = "FAKE-NODE-NDARRAY-META"
-    port = pick_free_port()
-    sys_md = {"world_size": 1, "master_address": "127.0.0.1", "master_port": port}
     ndarray_arrays_md = {
         "array": {
             "global_shape": np.array([1, 1], dtype=np.int64),
@@ -186,7 +173,6 @@ def test_init_normalizes_ndarray_chunk_metadata(ray_cluster):
     c = Bridge(
         arrays_metadata=ndarray_arrays_md,
         comm=NoOpComm(0, 1),
-        system_metadata=sys_md,
         _node_id=fake_node_id,
         scheduling_actor_cls=StubSchedulingActor,
     )
@@ -225,12 +211,9 @@ def test_arrays_metadata_global_shape_must_match_chunk_grid():
 
 def test_close_returns_timestep_and_logs(ray_cluster, caplog):
     fake_node_id = "FAKE-NODE-CLOSE"
-    port = pick_free_port()
-    sys_md = {"world_size": 1, "master_address": "127.0.0.1", "master_port": port}
     c = Bridge(
         arrays_metadata=arrays_md,
         comm=NoOpComm(0, 1),
-        system_metadata=sys_md,
         _node_id=fake_node_id,
         scheduling_actor_cls=StubSchedulingActor,
     )
@@ -254,16 +237,10 @@ def test_init_race_free(nb_nodes, ray_cluster):
     world_size = len(fake_node_ids)
 
     def _mk(args):
-        rank, (node_id, port) = args
-        sys_md = {
-            "world_size": world_size,
-            "master_address": "127.0.0.1",
-            "master_port": port,
-        }
+        rank, (node_id, _port) = args
         Bridge(
             arrays_metadata=arrays_md,
             comm=NoOpComm(rank, world_size),
-            system_metadata=sys_md,
             _node_id=node_id,
             scheduling_actor_cls=StubSchedulingActor,
         )
@@ -284,14 +261,11 @@ def test_init_race_free(nb_nodes, ray_cluster):
 def test_actor_dies_and_client_recovers(ray_cluster):
     # NOTE: not sure needed because client init happens just once at the beginning.
     fake_node_id = "CRASHY-NODE"
-    port = pick_free_port()
 
     # First client brings up the actor
-    sys_md = {"world_size": 1, "master_address": "127.0.0.1", "master_port": port}
     Bridge(
         arrays_metadata=arrays_md,
         comm=NoOpComm(0, 1),
-        system_metadata=sys_md,
         _node_id=fake_node_id,
         scheduling_actor_cls=StubSchedulingActor,
     )
@@ -303,7 +277,6 @@ def test_actor_dies_and_client_recovers(ray_cluster):
     Bridge(
         arrays_metadata=arrays_md,
         comm=NoOpComm(0, 1),
-        system_metadata=sys_md,
         _node_id=fake_node_id,
         scheduling_actor_cls=StubSchedulingActor,
         _init_retries=5,

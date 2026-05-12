@@ -64,7 +64,6 @@ def simple_worker(
 
     start_iteration = kwargs.get("start_iteration", 0)
 
-    sys_md = {"world_size": nb_nodes, "master_address": "127.0.0.1", "master_port": port}
     arrays_md = {
         name: {
             "global_shape": tuple(n * c for n, c in zip(chunks_per_dim, chunk_size)),
@@ -75,12 +74,12 @@ def simple_worker(
     }
 
     comm = init_gloo_comm(
-        sys_md["world_size"],
+        nb_nodes,
         rank,
-        sys_md["master_address"],
-        sys_md["master_port"],
+        "127.0.0.1",
+        port,
     )
-    client = Bridge(arrays_metadata=arrays_md, comm=comm, system_metadata=sys_md, _node_id=node_id)
+    client = Bridge(arrays_metadata=arrays_md, comm=comm, _node_id=node_id)
 
     array = (rank + 1) * np.ones(chunk_size, dtype=dtype)
 
@@ -112,7 +111,6 @@ def simple_worker_error_test(
     from deisa.ray.bridge import Bridge
     from deisa.ray.comm import init_gloo_comm
 
-    sys_md = {"world_size": nb_nodes, "master_address": "127.0.0.1", "master_port": port}
     arrays_md = {
         array_name: {
             "global_shape": tuple(n * c for n, c in zip(chunks_per_dim, chunk_size)),
@@ -122,12 +120,12 @@ def simple_worker_error_test(
     }
 
     comm = init_gloo_comm(
-        sys_md["world_size"],
+        nb_nodes,
         rank,
-        sys_md["master_address"],
-        sys_md["master_port"],
+        "127.0.0.1",
+        port,
     )
-    client = Bridge(arrays_metadata=arrays_md, comm=comm, system_metadata=sys_md, _node_id=node_id)
+    client = Bridge(arrays_metadata=arrays_md, comm=comm, _node_id=node_id)
 
     array = (rank + 1) * np.ones(chunk_size, dtype=dtype)
 

@@ -57,13 +57,8 @@ The simulation creates one ``Bridge`` per participating rank and sends chunks.
 
     # 4 Bridges in total
     world_size = 4
-    sys_md = {
-        "world_size": world_size,
-        # must be a reachable address by all other bridges (localhost only single machine)
-        "master_address": "127.0.0.1",
-        # free port
-        "master_port": 29500,
-    }
+    master_address = "127.0.0.1"  # localhost only works on a single machine
+    master_port = 29500
 
     # descriptio of arrays being shared
     arrays_md = {
@@ -81,17 +76,16 @@ The simulation creates one ``Bridge`` per participating rank and sends chunks.
     from deisa.ray.comm import init_gloo_comm
 
     comm = init_gloo_comm(
-        sys_md["world_size"],
+        world_size,
         rank,
-        sys_md["master_address"],
-        sys_md["master_port"],
+        master_address,
+        master_port,
     )
 
     # this call should be repeated 4 times with a different rank
     bridge = Bridge(
         arrays_metadata=arrays_md,
         comm=comm,
-        system_metadata=sys_md,
     )
 
     # sending data chunk

@@ -18,7 +18,7 @@ from deisa.ray.comm import normalize_comm
 from deisa.ray.errors import ContractError, _default_exception_handler
 from deisa.ray.scheduling_actor import SchedulingActor as _RealSchedulingActor
 from deisa.ray.types import RayActorHandle
-from deisa.ray.validate import _validate_arrays_meta, _validate_system_meta
+from deisa.ray.validate import _validate_arrays_meta
 from deisa.ray.utils import get_node_actor_options
 import sys
 
@@ -41,10 +41,6 @@ class Bridge:
         Communication backend for the simulation ranks. The bridge ID is
         derived from ``comm.Get_rank()``. Raw ``mpi4py`` communicators are
         wrapped in :class:`deisa.ray.comm.MPICommAdapter`.
-    system_metadata : Mapping[str, Any] or None
-        Cluster-wide metadata (e.g., world size, master address/port). This is
-        optional descriptive metadata; communicator construction happens
-        outside the bridge.
     _node_id : str or None, optional
         Node identifier used for testing or custom scheduling. Defaults to ``None``.
     scheduling_actor_cls : Type, optional
@@ -76,15 +72,9 @@ class Bridge:
                 "chunk_position": (0, 0),
             }
         }
-        system_metadata = {
-            "nb_ranks": 4,
-            "ray_address": "auto",
-        }
-
         bridge = Bridge(
             arrays_metadata=arrays_metadata,
             comm=comm,
-            system_metadata=system_metadata,
         )
 
         bridge.send(
@@ -100,7 +90,6 @@ class Bridge:
         self,
         arrays_metadata: Mapping[str, Mapping[str, Any]],
         comm: ICommunicator,
-        system_metadata: Mapping[str, Any] | None = None,
         *,
         _node_id: str | None = None,
         scheduling_actor_cls: ActorClass = _RealSchedulingActor,
@@ -120,9 +109,6 @@ class Bridge:
             Communication backend to use. The unique bridge identifier is
             derived from ``comm.Get_rank()``. Raw ``mpi4py`` communicators are
             wrapped in :class:`deisa.ray.comm.MPICommAdapter`.
-        system_metadata : Mapping[str, Any] or None, optional
-            System metadata such as address of Ray cluster, number of MPI
-            ranks, and other general information that describes the system.
         _node_id : str or None, optional
             The ID of the node. If None, the ID is taken from the Ray runtime
             context. Useful for testing with several scheduling actors on a
@@ -169,15 +155,12 @@ class Bridge:
         # note we only need the metadata so that it can pass through the entire pipeline correctly and
         # in sequential order, so we just replicate the first metadata we have.
 
-        self.system_metadata = _validate_system_meta(system_metadata) if system_metadata is not None else None
         if self.bridge_id == 0:
             self.arrays_metadata["__deisa_last_iteration_array"] = {
                 "global_shape": (1, 1),
                 "chunk_shape": (1, 1),
                 "chunk_position": (0, 0),
             }
-        if self.system_metadata is None:
-            logger.debug("Bridge %s initialized with custom communicator and no system_metadata", self.bridge_id)
 
         if not ray.is_initialized():
             ray.init(address="auto", log_to_driver=False, logging_level=logging.ERROR)
