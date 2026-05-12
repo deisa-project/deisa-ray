@@ -399,9 +399,9 @@ class Bridge:
 
     def get(
         self,
-        name: str,
-        *,
+        key: str,
         timestep: Timestep | None = None,
+        default: Any | None = None,
     ) -> Any | None:
         """
         Retrieve feedback from analytics to influence the simulation.
@@ -411,11 +411,14 @@ class Bridge:
 
         Parameters
         ----------
-        name : str
-            The name of the key that is being retrieved from the Analytics.
-        timestep : Timestep | None, optional
+        key : str
+            The key that is being retrieved from the Analytics.
+        timestep : Optional[int], optional
             Timestep associated with the requested feedback value. When
-            omitted, returns the entire retained queue for ``name``.
+            omitted, returns the entire retained queue for ``key``.
+        default : Any, optional
+            Value returned when no feedback exists for ``key`` and
+            ``timestep``. Defaults to ``None``.
 
         Notes
         -----
@@ -433,7 +436,7 @@ class Bridge:
         -------
         Any | None
             The feedback value for ``timestep``, the full retained queue when
-            ``timestep`` is omitted, or ``None`` when no feedback exists.
+            ``timestep`` is omitted, or ``default`` when no feedback exists.
 
         Warning
         -------
@@ -447,9 +450,10 @@ class Bridge:
         """
         message = None
         if self.bridge_id == 0:
-            found, value = ray.get(self._get_head_actor().get_feedback.remote(name, timestep))
+            found, value = ray.get(self._get_head_actor().get_feedback.remote(key, timestep))
             message = {"found": found, "value": value}
 
         message = self.comm.bcast(message, root=0)
-        # NOTE: should it return message["found"]?
-        return message["value"]  # will be value or None
+        if not message["found"]:
+            return default
+        return message["value"]

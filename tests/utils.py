@@ -1,9 +1,11 @@
+import logging
+import os
+import socket
 import time
 
 import numpy as np
 import pytest
 import ray
-import socket
 
 
 def pick_free_port():
@@ -19,7 +21,8 @@ def pick_free_port():
 def ray_cluster():
     if ray.is_initialized():
         ray.shutdown()
-    ray.init()
+    os.environ.setdefault("RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO", "0")
+    ray.init(log_to_driver=False, logging_level=logging.ERROR)
     try:
         yield ray.get_runtime_context().gcs_address
     finally:

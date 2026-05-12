@@ -126,8 +126,8 @@ class Deisa:
         into unrelated Dask computations in later tests or user code.
         """
         if self._experimental_distributed_scheduling_enabled:
-            return dask.config.set(scheduler=deisa_ray_get, shuffle="tasks")
-        return dask.config.set(scheduler=ray_dask_get, shuffle="tasks")
+            return dask.config.set(scheduler=deisa_ray_get, dataframe__shuffle__method="tasks")
+        return dask.config.set(scheduler=ray_dask_get, dataframe__shuffle__method="tasks")
 
     def _create_head_actor(self) -> None:
         """

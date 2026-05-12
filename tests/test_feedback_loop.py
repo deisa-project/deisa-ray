@@ -67,7 +67,7 @@ def test_bridge_zero_queries_head_actor_directly(monkeypatch) -> None:
     bridge.comm = NoOpComm()
     bridge.head_actor = _RecordingHeadActor()
     bridge.node_actor = _FailingNodeActor()
-    bridge._closed = False
+    bridge._closed = True
 
     def fake_ray_get(object_ref):
         assert object_ref == "head-feedback-ref"
@@ -76,6 +76,27 @@ def test_bridge_zero_queries_head_actor_directly(monkeypatch) -> None:
     monkeypatch.setattr(ray, "get", fake_ray_get)
 
     assert bridge.get("foo", timestep=7) == "direct"
+    assert bridge.head_actor.get_feedback.calls == [("foo", 7)]
+
+
+def test_bridge_get_returns_default_when_feedback_missing(monkeypatch) -> None:
+    from deisa.ray.bridge import Bridge
+    from deisa.ray.comm import NoOpComm
+
+    bridge = Bridge.__new__(Bridge)
+    bridge.bridge_id = 0
+    bridge.comm = NoOpComm()
+    bridge.head_actor = _RecordingHeadActor()
+    bridge.node_actor = _FailingNodeActor()
+    bridge._closed = True
+
+    def fake_ray_get(object_ref):
+        assert object_ref == "head-feedback-ref"
+        return False, None
+
+    monkeypatch.setattr(ray, "get", fake_ray_get)
+
+    assert bridge.get("foo", timestep=7, default="fallback") == "fallback"
     assert bridge.head_actor.get_feedback.calls == [("foo", 7)]
 
 
