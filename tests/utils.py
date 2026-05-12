@@ -22,7 +22,7 @@ def ray_cluster():
     if ray.is_initialized():
         ray.shutdown()
     os.environ.setdefault("RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO", "0")
-    ray.init(log_to_driver=False, logging_level=logging.ERROR)
+    ray.init()
     try:
         yield ray.get_runtime_context().gcs_address
     finally:

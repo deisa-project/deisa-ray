@@ -7,25 +7,23 @@ top of Ray.
 
 from __future__ import annotations
 import logging
-from typing import Any, Dict, Mapping
+from typing import Any, Dict, Mapping, Optional, Union
 import numpy as np
 import ray
 from ray.actor import ActorClass
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
-from deisa.core import ICommunicator
-from deisa.ray import Timestep
+from deisa.core import ICommunicator, IBridge, validate_arrays_metadata
 from deisa.ray.comm import normalize_comm
 from deisa.ray.errors import ContractError, _default_exception_handler
 from deisa.ray.scheduling_actor import SchedulingActor as _RealSchedulingActor
 from deisa.ray.types import RayActorHandle
-from deisa.ray.validate import _validate_arrays_meta
 from deisa.ray.utils import get_node_actor_options
 import sys
 
 logger = logging.getLogger(__name__)
 
 
-class Bridge:
+class Bridge(IBridge):
     """
     Bridge between MPI ranks and Ray cluster for distributed array processing.
 
@@ -92,7 +90,7 @@ class Bridge:
         comm: ICommunicator,
         *args: Any,
         **kwargs: Any,
-    ) -> None:
+    ):
         """
         Initialize the Bridge to connect MPI rank to Ray cluster.
 
@@ -138,7 +136,7 @@ class Bridge:
         self._init_retries = _init_retries
         self._closed = False
 
-        self.arrays_metadata = _validate_arrays_meta(arrays_metadata)
+        self.arrays_metadata = validate_arrays_metadata(arrays_metadata)
         comm = normalize_comm(comm)
         if comm is None:
             raise ValueError("comm is required")
@@ -227,11 +225,9 @@ class Bridge:
 
     def send(
         self,
-        *,
         array_name: str,
         chunk: np.ndarray,
         timestep: int,
-        test_mode: bool = False,
     ) -> None:
         """
         Make a chunk of data available to the analytics.
@@ -248,9 +244,6 @@ class Bridge:
             The chunk of data to be sent to the analytics.
         timestep : int
             The timestep index for this chunk of data.
-        test_mode : bool, optional
-            Reserved flag for future testing or validation hooks. Currently
-            ignored. Default is False.
 
         Notes
         -----
@@ -287,7 +280,7 @@ class Bridge:
         except Exception as e:
             _default_exception_handler(e)
 
-    def __del__(self):
+    def __del__(self)-> None:
         try:
             if hasattr(self, "comm") and hasattr(self, "node_actor"):
                 self.close(sys.maxsize)
@@ -399,9 +392,9 @@ class Bridge:
     def get(
         self,
         key: str,
-        timestep: Timestep | None = None,
-        default: Any | None = None,
-    ) -> Any | None:
+        timestep: Optional[int] = None,
+        default: Any = None,
+    ) -> Optional[Union[list, Any]]:
         """
         Retrieve feedback from analytics to influence the simulation.
 
