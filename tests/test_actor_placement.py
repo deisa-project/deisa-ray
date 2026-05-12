@@ -1,9 +1,9 @@
 import pytest
 import ray
-import numpy as np
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 from tests.stubs import StubSchedulingActor
 from deisa.ray.bridge import Bridge
+from deisa.ray.comm import NoOpComm
 from ray.util.state import list_actors
 from deisa.ray.types import DeisaArray
 from ray.cluster_utils import Cluster
@@ -128,8 +128,8 @@ def test_actor_placement(enable_distributed_scheduling, ray_multinode_cluster):
         port = pick_free_port()
         sys_md = {"world_size": 1, "master_address": "127.0.0.1", "master_port": port}
         c = Bridge(
-            bridge_id=0,
             arrays_metadata=arrays_md,
+            comm=NoOpComm(0, 1),
             system_metadata=sys_md,
             _node_id=None,
             scheduling_actor_cls=StubSchedulingActor,

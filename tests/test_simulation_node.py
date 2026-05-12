@@ -10,7 +10,7 @@ from ray.util.state import list_actors
 from deisa.ray.types import RayActorHandle
 from tests.stubs import StubSchedulingActor
 from deisa.ray.bridge import Bridge
-from deisa.ray.comm import MPICommAdapter, NoOpComm, TorchDistComm
+from deisa.ray.comm import MPICommAdapter, NoOpComm, TorchDistComm, init_gloo_comm
 from deisa.ray.validate import _validate_arrays_meta
 from tests.utils import pick_free_port
 
@@ -40,11 +40,10 @@ def test_init(ray_cluster):
     port = pick_free_port()
     sys_md = {"world_size": 1, "master_address": "127.0.0.1", "master_port": port}
     c = Bridge(
-        bridge_id=0,
         arrays_metadata=arrays_md,
+        comm=NoOpComm(0, 1),
         system_metadata=sys_md,
         _node_id=fake_node_id,
-        comm=NoOpComm(0, 1),
         scheduling_actor_cls=StubSchedulingActor,
     )
     assert c.node_id == fake_node_id
@@ -52,7 +51,7 @@ def test_init(ray_cluster):
     assert isinstance(c, Bridge)
 
 
-def test_init_with_default_gloo_comm(ray_cluster):
+def test_init_with_explicit_gloo_comm(ray_cluster):
     fake_node_id = "FAKE-NODE-GLOO"
     port = pick_free_port()
     sys_md = {"world_size": 1, "master_address": "127.0.0.1", "master_port": port}
@@ -61,9 +60,15 @@ def test_init_with_default_gloo_comm(ray_cluster):
         dist.destroy_process_group()
 
     try:
+        comm = init_gloo_comm(
+            sys_md["world_size"],
+            0,
+            sys_md["master_address"],
+            sys_md["master_port"],
+        )
         c = Bridge(
-            bridge_id=0,
             arrays_metadata=arrays_md,
+            comm=comm,
             system_metadata=sys_md,
             _node_id=fake_node_id,
             scheduling_actor_cls=StubSchedulingActor,
@@ -76,28 +81,14 @@ def test_init_with_default_gloo_comm(ray_cluster):
             dist.destroy_process_group()
 
 
-def test_init_requires_system_metadata_for_default_gloo(ray_cluster):
-    fake_node_id = "FAKE-NODE-MISSING-SYS-MD"
-
-    with pytest.raises(ValueError, match="system_metadata is required when comm is None"):
-        Bridge(
-            bridge_id=0,
-            arrays_metadata=arrays_md,
-            system_metadata=None,
-            _node_id=fake_node_id,
-            scheduling_actor_cls=StubSchedulingActor,
-        )
-
-
 def test_init_raises_when_comm_and_system_metadata_are_none(ray_cluster):
     fake_node_id = "FAKE-NODE-NO-COMM-NO-SYS-MD"
 
-    with pytest.raises(ValueError, match="system_metadata is required when comm is None"):
+    with pytest.raises(ValueError, match="comm is required"):
         Bridge(
-            bridge_id=0,
             arrays_metadata=arrays_md,
-            system_metadata=None,
             comm=None,
+            system_metadata=None,
             _node_id=fake_node_id,
             scheduling_actor_cls=StubSchedulingActor,
         )
@@ -122,11 +113,10 @@ def test_init_with_mpi_comm_adapter(ray_cluster):
     mpi_comm = MPICommAdapter(fake_mpi_comm)
 
     c = Bridge(
-        bridge_id=0,
         arrays_metadata=arrays_md,
+        comm=mpi_comm,
         system_metadata=None,
         _node_id=fake_node_id,
-        comm=mpi_comm,
         scheduling_actor_cls=StubSchedulingActor,
     )
 
@@ -143,11 +133,10 @@ def test_init_with_raw_mpi_comm(ray_cluster):
     fake_node_id = "FAKE-NODE-RAW-MPI"
 
     c = Bridge(
-        bridge_id=0,
         arrays_metadata=arrays_md,
+        comm=MPI.COMM_SELF,
         system_metadata=None,
         _node_id=fake_node_id,
-        comm=MPI.COMM_SELF,
         scheduling_actor_cls=StubSchedulingActor,
     )
 
@@ -169,11 +158,10 @@ def test_init_normalizes_list_chunk_metadata(ray_cluster):
     }
 
     c = Bridge(
-        bridge_id=0,
         arrays_metadata=list_arrays_md,
+        comm=NoOpComm(0, 1),
         system_metadata=sys_md,
         _node_id=fake_node_id,
-        comm=NoOpComm(0, 1),
         scheduling_actor_cls=StubSchedulingActor,
     )
 
@@ -196,11 +184,10 @@ def test_init_normalizes_ndarray_chunk_metadata(ray_cluster):
     }
 
     c = Bridge(
-        bridge_id=0,
         arrays_metadata=ndarray_arrays_md,
+        comm=NoOpComm(0, 1),
         system_metadata=sys_md,
         _node_id=fake_node_id,
-        comm=NoOpComm(0, 1),
         scheduling_actor_cls=StubSchedulingActor,
     )
 
@@ -241,11 +228,10 @@ def test_close_returns_timestep_and_logs(ray_cluster, caplog):
     port = pick_free_port()
     sys_md = {"world_size": 1, "master_address": "127.0.0.1", "master_port": port}
     c = Bridge(
-        bridge_id=0,
         arrays_metadata=arrays_md,
+        comm=NoOpComm(0, 1),
         system_metadata=sys_md,
         _node_id=fake_node_id,
-        comm=NoOpComm(0, 1),
         scheduling_actor_cls=StubSchedulingActor,
     )
 
@@ -275,11 +261,10 @@ def test_init_race_free(nb_nodes, ray_cluster):
             "master_port": port,
         }
         Bridge(
-            bridge_id=rank,  # IMPORTANT: unique rank per simulated process
             arrays_metadata=arrays_md,
+            comm=NoOpComm(rank, world_size),
             system_metadata=sys_md,
             _node_id=node_id,
-            comm=NoOpComm(rank, world_size),
             scheduling_actor_cls=StubSchedulingActor,
         )
         return True
@@ -304,11 +289,10 @@ def test_actor_dies_and_client_recovers(ray_cluster):
     # First client brings up the actor
     sys_md = {"world_size": 1, "master_address": "127.0.0.1", "master_port": port}
     Bridge(
-        bridge_id=0,
         arrays_metadata=arrays_md,
+        comm=NoOpComm(0, 1),
         system_metadata=sys_md,
         _node_id=fake_node_id,
-        comm=NoOpComm(0, 1),
         scheduling_actor_cls=StubSchedulingActor,
     )
     # Find the actor handle and kill it
@@ -317,12 +301,11 @@ def test_actor_dies_and_client_recovers(ray_cluster):
 
     # Now, creating another client should recover (thanks to retry in Bridge.__init__)
     Bridge(
-        bridge_id=0,
         arrays_metadata=arrays_md,
+        comm=NoOpComm(0, 1),
         system_metadata=sys_md,
         _node_id=fake_node_id,
         scheduling_actor_cls=StubSchedulingActor,
-        comm=NoOpComm(0, 1),
         _init_retries=5,
     )
 

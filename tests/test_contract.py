@@ -1,7 +1,6 @@
 import time
 import pytest
 import ray
-import numpy as np
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 from ray.cluster_utils import Cluster
 from deisa.ray.types import DeisaArray
@@ -94,6 +93,7 @@ def test_sim_start_first_and_analytics_can_start_after_x_secs(ray_multinode_clus
     @ray.remote
     def start_sim(rank, chunk_pos, port):
         from deisa.ray.bridge import Bridge
+        from deisa.ray.comm import init_gloo_comm
 
         arrays_md = {
             "array": {
@@ -105,9 +105,15 @@ def test_sim_start_first_and_analytics_can_start_after_x_secs(ray_multinode_clus
 
         sys_md = {"world_size": 4, "master_address": "127.0.0.1", "master_port": port}
         try:
+            comm = init_gloo_comm(
+                sys_md["world_size"],
+                rank,
+                sys_md["master_address"],
+                sys_md["master_port"],
+            )
             b = Bridge(
-                bridge_id=rank,
                 arrays_metadata=arrays_md,
+                comm=comm,
                 system_metadata=sys_md,
                 _node_id=None,
             )  # type:ignore
@@ -179,6 +185,7 @@ def test_analytics_start_first_and_sim_can_start_after_x_secs(ray_multinode_clus
     @ray.remote
     def start_sim(rank, chunk_pos, port):
         from deisa.ray.bridge import Bridge
+        from deisa.ray.comm import init_gloo_comm
 
         arrays_md = {
             "array": {
@@ -190,9 +197,15 @@ def test_analytics_start_first_and_sim_can_start_after_x_secs(ray_multinode_clus
 
         sys_md = {"world_size": 4, "master_address": "127.0.0.1", "master_port": port}
         try:
+            comm = init_gloo_comm(
+                sys_md["world_size"],
+                rank,
+                sys_md["master_address"],
+                sys_md["master_port"],
+            )
             b = Bridge(
-                bridge_id=rank,
                 arrays_metadata=arrays_md,
+                comm=comm,
                 system_metadata=sys_md,
                 _node_id=None,
             )  # type:ignore
@@ -261,6 +274,7 @@ def test_sim_raise_if_not_enough_bridges_connect(ray_multinode_cluster):
         @ray.remote
         def start_sim(rank, chunk_pos, port):
             from deisa.ray.bridge import Bridge
+            from deisa.ray.comm import init_gloo_comm
 
             arrays_md = {
                 "array": {
@@ -271,12 +285,18 @@ def test_sim_raise_if_not_enough_bridges_connect(ray_multinode_cluster):
             }
             sys_md = {"world_size": 4, "master_address": "127.0.0.1", "master_port": port}
             try:
+                comm = init_gloo_comm(
+                    sys_md["world_size"],
+                    rank,
+                    sys_md["master_address"],
+                    sys_md["master_port"],
+                    timeout_s=10,
+                )
                 b = Bridge(
-                    bridge_id=rank,
                     arrays_metadata=arrays_md,
+                    comm=comm,
                     system_metadata=sys_md,
                     _node_id=None,
-                    _comm_timeout=10,
                 )  # type:ignore
                 b.close(timestep=0)
             except Exception:

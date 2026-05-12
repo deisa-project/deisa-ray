@@ -33,7 +33,6 @@ def main() -> None:
 
     mpi_comm = MPI.COMM_WORLD
     rank = mpi_comm.Get_rank()
-    world_size = mpi_comm.Get_size()
     ray_address = os.environ.get("DEISA_RAY_ADDRESS", "auto")
 
     if not ray.is_initialized():
@@ -49,10 +48,9 @@ def main() -> None:
         }
     }
     bridge = Bridge(
-        bridge_id=rank,
         arrays_metadata=arrays_md,
-        system_metadata=None,
         comm=mpi_comm,
+        system_metadata=None,
         _node_id="mpi-node",
     )
 

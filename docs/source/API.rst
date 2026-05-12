@@ -53,23 +53,28 @@ Simulation-side API
 
 .. code-block:: python
 
+    from deisa.ray.comm import init_gloo_comm
+
+    comm = init_gloo_comm(
+        system_metadata["world_size"],
+        rank,
+        system_metadata["master_address"],
+        system_metadata["master_port"],
+    )
     bridge = Bridge(
-        bridge_id=rank,
         arrays_metadata=arrays_metadata,
+        comm=comm,
         system_metadata=system_metadata,
     )
 
 Each rank that will ever send data must create a ``Bridge``. The
-``bridge_id`` must be unique among participating ranks, and there must be a
-bridge with ``bridge_id=0``. Bridge ``0`` is special because it sends the final
-sentinel array used to stop analytics callback execution.
+bridge ID is derived from ``comm.Get_rank()`` and must be unique among
+participating ranks. There must be a bridge with rank ``0``. Bridge ``0`` is
+special because it sends the final sentinel array used to stop analytics
+callback execution.
 
 Arguments
 """""""""
-
-``bridge_id``
-    Integer identifier for this simulation rank. In MPI programs this is
-    usually the MPI rank.
 
 ``arrays_metadata``
     Mapping from array name to metadata for the chunk owned by this bridge.
@@ -93,30 +98,25 @@ Arguments
         ``nb_chunks_per_dim``.
 
 ``system_metadata``
-    Required when ``comm`` is omitted. The default communicator uses
-    ``system_metadata["world_size"]``, ``system_metadata["master_address"]``,
-    and ``system_metadata["master_port"]`` to initialize a Gloo process group.
-    If a custom communicator is supplied, this argument may be omitted.
+    Optional descriptive metadata for the simulation system.
 
 ``comm``
-    Optional communicator. A raw ``mpi4py.MPI.Comm`` is accepted and wrapped
-    automatically. Any custom communicator must expose ``rank``, ``world_size``,
-    ``barrier()``, and ``broadcast_object(obj, src=0)``. ``Bridge.get`` uses
-    ``broadcast_object`` so bridge ``0`` can query feedback once and share the
-    result with all participating bridges. Passing an MPI communicator is the
-    recommended option when the simulation already has one, because it reuses
-    the simulation's native fast communication layer instead of creating the
-    default Gloo process group.
+    Required communicator implementing ``deisa.core.ICommunicator``. A raw
+    ``mpi4py.MPI.Comm`` is accepted and wrapped automatically. The bridge ID is
+    derived from ``comm.Get_rank()``. ``Bridge.get`` uses ``bcast`` so bridge
+    ``0`` can query feedback once and share the result with all participating
+    bridges. Passing an MPI communicator is the recommended option when the
+    simulation already has one; otherwise build a Gloo communicator with
+    ``deisa.ray.comm.init_gloo_comm`` before constructing the bridge.
 
-``_node_id``, ``scheduling_actor_cls``, ``_init_retries``, ``_comm_timeout``
+``_node_id``, ``scheduling_actor_cls``, ``_init_retries``
     Implementation and testing hooks. Normal users should not need them.
-    ``_comm_timeout`` controls the default Gloo rendezvous timeout in seconds.
 
 Behavior
 """"""""
 
-During construction, ``Bridge`` validates array metadata, initializes or
-normalizes its communicator, starts Ray with ``address="auto"`` if needed,
+During construction, ``Bridge`` validates array metadata, normalizes its
+communicator, starts Ray with ``address="auto"`` if needed,
 creates or reuses a detached scheduling actor on the local Ray node, registers
 the chunk metadata with that actor, waits for actor readiness, and finally
 enters a communicator barrier so all bridges start from a consistent point.
@@ -453,8 +453,8 @@ Participating ranks
     participating world size is fixed at startup.
 
 Master bridge
-    ``bridge_id=0`` must exist. It is responsible for emitting the final
-    sentinel in ``Bridge.close``.
+    A communicator rank ``0`` bridge must exist. It is responsible for emitting
+    the final sentinel in ``Bridge.close``.
 
 Timestep ordering
     Timesteps must be sent in non-decreasing order. The system assumes it can
@@ -499,8 +499,8 @@ Simulation:
 
 .. code-block:: python
 
+    comm = init_gloo_comm(world_size, rank, "127.0.0.1", 29500)
     bridge = Bridge(
-        bridge_id=rank,
         arrays_metadata={
             "temperature": {
                 "chunk_shape": (64, 64),
@@ -509,6 +509,7 @@ Simulation:
                 "chunk_position": chunk_position,
             },
         },
+        comm=comm,
         system_metadata={
             "world_size": world_size,
             "master_address": "127.0.0.1",

@@ -16,8 +16,8 @@ Simulation side
 - The simulation is distributed (MPI or similar) and iterative.
 - Any rank that will **ever** send data must instantiate a ``Bridge``.
 - The total number of participating ranks (``world_size``) is known up front.
-- Each ``Bridge`` has a unique ``bridge_id``, and there is always a bridge with
-  ``bridge_id=0`` (the master bridge).
+- Each ``Bridge`` derives its ID from ``comm.Get_rank()``, and there is always
+  a bridge with rank ``0`` (the master bridge).
 - Each bridge describes the arrays it will share via ``arrays_metadata``.
 - Sends are ordered by non-decreasing timestep: all sends for timestep *i*
   happen before any send for timestep *j > i*.
@@ -78,10 +78,19 @@ The simulation creates one ``Bridge`` per participating rank and sends chunks.
         }
     }
 
-    # this call should be repeated 4 times with a different id
+    from deisa.ray.comm import init_gloo_comm
+
+    comm = init_gloo_comm(
+        sys_md["world_size"],
+        rank,
+        sys_md["master_address"],
+        sys_md["master_port"],
+    )
+
+    # this call should be repeated 4 times with a different rank
     bridge = Bridge(
-        bridge_id=rank,
         arrays_metadata=arrays_md,
+        comm=comm,
         system_metadata=sys_md,
     )
 

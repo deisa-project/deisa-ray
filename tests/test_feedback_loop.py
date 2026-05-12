@@ -171,6 +171,7 @@ def feedback_head() -> bool:
 @ray.remote(num_cpus=0, max_retries=0)
 def feedback_worker(*, rank: int, port: int) -> tuple[int, str, int]:
     from deisa.ray.bridge import Bridge
+    from deisa.ray.comm import init_gloo_comm
 
     sys_md = {"world_size": 2, "master_address": "127.0.0.1", "master_port": port}
     arrays_md = {
@@ -181,7 +182,13 @@ def feedback_worker(*, rank: int, port: int) -> tuple[int, str, int]:
         }
     }
 
-    bridge = Bridge(bridge_id=rank, arrays_metadata=arrays_md, system_metadata=sys_md, _node_id=f"node_{rank}")
+    comm = init_gloo_comm(
+        sys_md["world_size"],
+        rank,
+        sys_md["master_address"],
+        sys_md["master_port"],
+    )
+    bridge = Bridge(arrays_metadata=arrays_md, comm=comm, system_metadata=sys_md, _node_id=f"node_{rank}")
 
     for timestep in range(2):
         bridge.send(

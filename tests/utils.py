@@ -57,6 +57,7 @@ def simple_worker(
 ) -> None:
     """Worker node sending chunks of data"""
     from deisa.ray.bridge import Bridge
+    from deisa.ray.comm import init_gloo_comm
 
     if isinstance(array_name, str):
         array_name = [array_name]
@@ -73,7 +74,13 @@ def simple_worker(
         for name in array_name
     }
 
-    client = Bridge(bridge_id=rank, arrays_metadata=arrays_md, system_metadata=sys_md, _node_id=node_id)
+    comm = init_gloo_comm(
+        sys_md["world_size"],
+        rank,
+        sys_md["master_address"],
+        sys_md["master_port"],
+    )
+    client = Bridge(arrays_metadata=arrays_md, comm=comm, system_metadata=sys_md, _node_id=node_id)
 
     array = (rank + 1) * np.ones(chunk_size, dtype=dtype)
 
@@ -103,6 +110,7 @@ def simple_worker_error_test(
 ) -> None:
     """Worker node sending chunks of data"""
     from deisa.ray.bridge import Bridge
+    from deisa.ray.comm import init_gloo_comm
 
     sys_md = {"world_size": nb_nodes, "master_address": "127.0.0.1", "master_port": port}
     arrays_md = {
@@ -113,7 +121,13 @@ def simple_worker_error_test(
         }
     }
 
-    client = Bridge(bridge_id=rank, arrays_metadata=arrays_md, system_metadata=sys_md, _node_id=node_id)
+    comm = init_gloo_comm(
+        sys_md["world_size"],
+        rank,
+        sys_md["master_address"],
+        sys_md["master_port"],
+    )
+    client = Bridge(arrays_metadata=arrays_md, comm=comm, system_metadata=sys_md, _node_id=node_id)
 
     array = (rank + 1) * np.ones(chunk_size, dtype=dtype)
 

@@ -26,6 +26,7 @@ def strange_worker(
 ) -> None:
     """Strange worker that sends nodes out of order!"""
     from deisa.ray.bridge import Bridge
+    from deisa.ray.comm import init_gloo_comm
 
     if isinstance(array_name, str):
         array_name = [array_name]
@@ -42,7 +43,13 @@ def strange_worker(
         for name in array_name
     }
 
-    client = Bridge(bridge_id=rank, arrays_metadata=arrays_md, system_metadata=sys_md, _node_id=node_id)
+    comm = init_gloo_comm(
+        sys_md["world_size"],
+        rank,
+        sys_md["master_address"],
+        sys_md["master_port"],
+    )
+    client = Bridge(arrays_metadata=arrays_md, comm=comm, system_metadata=sys_md, _node_id=node_id)
 
     array = (rank + 1) * np.ones(chunk_size, dtype=dtype)
 

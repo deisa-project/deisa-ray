@@ -7,31 +7,22 @@ top of Ray.
 
 from __future__ import annotations
 import logging
-from typing import Any, Dict, Mapping, Optional
+from typing import Any, Dict, Mapping
 import numpy as np
 import ray
 from ray.actor import ActorClass
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
+from deisa.core import ICommunicator
 from deisa.ray import Timestep
+from deisa.ray.comm import normalize_comm
+from deisa.ray.errors import ContractError, _default_exception_handler
 from deisa.ray.scheduling_actor import SchedulingActor as _RealSchedulingActor
 from deisa.ray.types import RayActorHandle
-from deisa.ray.errors import ContractError, _default_exception_handler
-from deisa.ray.comm import init_gloo_comm, normalize_comm
 from deisa.ray.validate import _validate_arrays_meta, _validate_system_meta
 from deisa.ray.utils import get_node_actor_options
-import torch.distributed as dist
 import sys
 
 logger = logging.getLogger(__name__)
-
-_GLOO_RENDEZVOUS_ERRORS = tuple(
-    err
-    for err in (
-        getattr(dist, "DistStoreError", None),
-        getattr(dist, "DistNetworkError", None),
-    )
-    if err is not None
-)
 
 
 class Bridge:
@@ -44,19 +35,16 @@ class Bridge:
 
     Parameters
     ----------
-    bridge_id : int
-        Identifier of the MPI rank that owns this bridge instance.
     arrays_metadata : Mapping[str, Mapping[str, Any]]
         Metadata describing the array layout managed by this bridge.
+    comm : deisa.core.ICommunicator
+        Communication backend for the simulation ranks. The bridge ID is
+        derived from ``comm.Get_rank()``. Raw ``mpi4py`` communicators are
+        wrapped in :class:`deisa.ray.comm.MPICommAdapter`.
     system_metadata : Mapping[str, Any] or None
         Cluster-wide metadata (e.g., world size, master address/port). This is
-        required only when ``comm`` is ``None`` and Bridge must initialize the
-        default Gloo communicator.
-    comm : Comm or mpi4py.MPI.Comm, optional
-        Custom communication backend to use instead of the default Gloo
-        communicator. Raw ``mpi4py`` communicators are wrapped in
-        :class:`deisa.ray.comm.MPICommAdapter`. If ``None``,
-        ``init_gloo_comm`` runs with ``system_metadata``.
+        optional descriptive metadata; communicator construction happens
+        outside the bridge.
     _node_id : str or None, optional
         Node identifier used for testing or custom scheduling. Defaults to ``None``.
     scheduling_actor_cls : Type, optional
@@ -64,9 +52,6 @@ class Bridge:
         :class:`deisa.ray.scheduling_actor.SchedulingActor`.
     _init_retries : int, optional
         Number of attempts to create and ready the node actor. Defaults to 3.
-    _comm_timeout : int or None, optional
-        Timeout (in seconds) for Gloo rendezvous during communicator
-        initialization. Defaults to 120.
 
     Attributes
     ----------
@@ -97,9 +82,9 @@ class Bridge:
         }
 
         bridge = Bridge(
-            id=0,
             arrays_metadata=arrays_metadata,
-            system_metadata=system_metadata
+            comm=comm,
+            system_metadata=system_metadata,
         )
 
         bridge.send(
@@ -113,38 +98,31 @@ class Bridge:
     # should sim crash? Keep going?
     def __init__(
         self,
-        bridge_id: int,
         arrays_metadata: Mapping[str, Mapping[str, Any]],
+        comm: ICommunicator,
         system_metadata: Mapping[str, Any] | None = None,
-        comm: Any = None,
         *,
         _node_id: str | None = None,
         scheduling_actor_cls: ActorClass = _RealSchedulingActor,
         _init_retries: int = 3,
-        _comm_timeout: Optional[int] = None,
     ) -> None:
         """
         Initialize the Bridge to connect MPI rank to Ray cluster.
 
         Parameters
         ----------
-        bridge_id : int
-            Unique identifier of this Bridge.
         arrays_metadata : Mapping[str, Mapping[str, Any]]
             Dictionary that describes the arrays being shared by the simulation.
             Keys represent the name of the array while the values are
             dictionaries that must at least declare the metadata expected by
             :meth:`validate_arrays_meta`.
+        comm : deisa.core.ICommunicator
+            Communication backend to use. The unique bridge identifier is
+            derived from ``comm.Get_rank()``. Raw ``mpi4py`` communicators are
+            wrapped in :class:`deisa.ray.comm.MPICommAdapter`.
         system_metadata : Mapping[str, Any] or None, optional
             System metadata such as address of Ray cluster, number of MPI
             ranks, and other general information that describes the system.
-            This is required only when ``comm`` is ``None`` and Bridge must
-            initialize the default Gloo communicator.
-        comm : Comm or mpi4py.MPI.Comm, optional
-            Communication backend to use. Raw ``mpi4py`` communicators are
-            wrapped in :class:`deisa.ray.comm.MPICommAdapter`. If ``None``, a
-            Gloo communicator configured from ``system_metadata`` is
-            initialized.
         _node_id : str or None, optional
             The ID of the node. If None, the ID is taken from the Ray runtime
             context. Useful for testing with several scheduling actors on a
@@ -155,19 +133,15 @@ class Bridge:
         _init_retries : int, optional
             Number of retry attempts when initializing the scheduling actor.
             Default is 3.
-        _comm_timeout : int or None, optional
-            Timeout in seconds for Gloo rendezvous. Default is 120 when not
-            provided.
-
         Raises
         ------
         RuntimeError
             If the scheduling actor cannot be created or initialized after
             the specified number of retries.
         ValueError
-            If ``system_metadata`` is omitted while ``comm`` is ``None``.
-        ValueError
-            If ``_comm_timeout`` is provided and is not strictly positive.
+            If ``comm`` is ``None``.
+        TypeError
+            If ``comm`` does not implement :class:`deisa.core.ICommunicator`.
 
         Notes
         -----
@@ -176,12 +150,17 @@ class Bridge:
         node affinity scheduling when `_node_id` is None. The first remote call
         to the scheduling actor serves as a readiness check.
         """
-        self.bridge_id = bridge_id
         self._init_retries = _init_retries
         self._closed = False
 
         self.arrays_metadata = _validate_arrays_meta(arrays_metadata)
         comm = normalize_comm(comm)
+        if comm is None:
+            raise ValueError("comm is required")
+        if not isinstance(comm, ICommunicator):
+            raise TypeError("comm must implement deisa.core.ICommunicator")
+        self.comm = comm
+        self.bridge_id = self.comm.Get_rank()
 
         # NOTE : Possible error : if two bridges have different first array it will have different
         # shape and will be declared twice.
@@ -197,36 +176,8 @@ class Bridge:
                 "chunk_shape": (1, 1),
                 "chunk_position": (0, 0),
             }
-        self._comm_timeout = 120 if _comm_timeout is None else int(_comm_timeout)
-        if self._comm_timeout <= 0:
-            raise ValueError(f"_comm_timeout must be > 0 seconds, got {self._comm_timeout}")
-
-        if comm is None:
-            if self.system_metadata is None:
-                raise ValueError("system_metadata is required when comm is None")
-            try:
-                comm = init_gloo_comm(
-                    self.system_metadata["world_size"],
-                    self.bridge_id,
-                    self.system_metadata["master_address"],
-                    self.system_metadata["master_port"],
-                    self._comm_timeout,
-                )
-            except _GLOO_RENDEZVOUS_ERRORS as e:
-                e.add_note(
-                    "Gloo rendezvous timeout.\n"
-                    f"Rank: {self.bridge_id}\n"
-                    f"Expected world size: {self.system_metadata['world_size']}\n"
-                    f"Master: {self.system_metadata['master_address']}:{self.system_metadata['master_port']}\n"
-                    "Not all Bridge processes connected before the deadline.\n"
-                    "This usually indicates that one or more Bridge instances crashed, "
-                    "never started, or are blocked during initialization."
-                )
-                raise
-        elif self.system_metadata is None:
+        if self.system_metadata is None:
             logger.debug("Bridge %s initialized with custom communicator and no system_metadata", self.bridge_id)
-
-        self.comm = comm
 
         if not ray.is_initialized():
             ray.init(address="auto", log_to_driver=False, logging_level=logging.ERROR)
@@ -355,7 +306,11 @@ class Bridge:
             _default_exception_handler(e)
 
     def __del__(self):
-        self.close(sys.maxsize)
+        try:
+            if hasattr(self, "comm") and hasattr(self, "node_actor"):
+                self.close(sys.maxsize)
+        except Exception:
+            logger.debug("Ignoring exception while finalizing Bridge", exc_info=True)
 
     def close(
         self,
@@ -512,6 +467,6 @@ class Bridge:
             found, value = ray.get(self._get_head_actor().get_feedback.remote(name, timestep))
             message = {"found": found, "value": value}
 
-        message = self.comm.broadcast_object(message, src=0)
+        message = self.comm.bcast(message, root=0)
         # NOTE: should it return message["found"]?
         return message["value"]  # will be value or None
