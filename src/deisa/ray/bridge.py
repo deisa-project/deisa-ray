@@ -88,19 +88,17 @@ class Bridge:
     # should sim crash? Keep going?
     def __init__(
         self,
-        arrays_metadata: Mapping[str, Mapping[str, Any]],
+        arrays_metadata: Dict[str, Dict],
         comm: ICommunicator,
-        *,
-        _node_id: str | None = None,
-        scheduling_actor_cls: ActorClass = _RealSchedulingActor,
-        _init_retries: int = 3,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         """
         Initialize the Bridge to connect MPI rank to Ray cluster.
 
         Parameters
         ----------
-        arrays_metadata : Mapping[str, Mapping[str, Any]]
+        arrays_metadata : Dict[str, Dict]
             Dictionary that describes the arrays being shared by the simulation.
             Keys represent the name of the array while the values are
             dictionaries that must at least declare the metadata expected by
@@ -109,16 +107,7 @@ class Bridge:
             Communication backend to use. The unique bridge identifier is
             derived from ``comm.Get_rank()``. Raw ``mpi4py`` communicators are
             wrapped in :class:`deisa.ray.comm.MPICommAdapter`.
-        _node_id : str or None, optional
-            The ID of the node. If None, the ID is taken from the Ray runtime
-            context. Useful for testing with several scheduling actors on a
-            single machine. Default is None.
-        scheduling_actor_cls : Type, optional
-            The class to use for creating the scheduling actor. Default is
-            `_RealSchedulingActor`.
-        _init_retries : int, optional
-            Number of retry attempts when initializing the scheduling actor.
-            Default is 3.
+        
         Raises
         ------
         RuntimeError
@@ -136,6 +125,16 @@ class Bridge:
         node affinity scheduling when `_node_id` is None. The first remote call
         to the scheduling actor serves as a readiness check.
         """
+        if args:
+            raise TypeError(f"Bridge.__init__() takes 3 positional arguments but {len(args) + 3} were given")
+
+        _node_id: str | None = kwargs.pop("_node_id", None)
+        scheduling_actor_cls: ActorClass = kwargs.pop("scheduling_actor_cls", _RealSchedulingActor)
+        _init_retries: int = kwargs.pop("_init_retries", 3)
+        if kwargs:
+            unexpected = next(iter(kwargs))
+            raise TypeError(f"Bridge.__init__() got an unexpected keyword argument '{unexpected}'")
+
         self._init_retries = _init_retries
         self._closed = False
 

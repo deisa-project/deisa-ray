@@ -1,6 +1,7 @@
 # TODO: test clean exit if scheduling actor not created
 
 import concurrent.futures
+import inspect
 import ray
 import pytest
 import numpy as np
@@ -46,6 +47,15 @@ def test_init(ray_cluster):
     assert c.node_id == fake_node_id
     assert isinstance(c.node_actor, RayActorHandle)
     assert isinstance(c, Bridge)
+
+
+def test_init_accepts_variadic_args_signature():
+    signature = inspect.signature(Bridge.__init__)
+    parameters = list(signature.parameters.values())
+
+    assert [parameter.name for parameter in parameters[:5]] == ["self", "arrays_metadata", "comm", "args", "kwargs"]
+    assert parameters[3].kind is inspect.Parameter.VAR_POSITIONAL
+    assert parameters[4].kind is inspect.Parameter.VAR_KEYWORD
 
 
 def test_init_with_explicit_gloo_comm(ray_cluster):
