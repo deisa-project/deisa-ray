@@ -6,6 +6,7 @@ top of Ray.
 """
 
 from __future__ import annotations
+import copy
 import logging
 from typing import Any, Dict, Mapping, Optional, Union
 import numpy as np
@@ -136,7 +137,7 @@ class Bridge(IBridge):
         self._init_retries = _init_retries
         self._closed = False
 
-        self.arrays_metadata = validate_arrays_metadata(arrays_metadata)
+        self.arrays_metadata = copy.deepcopy(validate_arrays_metadata(arrays_metadata))
         comm = normalize_comm(comm)
         if comm is None:
             raise ValueError("comm is required")
