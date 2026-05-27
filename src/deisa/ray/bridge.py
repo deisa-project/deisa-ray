@@ -34,12 +34,12 @@ class Bridge(IBridge):
 
     Parameters
     ----------
-    arrays_metadata : Mapping[str, Mapping[str, Any]]
-        Metadata describing the array layout managed by this bridge.
     comm : deisa.core.ICommunicator
         Communication backend for the simulation ranks. The bridge ID is
         derived from ``comm.Get_rank()``. Raw ``mpi4py`` communicators are
         wrapped in :class:`deisa.ray.comm.MPICommAdapter`.
+    arrays_metadata : Mapping[str, Mapping[str, Any]]
+        Metadata describing the array layout managed by this bridge.
     _node_id : str or None, optional
         Node identifier used for testing or custom scheduling. Defaults to ``None``.
     scheduling_actor_cls : Type, optional
@@ -87,8 +87,8 @@ class Bridge(IBridge):
     # should sim crash? Keep going?
     def __init__(
         self,
-        arrays_metadata: Dict[str, Dict],
         comm: ICommunicator,
+        arrays_metadata: Dict[str, Dict],
         *args: Any,
         **kwargs: Any,
     ):
@@ -97,15 +97,15 @@ class Bridge(IBridge):
 
         Parameters
         ----------
+        comm : deisa.core.ICommunicator
+            Communication backend to use. The unique bridge identifier is
+            derived from ``comm.Get_rank()``. Raw ``mpi4py`` communicators are
+            wrapped in :class:`deisa.ray.comm.MPICommAdapter`.
         arrays_metadata : Dict[str, Dict]
             Dictionary that describes the arrays being shared by the simulation.
             Keys represent the name of the array while the values are
             dictionaries that must at least declare the metadata expected by
             :meth:`validate_arrays_meta`.
-        comm : deisa.core.ICommunicator
-            Communication backend to use. The unique bridge identifier is
-            derived from ``comm.Get_rank()``. Raw ``mpi4py`` communicators are
-            wrapped in :class:`deisa.ray.comm.MPICommAdapter`.
 
         Raises
         ------
