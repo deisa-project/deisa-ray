@@ -342,10 +342,7 @@ class Deisa:
                         except AssertionError as e:
                             raise e
                         except BaseException as e:
-                            try:
-                                exception_handler(e)
-                            except BaseException as e:
-                                _default_exception_handler(e)
+                            exception_handler(e)
 
                         del callback_args
                         gc.collect()
