@@ -202,7 +202,7 @@ class Window:
     """
 
     name: str
-    window_size: int | None = 1
+    size: int = 1
 
 
 type CallbackArgs = Window | str

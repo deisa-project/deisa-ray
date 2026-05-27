@@ -226,7 +226,7 @@ class Deisa(IDeisa):
             if isinstance(callback_arg, Window):
                 arrays_spec.append(callback_arg)
             elif isinstance(callback_arg, str):
-                arrays_spec.append(Window(callback_arg, window_size=1))
+                arrays_spec.append(Window(callback_arg, size=1))
 
         self._ensure_connected()  # connect + handshake before accepting callbacks
         cfg = _CallbackConfig(
@@ -249,9 +249,9 @@ class Deisa(IDeisa):
         """
         for cb_cfg in self.registered_callbacks:
             description = cb_cfg.arrays_description
-            for array_def in description:
-                name = array_def.name
-                window_size: int = array_def.window_size if array_def.window_size is not None else 1
+            for array_window in description:
+                name = array_window.name
+                window_size: int = array_window.size if array_window.size is not None else 1
 
                 if name in self.queue_per_array:
                     if self.queue_per_array[name].maxlen < window_size:
@@ -385,9 +385,9 @@ class Deisa(IDeisa):
             Mapping from array name to the latest (windowed) list of ``DeisaArray`` instances.
         """
         callback_args = {}
-        for description in description_of_arrays_needed:
-            name = description.name
-            window_size = description.window_size
+        for window in description_of_arrays_needed:
+            name = window.name
+            window_size = window.size
             queue = self.queue_per_array[name]
             if window_size is None:
                 callback_args[name] = [queue[-1]]
