@@ -10,7 +10,7 @@ from ray.util.dask import ray_dask_get
 
 from deisa.ray._scheduler import deisa_ray_get
 from deisa.ray.config import config
-from deisa.ray.errors import _default_exception_handler
+from deisa.core import IDeisa
 from deisa.ray.head_node import HeadNodeActor
 from deisa.ray.types import (
     ActorID,
@@ -22,6 +22,10 @@ from deisa.ray.types import (
     _CallbackConfig,
 )
 from deisa.ray.utils import get_head_actor_options
+
+Callback = IDeisa.Callback
+ExceptionHandler = IDeisa.ExceptionHandler
+_default_exception_handler = IDeisa._IDeisa__default_exception_handler
 
 
 def _ray_start_impl() -> None:
@@ -49,7 +53,7 @@ def _with_timestep(array: da.Array, timestep: Timestep) -> DeisaArray:
     )
 
 
-class Deisa:
+class Deisa(IDeisa):
     """
     Entry point that orchestrates analytics callbacks on Ray.
 
@@ -59,8 +63,8 @@ class Deisa:
 
     def __init__(
         self,
-        *,
         feedback_queue_size: int = 1024,
+        *args: Any,
         **kwargs: Any,
     ) -> None:
         """
@@ -151,9 +155,9 @@ class Deisa:
     def register(
         self,
         *callback_args: CallbackArgs,
-        exception_handler: Optional[Callable] = None,
+        exception_handler: ExceptionHandler = _default_exception_handler,
         when: Literal["AND", "OR"] = "AND",
-    ):
+    )-> Callable:
         """
         Decorator that registers a sliding-window analytics callback.
 
@@ -163,7 +167,7 @@ class Deisa:
             Array descriptions the callback should receive.
         exception_handler : Optional[Callable], optional
             Handler invoked when the user callback raises. Defaults to
-            :func:`deisa.ray.errors._default_exception_handler`.
+            :func:`deisa.core.IDeisa.__default_exception_handler`.
         when : Literal["AND", "OR"], optional
             Governs whether all arrays (``"AND"``) or any array (``"OR"``)
             must be available before the callback runs. Defaults to ``"AND"``.
@@ -187,9 +191,9 @@ class Deisa:
 
     def register_callback(
         self,
-        simulation_callback: Callable,
+        callback: Callback,
         *callback_args: CallbackArgs,
-        exception_handler: Optional[Callable] = None,
+        exception_handler: ExceptionHandler = _default_exception_handler,
         when: Literal["AND", "OR"] = "AND",
     ) -> Callable:
         """
@@ -197,7 +201,7 @@ class Deisa:
 
         Parameters
         ----------
-        simulation_callback : Callable
+        callback : Callable
             Function to run for each iteration; receives arrays as kwargs
             and ``timestep``.
         *callback_args : CallbackArgs
@@ -226,15 +230,15 @@ class Deisa:
 
         self._ensure_connected()  # connect + handshake before accepting callbacks
         cfg = _CallbackConfig(
-            simulation_callback=simulation_callback,
+            simulation_callback=callback,
             arrays_description=arrays_spec,
-            exception_handler=exception_handler or _default_exception_handler,
+            exception_handler=exception_handler,
             when=when,
         )
         self.registered_callbacks.append(cfg)
-        return simulation_callback
+        return callback
 
-    def generate_queue_per_array(self):
+    def _generate_queue_per_array(self):
         """
         Prepare per-array queues that respect declared window sizes.
 
@@ -283,7 +287,7 @@ class Deisa:
                 raise RuntimeError("Please register at least one callback before calling execute_callbacks()")
 
             # generate one queue per array which cleanly handles the window size
-            self.generate_queue_per_array()
+            self._generate_queue_per_array()
 
             # get first array to kickstart the process
             # - Add to queue, mark as new timestep arrived
@@ -334,10 +338,10 @@ class Deisa:
                     exception_handler = cb_cfg.exception_handler
                     when = cb_cfg.when
 
-                    should_call = self.should_call(description_arrays_needed, when)
+                    should_call = self._should_call(description_arrays_needed, when)
                     if should_call:
                         # Compute the arrays to pass to the callback
-                        callback_args: dict[str, List[DeisaArray]] = self.determine_callback_args(
+                        callback_args: dict[str, List[DeisaArray]] = self._determine_callback_args(
                             description_arrays_needed
                         )
                         try:
@@ -364,7 +368,7 @@ class Deisa:
                         self.has_new_timestep[name] = True
                         self.has_seen_array[name] = True
 
-    def determine_callback_args(self, description_of_arrays_needed) -> dict[str, List[DeisaArray]]:
+    def _determine_callback_args(self, description_of_arrays_needed) -> dict[str, List[DeisaArray]]:
         """
         Build the kwargs passed to a simulation callback.
 
@@ -389,7 +393,7 @@ class Deisa:
                 callback_args[name] = list(queue)[-window_size:]
         return callback_args
 
-    def should_call(self, description_of_arrays_needed, when: Literal["AND", "OR"]) -> bool:
+    def _should_call(self, description_of_arrays_needed, when: Literal["AND", "OR"]) -> bool:
         """
         Determine whether a callback should execute for the current state.
 
@@ -415,7 +419,6 @@ class Deisa:
     def set(
         self,
         key: Hashable,
-        *,
         value: Any,
         timestep: Timestep,
     ) -> None:
