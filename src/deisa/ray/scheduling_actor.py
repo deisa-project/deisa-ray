@@ -108,7 +108,7 @@ class NodeActorBase:
             self.partial_arrays[array_name] = PartialArray()
             self.local_chunks[array_name] = 0
         return self.partial_arrays[array_name]
-    
+
     def register_chunk_meta(
         self,
         bridge_id: int,
@@ -132,7 +132,7 @@ class NodeActorBase:
             self.nb_chunks_per_dim[array_name] = nb_chunks_per_dim
 
     # TODO this call should happen one time (even though it is called once by each bridge)
-    # it also should be blocking in the sense that all bridges should call it, but only the first one should trigger the registration with the head actor, 
+    # it also should be blocking in the sense that all bridges should call it, but only the first one should trigger the registration with the head actor,
     # and all other bridges in the meantime should wait for the registration to be done without proceeding further.
     async def finalize_registration(
         self,
@@ -149,8 +149,9 @@ class NodeActorBase:
             for name, partial_array in self.partial_arrays._data.items():
                 # since this method is called after barrier, we are sure all the chunks have been registered.
                 local_chunks = self.local_chunks[name]
-                assert  len(partial_array.chunks_contained_meta) == local_chunks,  \
-                "Sanity check failed: number of registered chunks does not match expected count for this node."
+                assert len(partial_array.chunks_contained_meta) == local_chunks, (
+                    "Sanity check failed: number of registered chunks does not match expected count for this node."
+                )
 
                 await self.head.register_partial_array.options(enable_task_events=False).remote(
                     self.actor_id,

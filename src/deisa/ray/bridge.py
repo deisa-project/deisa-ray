@@ -106,7 +106,7 @@ class Bridge(IBridge):
             Communication backend to use. The unique bridge identifier is
             derived from ``comm.Get_rank()``. Raw ``mpi4py`` communicators are
             wrapped in :class:`deisa.ray.comm.MPICommAdapter`.
-        
+
         Raises
         ------
         RuntimeError
@@ -197,7 +197,6 @@ class Bridge(IBridge):
         # ray method calls are sequential on same actor
         ray.get(self.node_actor.finalize_registration.remote())
 
-
     def _exchange_chunks_meta_with_node_actor(self):
         """
         Push per-array metadata to the node actor.
@@ -281,7 +280,7 @@ class Bridge(IBridge):
         except Exception as e:
             _default_exception_handler(e)
 
-    def __del__(self)-> None:
+    def __del__(self) -> None:
         try:
             if hasattr(self, "comm") and hasattr(self, "node_actor"):
                 self.close(sys.maxsize)

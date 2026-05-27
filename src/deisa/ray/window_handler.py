@@ -99,7 +99,7 @@ class Deisa(IDeisa):
         self.feedback_queue_size: int = feedback_queue_size
         self.has_new_timestep: dict[str, bool] = defaultdict(bool)
         self.has_seen_array: dict[str, bool] = defaultdict(bool)
-        self.queue_per_array: dict[str, deque]= {}
+        self.queue_per_array: dict[str, deque] = {}
 
     def _ensure_connected(self) -> None:
         """
@@ -157,7 +157,7 @@ class Deisa(IDeisa):
         *callback_args: CallbackArgs,
         exception_handler: ExceptionHandler = _default_exception_handler,
         when: Literal["AND", "OR"] = "AND",
-    )-> Callable:
+    ) -> Callable:
         """
         Decorator that registers a sliding-window analytics callback.
 

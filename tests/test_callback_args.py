@@ -31,8 +31,7 @@ def test_register_accepts_callback_arg_combinations(monkeypatch):
         pass
 
     registered_arrays = [
-        [(window.name, window.window_size) for window in cfg.arrays_description]
-        for cfg in deisa.registered_callbacks
+        [(window.name, window.window_size) for window in cfg.arrays_description] for cfg in deisa.registered_callbacks
     ]
 
     assert registered_arrays == [

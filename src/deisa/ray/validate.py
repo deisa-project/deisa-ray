@@ -88,9 +88,7 @@ def _validate_single_array_metadata(
         raise ValueError(f"arrays_metadata['{name}']['global_shape'] must have the same length as 'chunk_shape'")
 
     if any(global_dim % chunk_dim != 0 for global_dim, chunk_dim in zip(global_shape, chunk_shape)):
-        raise ValueError(
-            f"arrays_metadata['{name}']['global_shape'] must be evenly divisible by 'chunk_shape'"
-        )
+        raise ValueError(f"arrays_metadata['{name}']['global_shape'] must be evenly divisible by 'chunk_shape'")
 
     nb_chunks_per_dim = tuple(global_dim // chunk_dim for global_dim, chunk_dim in zip(global_shape, chunk_shape))
 

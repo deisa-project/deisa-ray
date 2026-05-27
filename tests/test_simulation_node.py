@@ -4,7 +4,6 @@ import concurrent.futures
 import inspect
 import ray
 import pytest
-import numpy as np
 import torch.distributed as dist
 
 from ray.util.state import list_actors
