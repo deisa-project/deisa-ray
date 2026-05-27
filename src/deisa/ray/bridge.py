@@ -290,7 +290,7 @@ class Bridge(IBridge):
     def close(
         self,
         timestep: int,
-    ) -> int:
+    ) -> None:
         """
         Close the bridge by signaling analytics that the simulation finished.
 
@@ -299,13 +299,9 @@ class Bridge(IBridge):
         timestep : int
             The timestep index corresponding to the sentinel chunk.
 
-        Returns
-        -------
-        int
-            The final timestep after the sentinel chunk is known by the node actor.
         """
         if self._closed:
-            return timestep
+            return 
         self._closed = True
 
         self.comm.barrier()
@@ -325,7 +321,7 @@ class Bridge(IBridge):
                 logger.info("Bridge %s closed at timestep %s", self.bridge_id, timestep)
             except Exception as e:
                 _default_exception_handler(e)
-        return timestep
+        return 
 
     def _create_node_actor(
         self,

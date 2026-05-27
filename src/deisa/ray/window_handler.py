@@ -320,6 +320,8 @@ class Deisa(IDeisa):
                         )
                     if name == "__deisa_last_iteration_array":
                         end_reached = True
+                        # TODO should it print or return? 
+                        print(f"Simulation closed at timestep: {arr_timestep}", flush=True)
                         break
                     # simulation has produced a higher timestep -> process all arrays for current_timestep
                     if arr_timestep > current_timestep:
