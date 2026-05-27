@@ -301,7 +301,7 @@ class Bridge(IBridge):
 
         """
         if self._closed:
-            return 
+            return
         self._closed = True
 
         self.comm.barrier()
@@ -321,7 +321,7 @@ class Bridge(IBridge):
                 logger.info("Bridge %s closed at timestep %s", self.bridge_id, timestep)
             except Exception as e:
                 _default_exception_handler(e)
-        return 
+        return
 
     def _create_node_actor(
         self,

@@ -52,7 +52,7 @@ def test_init_accepts_variadic_args_signature():
     signature = inspect.signature(Bridge.__init__)
     parameters = list(signature.parameters.values())
 
-    assert [parameter.name for parameter in parameters[:5]] == ["self", "arrays_metadata", "comm", "args", "kwargs"]
+    assert [parameter.name for parameter in parameters[:5]] == ["self", "comm", "arrays_metadata", "args", "kwargs"]
     assert parameters[3].kind is inspect.Parameter.VAR_POSITIONAL
     assert parameters[4].kind is inspect.Parameter.VAR_KEYWORD
 
@@ -218,7 +218,7 @@ def test_arrays_metadata_global_shape_must_match_chunk_grid():
         _validate_arrays_meta(arrays_md)
 
 
-def test_close_returns_timestep_and_logs(ray_cluster, caplog):
+def test_close_returns_none_and_logs(ray_cluster, caplog):
     fake_node_id = "FAKE-NODE-CLOSE"
     c = Bridge(
         arrays_metadata=arrays_md,
@@ -228,9 +228,9 @@ def test_close_returns_timestep_and_logs(ray_cluster, caplog):
     )
 
     with caplog.at_level("INFO", logger="deisa.ray.bridge"):
-        last_timestep = c.close(timestep=7)
+        result = c.close(timestep=7)
 
-    assert last_timestep == 7
+    assert result is None
     assert "Bridge 0 closed at timestep 7" in caplog.text
 
 

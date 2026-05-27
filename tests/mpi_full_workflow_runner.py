@@ -58,7 +58,7 @@ def main() -> None:
     for timestep in range(NB_ITERATIONS):
         bridge.send(array_name="array", chunk=timestep * array, timestep=timestep)
 
-    assert bridge.close(timestep=NB_ITERATIONS) == NB_ITERATIONS
+    assert bridge.close(timestep=NB_ITERATIONS) is None
 
     mpi_comm.Barrier()
 
