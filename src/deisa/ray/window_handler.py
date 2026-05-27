@@ -1,7 +1,7 @@
 from collections import deque, defaultdict
 import gc
 import logging
-from typing import Any, Callable, Hashable, List, Optional, Literal
+from typing import Any, Callable, List, Optional, Literal
 
 import dask
 import dask.array as da
@@ -16,7 +16,6 @@ from deisa.ray.types import (
     ActorID,
     DeisaArray,
     RayActorHandle,
-    Timestep,
     Window,
     CallbackArgs,
     _CallbackConfig,
@@ -41,7 +40,7 @@ def _ray_start_impl() -> None:
         ray.init(address="auto", log_to_driver=False, logging_level=logging.ERROR)
 
 
-def _with_timestep(array: da.Array, timestep: Timestep) -> DeisaArray:
+def _with_timestep(array: da.Array, timestep: int) -> DeisaArray:
     return DeisaArray(
         array.dask,
         array.name,
@@ -420,9 +419,9 @@ class Deisa(IDeisa):
 
     def set(
         self,
-        key: Hashable,
+        key: str,
         value: Any,
-        timestep: Timestep,
+        timestep: int,
     ) -> None:
         """
         Publish a feedback value for bridges.
