@@ -82,7 +82,7 @@ def normalize_comm(comm) -> ICommunicator | None:
     return comm
 
 
-class MPICommAdapter:
+class MPICommAdapter(ICommunicator):
     """Adapter exposing an MPI communicator via the shared Comm protocol."""
 
     def __init__(self, comm):
@@ -123,7 +123,7 @@ class MPICommAdapter:
         return self.bcast(obj, root=src)
 
 
-class TorchDistComm:
+class TorchDistComm(ICommunicator):
     """Torch distributed communicator implementing the Comm protocol."""
 
     def __init__(self, *, rank: int, world_size: int):
@@ -169,7 +169,7 @@ class TorchDistComm:
         return self.bcast(obj, root=src)
 
 
-class NoOpComm:
+class NoOpComm(ICommunicator):
     """Fallback communicator that no-ops synchronization calls."""
 
     def __init__(self, rank: int = 0, world_size: int = 1):
