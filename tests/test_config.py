@@ -50,3 +50,21 @@ def test_instance_copies_value_at_construction_time():
     deisa.config.enable_experimental_distributed_scheduling(True)
     d = Deisa()
     assert d._experimental_distributed_scheduling_enabled is True
+
+
+def test_ray_start_is_read_from_kwargs():
+    def ray_start():
+        pass
+
+    d = Deisa(ray_start=ray_start)
+    assert d._ray_start is ray_start
+
+
+def test_max_simulation_ahead_is_read_from_kwargs():
+    d = Deisa(max_simulation_ahead=2)
+    assert d.max_simulation_ahead == 2
+
+
+def test_unexpected_init_kwarg_is_rejected():
+    with pytest.raises(TypeError, match="unexpected keyword argument 'unknown'"):
+        Deisa(unknown=True)

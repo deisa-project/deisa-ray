@@ -60,9 +60,8 @@ class Deisa:
     def __init__(
         self,
         *,
-        ray_start: Optional[Callable[[], None]] = None,
-        max_simulation_ahead: int = 1,
         feedback_queue_size: int = 1024,
+        **kwargs: Any,
     ) -> None:
         """
         Initialize handler state without touching Ray.
@@ -75,6 +74,12 @@ class Deisa:
             Number of timesteps the analytics may lag behind the simulation.
             Defaults to 1.
         """
+        ray_start: Optional[Callable[[], None]] = kwargs.pop("ray_start", None)
+        max_simulation_ahead: int = kwargs.pop("max_simulation_ahead", 1)
+        if kwargs:
+            unexpected = next(iter(kwargs))
+            raise TypeError(f"Deisa.__init__() got an unexpected keyword argument '{unexpected}'")
+
         # cheap constructor: no Ray side effects
         config.lock()
         self._experimental_distributed_scheduling_enabled = config.experimental_distributed_scheduling_enabled
