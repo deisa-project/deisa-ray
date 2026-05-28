@@ -48,7 +48,7 @@ class ArrayPerTimestep:
     def __init__(self):
         """Create the readiness event and the async storage for local chunks."""
         # Triggered when all the chunks are ready
-        self.chunks_ready_event: asyncio.Event = asyncio.Event()
+        self.chunks_ready_event: asyncio.Lock = asyncio.Lock()
 
         # {bridgeID: chunk}
         self.local_chunks: AsyncDict[int, ray.ObjectRef | bytes] = AsyncDict()

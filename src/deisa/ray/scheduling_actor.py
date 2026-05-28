@@ -242,6 +242,7 @@ class NodeActorBase:
 
         if timestep not in partial_array.per_timestep_arrays.keys():
             partial_array.per_timestep_arrays[timestep] = ArrayPerTimestep()
+            partial_array.per_timestep_arrays[timestep].chunks_ready_future = asyncio.Future()
         array_timestep = partial_array.per_timestep_arrays[timestep]
 
         chunk_ref: ray.ObjectRef = chunk_ref[0]
@@ -259,7 +260,6 @@ class NodeActorBase:
                 assert isinstance(ref, ray.ObjectRef)
 
                 pos_to_ref[partial_array.bid_to_pos[bridge_id]] = ref
-
                 array_timestep.local_chunks[bridge_id] = pickle.dumps(ref)
 
             # TODO rename
@@ -267,10 +267,9 @@ class NodeActorBase:
                 array_name, timestep, pos_to_ref, self.actor_id, array_timestep.dtype
             )
 
-            array_timestep.chunks_ready_event.set()
-            array_timestep.chunks_ready_event.clear()
+            array_timestep.chunks_ready_future.set_result(True)
         else:
-            await array_timestep.chunks_ready_event.wait()
+            await array_timestep.chunks_ready_future.wait()
 
 
 @ray.remote
