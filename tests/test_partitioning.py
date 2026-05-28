@@ -1,3 +1,4 @@
+import os
 import dask.array as da
 import pytest
 import ray
@@ -15,9 +16,7 @@ def head_script(partitioning_strategy: str) -> None:
     from deisa.ray.window_handler import Deisa
     from deisa.ray.types import Window
 
-    import deisa.ray as deisa
-
-    deisa.config.enable_experimental_distributed_scheduling(True)
+    os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1"
 
     d = Deisa()
 

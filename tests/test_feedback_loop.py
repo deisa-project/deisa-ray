@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 import ray
 
-import deisa.ray as deisa
+from deisa.ray.config import DEISA_DISTRIBUTED_SCHEDULING_ENV
 from tests.utils import pick_free_port, ray_cluster, wait_for_head_node  # noqa: F401
 
 # I need to test:
@@ -22,11 +22,11 @@ from tests.utils import pick_free_port, ray_cluster, wait_for_head_node  # noqa:
 
 
 @pytest.fixture(autouse=True)
-def reset_process_state():
+def reset_process_state(monkeypatch):
     scheduler = dask.config.get("scheduler", default=None)
-    deisa.config._reset_for_tests()
+    monkeypatch.delenv(DEISA_DISTRIBUTED_SCHEDULING_ENV, raising=False)
     yield
-    deisa.config._reset_for_tests()
+    monkeypatch.delenv(DEISA_DISTRIBUTED_SCHEDULING_ENV, raising=False)
     dask.config.set(scheduler=scheduler)
 
 

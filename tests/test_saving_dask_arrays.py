@@ -28,9 +28,7 @@ def test_dask_save_hdf5(fname, enable_distributed_scheduling, ray_cluster) -> No
         from deisa.ray.window_handler import Deisa
         from deisa.ray.types import Window
 
-        import deisa.ray as deisa
-
-        deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
+        os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
 
         d = Deisa()
 
@@ -104,9 +102,7 @@ def test_dask_save_several_timesteps_hdf5(fname, enable_distributed_scheduling, 
         from deisa.ray.window_handler import Deisa
         from deisa.ray.types import Window
 
-        import deisa.ray as deisa
-
-        deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
+        os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
 
         d = Deisa()
 
@@ -177,9 +173,7 @@ def test_dask_save_several_arrays_hdf5(fname, enable_distributed_scheduling, ray
         from deisa.ray.window_handler import Deisa
         from deisa.ray.types import Window, to_hdf5
 
-        import deisa.ray as deisa
-
-        deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
+        os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
 
         d = Deisa()
 
@@ -261,9 +255,7 @@ def test_dask_save_zarr(fname, enable_distributed_scheduling, ray_cluster) -> No
         from deisa.ray.window_handler import Deisa
         from deisa.ray.types import Window
 
-        import deisa.ray as deisa
-
-        deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
+        os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
 
         d = Deisa()
 
@@ -333,10 +325,9 @@ def test_dask_save_netcdf_xarray(fname, enable_distributed_scheduling, ray_clust
         from deisa.ray.window_handler import Deisa
         from deisa.ray.types import Window
 
-        import deisa.ray as deisa
         import xarray as xr
 
-        deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
+        os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
 
         d = Deisa()
 
@@ -398,7 +389,7 @@ def test_dask_save_netcdf_xarray(fname, enable_distributed_scheduling, ray_clust
 # test_feedback_loop previously leaked a Dask scheduler change into this file.
 # The leak happened in the pytest driver process: Deisa.set() called
 # _ensure_connected(), which globally set Dask's scheduler to ray_dask_get. The
-# enable_experimental_distributed_scheduling() calls in this file happen inside
+# DEISA_DISTRIBUTED_SCHEDULING is set in this file inside
 # Ray remote head_script tasks, so they configure those Ray worker processes, not
 # the pytest driver process that later opens HDF5/Zarr output and calls
 # data.sum().compute() or data.compute().

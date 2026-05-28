@@ -1,3 +1,4 @@
+import os
 # Design different tests to see if various possible expose patterns are safe
 # We have two arrays "A" and "B".
 
@@ -33,9 +34,8 @@ def test_typical(nb_nodes: int, enable_distributed_scheduling: bool, ray_cluster
         """The head node checks that the values are correct"""
         from deisa.ray.window_handler import Deisa
         from deisa.ray.types import Window
-        import deisa.ray as deisa
 
-        deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
+        os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
         d = Deisa()
 
         @d.register(Window("A"), Window("B"))
@@ -86,9 +86,8 @@ def test_rank_ahead(nb_nodes: int, enable_distributed_scheduling: bool, ray_clus
         """The head node checks that the values are correct"""
         from deisa.ray.window_handler import Deisa
         from deisa.ray.types import Window
-        import deisa.ray as deisa
 
-        deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
+        os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
         d = Deisa()
 
         @d.register(Window("A"))
@@ -139,9 +138,8 @@ def test_out_of_sync(nb_nodes: int, enable_distributed_scheduling: bool, ray_clu
         """The head node checks that the values are correct"""
         from deisa.ray.window_handler import Deisa
         from deisa.ray.types import Window
-        import deisa.ray as deisa
 
-        deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
+        os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
         d = Deisa()
 
         @d.register(Window("A"), Window("B"))
@@ -211,7 +209,7 @@ def test_out_of_sync(nb_nodes: int, enable_distributed_scheduling: bool, ray_clu
 #         from deisa.ray.types import Window
 #         import deisa.ray as deisa
 #
-#         deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
+#         os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
 #         d = Deisa()
 #
 #         @d.register(Window("A"), Window("B"))

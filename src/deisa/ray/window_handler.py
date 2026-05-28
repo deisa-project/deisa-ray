@@ -9,7 +9,7 @@ import ray
 from ray.util.dask import ray_dask_get
 
 from deisa.ray._scheduler import deisa_ray_get
-from deisa.ray.config import config
+from deisa.ray.config import distributed_scheduling_enabled_from_env
 from deisa.core import IDeisa
 from deisa.ray.head_node import HeadNodeActor
 from deisa.ray.types import (
@@ -84,8 +84,7 @@ class Deisa(IDeisa):
             raise TypeError(f"Deisa.__init__() got an unexpected keyword argument '{unexpected}'")
 
         # cheap constructor: no Ray side effects
-        config.lock()
-        self._experimental_distributed_scheduling_enabled = config.experimental_distributed_scheduling_enabled
+        self._experimental_distributed_scheduling_enabled = distributed_scheduling_enabled_from_env()
 
         # Do NOT mutate global config here if you want cheap unit tests;
         # do it when connecting, or inject it similarly.

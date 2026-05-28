@@ -1,3 +1,4 @@
+import os
 import ray
 import pytest
 
@@ -13,9 +14,7 @@ def head_script(enable_distributed_scheduling) -> None:
     from deisa.ray.window_handler import Deisa
     from deisa.ray.types import Window
 
-    import deisa.ray as deisa
-
-    deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
+    os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
 
     d = Deisa()
 
