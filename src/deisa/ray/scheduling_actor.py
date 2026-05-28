@@ -82,12 +82,11 @@ class NodeActorBase:
         # TODO: I think these two responsabilities could be separated.
         self.partial_arrays: AsyncDict[str, PartialArray] = AsyncDict()
 
-        # For feedback between analytics and simulation
-        self.feedback: Dict[Hashable, Any] = {}
         self.should_persist: Dict[Hashable, bool] = {}
         self.is_finalized = False
         self.finalization_lock = asyncio.Lock()
-        self.local_chunks: dict[str, int] = {}
+        # the number of chunks per array that a physical node (and therefore this actor) owns.
+        self.local_nb_chunks: dict[str, int] = {}
         self.nb_chunks_per_dim: dict[str, tuple[int, ...]] = {}
 
     def _create_or_retrieve_partial_array(self, array_name: str) -> PartialArray:
@@ -106,7 +105,7 @@ class NodeActorBase:
         """
         if array_name not in self.partial_arrays:
             self.partial_arrays[array_name] = PartialArray()
-            self.local_chunks[array_name] = 0
+            self.local_nb_chunks[array_name] = 0
         return self.partial_arrays[array_name]
 
     def register_chunk_meta(
@@ -124,14 +123,13 @@ class NodeActorBase:
         partial_array.bid_to_pos[bridge_id] = chunk_position
 
         # increase the counter of chunks of the node for this array.
-        self.local_chunks[array_name] += 1
+        self.local_nb_chunks[array_name] += 1
         nb_chunks_per_dim = tuple(global_dim // chunk_dim for global_dim, chunk_dim in zip(global_shape, chunk_shape))
         if array_name in self.nb_chunks_per_dim:
             assert self.nb_chunks_per_dim[array_name] == nb_chunks_per_dim
         else:
             self.nb_chunks_per_dim[array_name] = nb_chunks_per_dim
 
-    # TODO this call should happen one time (even though it is called once by each bridge)
     # it also should be blocking in the sense that all bridges should call it, but only the first one should trigger the registration with the head actor,
     # and all other bridges in the meantime should wait for the registration to be done without proceeding further.
     async def finalize_registration(
@@ -148,7 +146,7 @@ class NodeActorBase:
 
             for name, partial_array in self.partial_arrays._data.items():
                 # since this method is called after barrier, we are sure all the chunks have been registered.
-                local_chunks = self.local_chunks[name]
+                local_chunks = self.local_nb_chunks[name]
                 assert len(partial_array.chunks_contained_meta) == local_chunks, (
                     "Sanity check failed: number of registered chunks does not match expected count for this node."
                 )
@@ -253,7 +251,7 @@ class NodeActorBase:
         else:
             assert array_timestep.dtype == dtype
 
-        if len(array_timestep.local_chunks) == self.local_chunks[array_name]:
+        if len(array_timestep.local_chunks) == self.local_nb_chunks[array_name]:
             pos_to_ref: dict[tuple, ray.ObjectRef] = {}
             assert array_timestep.dtype is not None
 

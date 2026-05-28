@@ -118,10 +118,6 @@ class MPICommAdapter(ICommunicator):
         """Broadcast a Python object from ``root`` to all MPI ranks."""
         return self._comm.bcast(obj, root=root)
 
-    def broadcast_object(self, obj, src: int = 0):
-        """Broadcast a Python object from ``src`` to all MPI ranks."""
-        return self.bcast(obj, root=src)
-
 
 class TorchDistComm(ICommunicator):
     """Torch distributed communicator implementing the Comm protocol."""
@@ -164,10 +160,6 @@ class TorchDistComm(ICommunicator):
         dist.broadcast_object_list(objects, src=root)
         return objects[0]
 
-    def broadcast_object(self, obj, src: int = 0):
-        """Broadcast a Python object from ``src`` to all Torch distributed ranks."""
-        return self.bcast(obj, root=src)
-
 
 class NoOpComm(ICommunicator):
     """Fallback communicator that no-ops synchronization calls."""
@@ -205,7 +197,3 @@ class NoOpComm(ICommunicator):
     def bcast(self, obj, root: int = 0):
         """Return ``obj`` unchanged in single-process setups."""
         return obj
-
-    def broadcast_object(self, obj, src: int = 0):
-        """Return ``obj`` unchanged in single-process setups."""
-        return self.bcast(obj, root=src)
