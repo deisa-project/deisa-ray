@@ -18,7 +18,7 @@ DEISA. For a distributed array at a given timestep, all bridges that own chunks
 of that array must share their local chunk for the same timestep before DEISA
 can assemble the full Dask array seen by analytics.
 
-Callbacks see those shares through a sliding window. A ``WindowSpec`` with
+Callbacks see those shares through a sliding window. A ``Window`` with
 ``window_size=N`` gives the callback up to the most recent ``N`` shared
 timesteps for that array, ordered oldest to newest. This is what lets analysis
 code combine data across time, for example comparing the newest field with the
@@ -28,11 +28,11 @@ The simulation and analytics may start in either order. The runtime uses Ray
 actors to rendezvous, collect chunks, build Dask arrays, and execute Dask graphs
 close to the data.
 
-Bridges also use a communicator to coordinate with each other. By default,
-``deisa-ray`` creates a Gloo communicator from ``system_metadata``, but
-applications that already run under MPI can pass an MPI communicator instead.
-That communicator is used for fast, efficient bridge-to-bridge coordination,
-including barriers and feedback broadcasts.
+Bridges also use a communicator to coordinate with each other. Applications
+that already run under MPI can pass an MPI communicator directly; otherwise
+they can create a Gloo communicator with ``deisa.ray.comm.init_gloo_comm``
+before constructing the bridge. That communicator is used for fast, efficient
+bridge-to-bridge coordination, including barriers and feedback broadcasts.
 
 Main imports
 ------------
@@ -41,7 +41,7 @@ Main imports
 
     from deisa.ray.bridge import Bridge
     from deisa.ray.window_handler import Deisa
-    from deisa.ray.types import DeisaArray, WindowSpec, to_hdf5
+    from deisa.ray.types import DeisaArray, Window, to_hdf5
 
 Simulation-side API
 -------------------
@@ -53,23 +53,27 @@ Simulation-side API
 
 .. code-block:: python
 
+    from deisa.ray.comm import init_gloo_comm
+
+    comm = init_gloo_comm(
+        world_size,
+        rank,
+        master_address,
+        master_port,
+    )
     bridge = Bridge(
-        bridge_id=rank,
         arrays_metadata=arrays_metadata,
-        system_metadata=system_metadata,
+        comm=comm,
     )
 
 Each rank that will ever send data must create a ``Bridge``. The
-``bridge_id`` must be unique among participating ranks, and there must be a
-bridge with ``bridge_id=0``. Bridge ``0`` is special because it sends the final
-sentinel array used to stop analytics callback execution.
+bridge ID is derived from ``comm.Get_rank()`` and must be unique among
+participating ranks. There must be a bridge with rank ``0``. Bridge ``0`` is
+special because it sends the final sentinel array used to stop analytics
+callback execution.
 
 Arguments
 """""""""
-
-``bridge_id``
-    Integer identifier for this simulation rank. In MPI programs this is
-    usually the MPI rank.
 
 ``arrays_metadata``
     Mapping from array name to metadata for the chunk owned by this bridge.
@@ -84,11 +88,6 @@ Arguments
         shape is approximately ``chunk_shape * nb_chunks_per_dim`` dimension by
         dimension.
 
-    ``nb_chunks_of_node``
-        Number of chunks for this array expected on the current scheduling
-        actor. This is the local completeness count used before forwarding an
-        array timestep.
-
     ``dtype``
         NumPy dtype, or a value accepted by ``numpy.dtype``.
 
@@ -97,31 +96,23 @@ Arguments
         the same dimensionality as ``chunk_shape`` and each index must be within
         ``nb_chunks_per_dim``.
 
-``system_metadata``
-    Required when ``comm`` is omitted. The default communicator uses
-    ``system_metadata["world_size"]``, ``system_metadata["master_address"]``,
-    and ``system_metadata["master_port"]`` to initialize a Gloo process group.
-    If a custom communicator is supplied, this argument may be omitted.
-
 ``comm``
-    Optional communicator. A raw ``mpi4py.MPI.Comm`` is accepted and wrapped
-    automatically. Any custom communicator must expose ``rank``, ``world_size``,
-    ``barrier()``, and ``broadcast_object(obj, src=0)``. ``Bridge.get`` uses
-    ``broadcast_object`` so bridge ``0`` can query feedback once and share the
-    result with all participating bridges. Passing an MPI communicator is the
-    recommended option when the simulation already has one, because it reuses
-    the simulation's native fast communication layer instead of creating the
-    default Gloo process group.
+    Required communicator implementing ``deisa.core.ICommunicator``. A raw
+    ``mpi4py.MPI.Comm`` is accepted and wrapped automatically. The bridge ID is
+    derived from ``comm.Get_rank()``. ``Bridge.get`` uses ``bcast`` so bridge
+    ``0`` can query feedback once and share the result with all participating
+    bridges. Passing an MPI communicator is the recommended option when the
+    simulation already has one; otherwise build a Gloo communicator with
+    ``deisa.ray.comm.init_gloo_comm`` before constructing the bridge.
 
-``_node_id``, ``scheduling_actor_cls``, ``_init_retries``, ``_comm_timeout``
+``_node_id``, ``scheduling_actor_cls``, ``_init_retries``
     Implementation and testing hooks. Normal users should not need them.
-    ``_comm_timeout`` controls the default Gloo rendezvous timeout in seconds.
 
 Behavior
 """"""""
 
-During construction, ``Bridge`` validates array metadata, initializes or
-normalizes its communicator, starts Ray with ``address="auto"`` if needed,
+During construction, ``Bridge`` validates array metadata, normalizes its
+communicator, starts Ray with ``address="auto"`` if needed,
 creates or reuses a detached scheduling actor on the local Ray node, registers
 the chunk metadata with that actor, waits for actor readiness, and finally
 enters a communicator barrier so all bridges start from a consistent point.
@@ -145,7 +136,7 @@ Arguments
 
 ``array_name``
     Name of the array. It must match a key in ``arrays_metadata`` and the
-    analytics-side ``WindowSpec`` name.
+    analytics-side ``Window`` name.
 
 ``chunk``
     A ``numpy.ndarray`` containing this bridge's local chunk. If the simulation
@@ -153,14 +144,6 @@ Arguments
 
 ``timestep``
     Integer timestep for the chunk.
-
-``chunked``
-    Reserved for future use. The current implementation always sends chunked
-    data through the distributed-array path.
-
-``store_externally``
-    Reserved for future external storage support. It is passed through the
-    internal actor layer but external storage is not implemented yet.
 
 ``test_mode``
     Reserved test hook and currently ignored.
@@ -277,11 +260,11 @@ happen lazily when registering callbacks or executing them.
 
     def summary(temperature: list[DeisaArray]):
         latest = temperature[-1]
-        print(latest.t, latest.dask.mean().compute())
+        print(latest.t, latest.mean().compute())
 
     deisa.register_callback(
         summary,
-        [WindowSpec("temperature", window_size=3)],
+        [Window("temperature", window_size=3)],
         when="AND",
     )
 
@@ -291,13 +274,13 @@ Arguments
 """""""""
 
 ``simulation_callback``
-    Callable that receives keyword arguments named after each ``WindowSpec``.
+    Callable that receives keyword arguments named after each ``Window``.
     Each argument is a ``list[DeisaArray]``. For ergonomic callbacks, choose
     array names that are valid Python parameter names, or write the callback to
     accept ``**kwargs``.
 
 ``arrays_spec``
-    List of ``WindowSpec`` objects describing which arrays the callback needs
+    List of ``Window`` objects describing which arrays the callback needs
     and how many timesteps should be kept for each array.
 
 ``exception_handler``
@@ -318,16 +301,16 @@ Returns
 Returns the original callback so the method can be used by decorator helpers
 and by code that wants to keep the callable.
 
-``Deisa.callback``
+``Deisa.register``
 ^^^^^^^^^^^^^^^^^^
 
 .. code-block:: python
 
-    @deisa.callback(WindowSpec("temperature"), WindowSpec("pressure"), when="OR")
+    @deisa.register(Window("temperature"), Window("pressure"), when="OR")
     def compare(temperature: list[DeisaArray], pressure: list[DeisaArray]):
         ...
 
-Decorator form of ``register_callback``. It accepts ``WindowSpec`` objects as
+Decorator form of ``register_callback``. It accepts ``Window`` objects as
 positional arguments and the same ``exception_handler`` and ``when`` keyword
 arguments.
 
@@ -393,15 +376,15 @@ callback execution.
 Callback data types
 -------------------
 
-``WindowSpec``
+``Window``
 ^^^^^^^^^^^^^^
 
 .. code-block:: python
 
-    WindowSpec("temperature")
-    WindowSpec("temperature", window_size=3)
+    Window("temperature")
+    Window("temperature", window_size=3)
 
-``WindowSpec`` describes one callback input.
+``Window`` describes one callback input.
 
 ``name``
     Array name. It must match ``Bridge`` metadata and ``Bridge.send``.
@@ -458,7 +441,7 @@ Execution guarantees and assumptions
 
 Array names
     The same array name must be used in ``arrays_metadata``, ``Bridge.send``,
-    and ``WindowSpec``. Analytics callbacks receive keyword arguments with
+    and ``Window``. Analytics callbacks receive keyword arguments with
     those names.
 
 Participating ranks
@@ -466,8 +449,8 @@ Participating ranks
     participating world size is fixed at startup.
 
 Master bridge
-    ``bridge_id=0`` must exist. It is responsible for emitting the final
-    sentinel in ``Bridge.close``.
+    A communicator rank ``0`` bridge must exist. It is responsible for emitting
+    the final sentinel in ``Bridge.close``.
 
 Timestep ordering
     Timesteps must be sent in non-decreasing order. The system assumes it can
@@ -500,8 +483,6 @@ Current limitations
 
 - Feedback is for small Python objects. Distributed-array feedback from
   analytics back to simulation is not part of the current user API.
-- External storage for ``Bridge.send(..., store_externally=True)`` is not
-  implemented.
 - ``Bridge.send`` expects CPU ``numpy.ndarray`` inputs.
 - The theoretical ``deisa-core`` API includes protocol methods such as
   ``get_array``, ``delete``, and ``close`` on the analytics object. Those are
@@ -514,22 +495,17 @@ Simulation:
 
 .. code-block:: python
 
+    comm = init_gloo_comm(world_size, rank, "127.0.0.1", 29500)
     bridge = Bridge(
-        bridge_id=rank,
         arrays_metadata={
             "temperature": {
                 "chunk_shape": (64, 64),
                 "nb_chunks_per_dim": (4, 4),
-                "nb_chunks_of_node": 4,
                 "dtype": np.float64,
                 "chunk_position": chunk_position,
             },
         },
-        system_metadata={
-            "world_size": world_size,
-            "master_address": "127.0.0.1",
-            "master_port": 29500,
-        },
+        comm=comm,
     )
 
     for timestep in range(10):
@@ -547,13 +523,13 @@ Analytics:
 
     deisa = Deisa()
 
-    @deisa.callback(WindowSpec("temperature", window_size=3))
+    @deisa.register(Window("temperature", window_size=3))
     def analyze_temperature(temperature: list[DeisaArray]):
         if len(temperature) < 3:
             return
 
         newest = temperature[-1]
-        mean_value = newest.dask.mean().compute()
+        mean_value = newest.mean().compute()
         print("timestep", newest.t, "mean", mean_value)
 
     deisa.execute_callbacks()

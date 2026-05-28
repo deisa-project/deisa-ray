@@ -1,3 +1,4 @@
+import os
 import dask.array as da
 import ray
 from deisa.ray.types import DeisaArray
@@ -12,19 +13,17 @@ NB_ITERATIONS = 5
 def head_script(enable_distributed_scheduling) -> None:
     """The head node checks that the values are correct"""
     from deisa.ray.window_handler import Deisa
-    from deisa.ray.types import WindowSpec
+    from deisa.ray.types import Window
 
-    import deisa.ray as deisa
-
-    deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
+    os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
 
     d = Deisa()
 
     def simulation_callback(array: list[DeisaArray]):
         # This is the standard dask task graph
-        assert len(array[0].dask.sum().dask) == 9
+        assert len(array[0].sum().dask) == 9
 
-        x = array[0].dask.sum().persist()
+        x = array[0].sum().persist()
 
         # We still have a dask array
         assert isinstance(x, da.Array)
@@ -37,7 +36,7 @@ def head_script(enable_distributed_scheduling) -> None:
 
     d.register_callback(
         simulation_callback,
-        [WindowSpec("array")],
+        *[Window("array")],
     )
     d.execute_callbacks()
 
@@ -56,7 +55,6 @@ def test_dask_persist(enable_distributed_scheduling, ray_cluster) -> None:  # no
                 rank=rank,
                 position=(rank // 2, rank % 2),
                 chunks_per_dim=(2, 2),
-                nb_chunks_of_node=1,
                 chunk_size=(1, 1),
                 nb_iterations=NB_ITERATIONS,
                 node_id=f"node_{rank}",

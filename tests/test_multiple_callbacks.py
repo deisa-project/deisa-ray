@@ -1,3 +1,4 @@
+import os
 import pytest
 import ray
 
@@ -11,37 +12,36 @@ NB_ITERATIONS = 5
 def head_script(enable_distributed_scheduling, dim_sq) -> None:
     """The head node checks that the values are correct"""
     from deisa.ray.window_handler import Deisa
-    from deisa.ray.types import WindowSpec
-    import deisa.ray as deisa
+    from deisa.ray.types import Window
 
-    deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
+    os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
 
     d = Deisa()
 
     def simulation_callback1(array: list[DeisaArray]):
-        x = array[0].dask.sum().compute()
+        x = array[0].sum().compute()
         assert x == (dim_sq * (dim_sq + 1) / 2) * array[0].t
 
     def simulation_callback2(array1: list[DeisaArray]):
-        x = array1[0].dask.sum().compute()
+        x = array1[0].sum().compute()
         assert x == (dim_sq * (dim_sq + 1) / 2) * array1[0].t
 
     def simulation_callback3(array: list[DeisaArray], array1: list[DeisaArray]):
-        x = array[0].dask.sum().compute()
-        y = array1[0].dask.sum().compute()
+        x = array[0].sum().compute()
+        y = array1[0].sum().compute()
         assert x == (dim_sq * (dim_sq + 1) / 2) * array[0].t and y == (dim_sq * (dim_sq + 1) / 2) * array1[0].t
 
     d.register_callback(
         simulation_callback1,
-        [WindowSpec("array")],
+        *[Window("array")],
     )
     d.register_callback(
         simulation_callback2,
-        [WindowSpec("array1")],
+        *[Window("array1")],
     )
     d.register_callback(
         simulation_callback3,
-        [WindowSpec("array"), WindowSpec("array1")],
+        *[Window("array"), Window("array1")],
     )
     d.execute_callbacks()
 
@@ -64,7 +64,6 @@ def test_multiple_callbacks(enable_distributed_scheduling: bool, ray_cluster) ->
                 rank=rank,
                 position=(rank // dim, rank % dim),
                 chunks_per_dim=(dim, dim),
-                nb_chunks_of_node=1,
                 chunk_size=(1, 1),
                 nb_iterations=NB_ITERATIONS,
                 node_id=f"node_{rank}",
@@ -81,27 +80,26 @@ def test_multiple_callbacks(enable_distributed_scheduling: bool, ray_cluster) ->
 def head_script2(enable_distributed_scheduling, dim_sq) -> None:
     """The head node checks that the values are correct"""
     from deisa.ray.window_handler import Deisa
-    from deisa.ray.types import WindowSpec
-    import deisa.ray as deisa
+    from deisa.ray.types import Window
 
-    deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
+    os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
 
     d = Deisa()
 
-    @d.callback(WindowSpec("array"))
+    @d.register(Window("array"))
     def simulation_callback1(array: list[DeisaArray]):
-        x = array[0].dask.sum().compute()
+        x = array[0].sum().compute()
         assert x == (dim_sq * (dim_sq + 1) / 2) * array[0].t
 
-    @d.callback(WindowSpec("array1"))
+    @d.register(Window("array1"))
     def simulation_callback2(array1: list[DeisaArray]):
-        x = array1[0].dask.sum().compute()
+        x = array1[0].sum().compute()
         assert x == (dim_sq * (dim_sq + 1) / 2) * array1[0].t
 
-    @d.callback(WindowSpec("array"), WindowSpec("array1"))
+    @d.register(Window("array"), Window("array1"))
     def simulation_callback3(array: list[DeisaArray], array1: list[DeisaArray]):
-        x = array[0].dask.sum().compute()
-        y = array1[0].dask.sum().compute()
+        x = array[0].sum().compute()
+        y = array1[0].sum().compute()
         assert x == (dim_sq * (dim_sq + 1) / 2) * array[0].t and y == (dim_sq * (dim_sq + 1) / 2) * array1[0].t
 
     d.execute_callbacks()
@@ -125,7 +123,6 @@ def test_multiple_callbacks_decorator(enable_distributed_scheduling: bool, ray_c
                 rank=rank,
                 position=(rank // dim, rank % dim),
                 chunks_per_dim=(dim, dim),
-                nb_chunks_of_node=1,
                 chunk_size=(1, 1),
                 nb_iterations=NB_ITERATIONS,
                 node_id=f"node_{rank}",

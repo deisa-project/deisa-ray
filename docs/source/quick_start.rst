@@ -16,8 +16,8 @@ Simulation side
 - The simulation is distributed (MPI or similar) and iterative.
 - Any rank that will **ever** send data must instantiate a ``Bridge``.
 - The total number of participating ranks (``world_size``) is known up front.
-- Each ``Bridge`` has a unique ``bridge_id``, and there is always a bridge with
-  ``bridge_id=0`` (the master bridge).
+- Each ``Bridge`` derives its ID from ``comm.Get_rank()``, and there is always
+  a bridge with rank ``0`` (the master bridge).
 - Each bridge describes the arrays it will share via ``arrays_metadata``.
 - Sends are ordered by non-decreasing timestep: all sends for timestep *i*
   happen before any send for timestep *j > i*.
@@ -28,8 +28,8 @@ Analytics side
 
 - Analytics run on a Ray head node. Dask arrays are backed by Ray tasks.
 - You register callbacks with ``Deisa`` and then execute them.
-- Callback arguments are lists of ``DeisaArray`` objects. The length of the list is the "window size", defined when creating a ``WindowSpec``.
-- The array name in ``WindowSpec`` must match the bridge metadata name,
+- Callback arguments are lists of ``DeisaArray`` objects. The length of the list is the "window size", defined when creating a ``Window``.
+- The array name in ``Window`` must match the bridge metadata name,
   otherwise the callback will not run for that array.
 - The window list is time-ordered and only reflects the timesteps that were
   actually sent by the simulation.
@@ -57,36 +57,35 @@ The simulation creates one ``Bridge`` per participating rank and sends chunks.
 
     # 4 Bridges in total
     world_size = 4
-    sys_md = {
-        "world_size": world_size,
-        # must be a reachable address by all other bridges (localhost only single machine)
-        "master_address": "127.0.0.1",
-        # free port
-        "master_port": 29500,
-    }
+    master_address = "127.0.0.1"  # localhost only works on a single machine
+    master_port = 29500
 
     # descriptio of arrays being shared
     arrays_md = {
         "temperature": {
+            # shape of the full distributed array
+            "global_shape": (256, 256),
             # shape of the chunk
             "chunk_shape": (64, 64),
-            # how many chunks in each dimension
-            "nb_chunks_per_dim": (4, 4),
-            # how many chunks / bridges per node
-            "nb_chunks_of_node": 4,
-            # dype
-            "dtype": np.float64,
             # the coordinates of the chunk block in 
             # the global distributed array
             "chunk_position": (0, 0),
         }
     }
 
-    # this call should be repeated 4 times with a different id
+    from deisa.ray.comm import init_gloo_comm
+
+    comm = init_gloo_comm(
+        world_size,
+        rank,
+        master_address,
+        master_port,
+    )
+
+    # this call should be repeated 4 times with a different rank
     bridge = Bridge(
-        bridge_id=rank,
         arrays_metadata=arrays_md,
-        system_metadata=sys_md,
+        comm=comm,
     )
 
     # sending data chunk
@@ -100,24 +99,24 @@ The simulation creates one ``Bridge`` per participating rank and sends chunks.
 Analytics quick snippet
 -----------------------
 
-Define the analytics callback using Dask operations. ``DeisaArray.dask`` gives
-access to standard Dask array methods, and ``DeisaArray.t`` is the timestep.
+Define the analytics callback using Dask operations. ``DeisaArray`` provides
+standard Dask array methods directly, and ``DeisaArray.t`` is the timestep.
 
 .. code-block:: python
 
     from deisa.ray.window_handler import Deisa
-    from deisa.ray.types import WindowSpec
+    from deisa.ray.types import Window
 
     deisa = Deisa()
 
     def summary_callback(temperature_window):
         latest = temperature_window[-1]
-        mean_value = latest.dask.mean().compute()
+        mean_value = latest.mean().compute()
         print(f"t={latest.t} mean={mean_value}")
 
     deisa.register_callback(
         summary_callback,
-        [WindowSpec("temperature", window_size=3)],
+        [Window("temperature", window_size=3)],
     )
 
     deisa.execute_callbacks()
@@ -135,7 +134,7 @@ Template:
 
     deisa.register_callback(
         my_callback,
-        [WindowSpec("temperature"), WindowSpec("pressure")],
+        [Window("temperature"), Window("pressure")],
         when="AND",  # or "OR"
     )
 
@@ -145,21 +144,21 @@ You can also use the decorator form for a shorter registration pattern:
 
     d = Deisa()
 
-    @d.callback(WindowSpec("temperature"), WindowSpec("pressure"), when="OR")
+    @d.register(Window("temperature"), Window("pressure"), when="OR")
     def callback(temperature: list[DeisaArray], pressure: list[DeisaArray]):
         ...
 
-Using ``WindowSpec`` with a sliding window
+Using ``Window`` with a sliding window
 ------------------------------------------
 
 To keep the last three timesteps of an array available inside a callback, use a
-``WindowSpec`` with ``window_size=3``:
+``Window`` with ``window_size=3``:
 
 .. code-block:: python
 
-    from deisa.ray.types import WindowSpec
+    from deisa.ray.types import Window
 
-    temperature_spec = WindowSpec("temperature", window_size=3)
+    temperature_spec = Window("temperature", window_size=3)
 
 The callback argument for that window spec will contain up to the three most
 recent arrays sent by the simulation. During the first two iterations, the list
@@ -174,7 +173,7 @@ that needs three timesteps requires ``window_size=3``.
 
 The list is ordered from oldest to newest: the oldest array is at the
 beginning, and the most recent array is at the end. Each entry is a
-``DeisaArray`` object, so use ``.dask`` to access the Dask array and ``.t`` to
+``DeisaArray`` object, so use the object directly as the Dask array and ``.t`` to
 access its timestep.
 
 .. code-block:: python
@@ -188,7 +187,7 @@ access its timestep.
         newest = temperature_window[-1]
 
         midpoint_estimate = (
-            oldest.dask + middle.dask + newest.dask
+            oldest + middle + newest
         ) / 3
 
         print(
@@ -208,7 +207,7 @@ On the analytics side, call ``Deisa.set`` with a key, value, and timestep:
 
     def summary_callback(temperature_window):
         latest = temperature_window[-1]
-        mean_value = latest.dask.mean().compute()
+        mean_value = latest.mean().compute()
 
         if mean_value > 10:
             deisa.set("cooling_factor", value=0.5, timestep=latest.t)

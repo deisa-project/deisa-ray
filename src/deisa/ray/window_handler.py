@@ -1,25 +1,30 @@
 from collections import deque, defaultdict
 import gc
 import logging
-from typing import Any, Callable, Hashable, List, Optional, Literal
+from typing import Any, Callable, List, Optional, Literal
 
 import dask
+import dask.array as da
 import ray
 from ray.util.dask import ray_dask_get
 
 from deisa.ray._scheduler import deisa_ray_get
-from deisa.ray.config import config
-from deisa.ray.errors import _default_exception_handler
+from deisa.ray.config import distributed_scheduling_enabled_from_env
+from deisa.core import IDeisa
 from deisa.ray.head_node import HeadNodeActor
 from deisa.ray.types import (
     ActorID,
     DeisaArray,
     RayActorHandle,
-    Timestep,
-    WindowSpec,
+    Window,
+    CallbackArgs,
     _CallbackConfig,
 )
 from deisa.ray.utils import get_head_actor_options
+
+Callback = IDeisa.Callback
+ExceptionHandler = IDeisa.ExceptionHandler
+_default_exception_handler = IDeisa._IDeisa__default_exception_handler
 
 
 def _ray_start_impl() -> None:
@@ -35,7 +40,19 @@ def _ray_start_impl() -> None:
         ray.init(address="auto", log_to_driver=False, logging_level=logging.ERROR)
 
 
-class Deisa:
+def _with_timestep(array: da.Array, timestep: int) -> DeisaArray:
+    return DeisaArray(
+        array.dask,
+        array.name,
+        array.chunks,
+        dtype=array.dtype,
+        meta=getattr(array, "_meta", None),
+        shape=array.shape,
+        t=timestep,
+    )
+
+
+class Deisa(IDeisa):
     """
     Entry point that orchestrates analytics callbacks on Ray.
 
@@ -45,10 +62,9 @@ class Deisa:
 
     def __init__(
         self,
-        *,
-        ray_start: Optional[Callable[[], None]] = None,
-        max_simulation_ahead: int = 1,
         feedback_queue_size: int = 1024,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         """
         Initialize handler state without touching Ray.
@@ -61,9 +77,14 @@ class Deisa:
             Number of timesteps the analytics may lag behind the simulation.
             Defaults to 1.
         """
+        ray_start: Optional[Callable[[], None]] = kwargs.pop("ray_start", None)
+        max_simulation_ahead: int = kwargs.pop("max_simulation_ahead", 1)
+        if kwargs:
+            unexpected = next(iter(kwargs))
+            raise TypeError(f"Deisa.__init__() got an unexpected keyword argument '{unexpected}'")
+
         # cheap constructor: no Ray side effects
-        config.lock()
-        self._experimental_distributed_scheduling_enabled = config.experimental_distributed_scheduling_enabled
+        self._experimental_distributed_scheduling_enabled = distributed_scheduling_enabled_from_env()
 
         # Do NOT mutate global config here if you want cheap unit tests;
         # do it when connecting, or inject it similarly.
@@ -72,12 +93,11 @@ class Deisa:
         self._connected = False
         self.node_actors: dict[ActorID, RayActorHandle] = {}
         self.registered_callbacks: list[_CallbackConfig] = []
-        self.queue_per_array: dict[str, deque]
         self.max_simulation_ahead: int = max_simulation_ahead
         self.feedback_queue_size: int = feedback_queue_size
         self.has_new_timestep: dict[str, bool] = defaultdict(bool)
         self.has_seen_array: dict[str, bool] = defaultdict(bool)
-        self.queue_per_array = {}
+        self.queue_per_array: dict[str, deque] = {}
 
     def _ensure_connected(self) -> None:
         """
@@ -113,8 +133,8 @@ class Deisa:
         into unrelated Dask computations in later tests or user code.
         """
         if self._experimental_distributed_scheduling_enabled:
-            return dask.config.set(scheduler=deisa_ray_get, shuffle="tasks")
-        return dask.config.set(scheduler=ray_dask_get, shuffle="tasks")
+            return dask.config.set(scheduler=deisa_ray_get, dataframe__shuffle__method="tasks")
+        return dask.config.set(scheduler=ray_dask_get, dataframe__shuffle__method="tasks")
 
     def _create_head_actor(self) -> None:
         """
@@ -130,22 +150,22 @@ class Deisa:
             feedback_queue_size=self.feedback_queue_size,
         )
 
-    def callback(
+    def register(
         self,
-        *window_specs,
-        exception_handler: Optional[Callable] = None,
+        *callback_args: CallbackArgs,
+        exception_handler: ExceptionHandler = _default_exception_handler,
         when: Literal["AND", "OR"] = "AND",
-    ):
+    ) -> Callable:
         """
         Decorator that registers a sliding-window analytics callback.
 
         Parameters
         ----------
-        *window_specs : WindowSpec
+        *callback_args : CallbackArgs
             Array descriptions the callback should receive.
         exception_handler : Optional[Callable], optional
             Handler invoked when the user callback raises. Defaults to
-            :func:`deisa.ray.errors._default_exception_handler`.
+            :func:`deisa.core.IDeisa.__default_exception_handler`.
         when : Literal["AND", "OR"], optional
             Governs whether all arrays (``"AND"``) or any array (``"OR"``)
             must be available before the callback runs. Defaults to ``"AND"``.
@@ -158,15 +178,20 @@ class Deisa:
         """
 
         def deco(fn):
-            return self.register_callback(fn, list(window_specs), exception_handler, when)
+            return self.register_callback(
+                fn,
+                *callback_args,
+                exception_handler=exception_handler,
+                when=when,
+            )
 
         return deco
 
     def register_callback(
         self,
-        simulation_callback: Callable,
-        arrays_spec: list[WindowSpec],
-        exception_handler: Optional[Callable] = None,
+        callback: Callback,
+        *callback_args: CallbackArgs,
+        exception_handler: ExceptionHandler = _default_exception_handler,
         when: Literal["AND", "OR"] = "AND",
     ) -> Callable:
         """
@@ -174,10 +199,10 @@ class Deisa:
 
         Parameters
         ----------
-        simulation_callback : Callable
+        callback : Callable
             Function to run for each iteration; receives arrays as kwargs
             and ``timestep``.
-        arrays_spec : list[WindowSpec]
+        *callback_args : CallbackArgs
             Descriptions of arrays to stream to the callback (with optional
             sliding windows).
             Maximum iterations to execute. Default is a large sentinel.
@@ -194,36 +219,24 @@ class Deisa:
         Callable
             The original callback, allowing decorator-style usage.
         """
+        arrays_spec = []
+        for callback_arg in callback_args:
+            if isinstance(callback_arg, Window):
+                arrays_spec.append(callback_arg)
+            elif isinstance(callback_arg, str):
+                arrays_spec.append(Window(callback_arg, size=1))
+
         self._ensure_connected()  # connect + handshake before accepting callbacks
         cfg = _CallbackConfig(
-            simulation_callback=simulation_callback,
+            simulation_callback=callback,
             arrays_description=arrays_spec,
-            exception_handler=exception_handler or _default_exception_handler,
+            exception_handler=exception_handler,
             when=when,
         )
         self.registered_callbacks.append(cfg)
-        return simulation_callback
+        return callback
 
-    def unregister_callback(
-        self,
-        simulation_callback: Callable,
-    ) -> None:
-        """
-        Unregister a previously registered simulation callback.
-
-        Parameters
-        ----------
-        simulation_callback : Callable
-            Callback to remove from the registry.
-
-        Raises
-        ------
-        NotImplementedError
-            Always, as the feature has not been implemented yet.
-        """
-        raise NotImplementedError("method not yet implemented.")
-
-    def generate_queue_per_array(self):
+    def _generate_queue_per_array(self):
         """
         Prepare per-array queues that respect declared window sizes.
 
@@ -234,9 +247,9 @@ class Deisa:
         """
         for cb_cfg in self.registered_callbacks:
             description = cb_cfg.arrays_description
-            for array_def in description:
-                name = array_def.name
-                window_size: int = array_def.window_size if array_def.window_size is not None else 1
+            for array_window in description:
+                name = array_window.name
+                window_size: int = array_window.size if array_window.size is not None else 1
 
                 if name in self.queue_per_array:
                     if self.queue_per_array[name].maxlen < window_size:
@@ -272,7 +285,7 @@ class Deisa:
                 raise RuntimeError("Please register at least one callback before calling execute_callbacks()")
 
             # generate one queue per array which cleanly handles the window size
-            self.generate_queue_per_array()
+            self._generate_queue_per_array()
 
             # get first array to kickstart the process
             # - Add to queue, mark as new timestep arrived
@@ -282,7 +295,7 @@ class Deisa:
 
             queue = self.queue_per_array.get(name)
             if queue is not None:
-                queue.append(DeisaArray(dask=array, t=arr_timestep))
+                queue.append(_with_timestep(array, arr_timestep))
                 self.has_new_timestep[name] = True
                 self.has_seen_array[name] = True
 
@@ -305,6 +318,8 @@ class Deisa:
                         )
                     if name == "__deisa_last_iteration_array":
                         end_reached = True
+                        # TODO should it print or return?
+                        print(f"Simulation closed at timestep: {arr_timestep}", flush=True)
                         break
                     # simulation has produced a higher timestep -> process all arrays for current_timestep
                     if arr_timestep > current_timestep:
@@ -312,7 +327,7 @@ class Deisa:
 
                     queue = self.queue_per_array.get(name)
                     if queue is not None:
-                        queue.append(DeisaArray(dask=array, t=arr_timestep))
+                        queue.append(_with_timestep(array, arr_timestep))
                         self.has_new_timestep[name] = True
                         self.has_seen_array[name] = True
 
@@ -323,10 +338,10 @@ class Deisa:
                     exception_handler = cb_cfg.exception_handler
                     when = cb_cfg.when
 
-                    should_call = self.should_call(description_arrays_needed, when)
+                    should_call = self._should_call(description_arrays_needed, when)
                     if should_call:
                         # Compute the arrays to pass to the callback
-                        callback_args: dict[str, List[DeisaArray]] = self.determine_callback_args(
+                        callback_args: dict[str, List[DeisaArray]] = self._determine_callback_args(
                             description_arrays_needed
                         )
                         try:
@@ -336,10 +351,7 @@ class Deisa:
                         except AssertionError as e:
                             raise e
                         except BaseException as e:
-                            try:
-                                exception_handler(e)
-                            except BaseException as e:
-                                _default_exception_handler(e)
+                            exception_handler(e)
 
                         del callback_args
                         gc.collect()
@@ -352,17 +364,17 @@ class Deisa:
                 if not end_reached:
                     queue = self.queue_per_array.get(name)
                     if queue is not None:
-                        queue.append(DeisaArray(dask=array, t=arr_timestep))
+                        queue.append(_with_timestep(array, arr_timestep))
                         self.has_new_timestep[name] = True
                         self.has_seen_array[name] = True
 
-    def determine_callback_args(self, description_of_arrays_needed) -> dict[str, List[DeisaArray]]:
+    def _determine_callback_args(self, description_of_arrays_needed) -> dict[str, List[DeisaArray]]:
         """
         Build the kwargs passed to a simulation callback.
 
         Parameters
         ----------
-        description_of_arrays_needed : Sequence[WindowSpec]
+        description_of_arrays_needed : Sequence[Window]
             Array descriptions requested by the callback.
 
         Returns
@@ -371,9 +383,9 @@ class Deisa:
             Mapping from array name to the latest (windowed) list of ``DeisaArray`` instances.
         """
         callback_args = {}
-        for description in description_of_arrays_needed:
-            name = description.name
-            window_size = description.window_size
+        for window in description_of_arrays_needed:
+            name = window.name
+            window_size = window.size
             queue = self.queue_per_array[name]
             if window_size is None:
                 callback_args[name] = [queue[-1]]
@@ -381,13 +393,13 @@ class Deisa:
                 callback_args[name] = list(queue)[-window_size:]
         return callback_args
 
-    def should_call(self, description_of_arrays_needed, when: Literal["AND", "OR"]) -> bool:
+    def _should_call(self, description_of_arrays_needed, when: Literal["AND", "OR"]) -> bool:
         """
         Determine whether a callback should execute for the current state.
 
         Parameters
         ----------
-        description_of_arrays_needed : Sequence[WindowSpec]
+        description_of_arrays_needed : Sequence[Window]
             Array descriptions governing the callback.
         when : Literal["AND", "OR"]
             Execution mode specifying whether all arrays or any array must have
@@ -406,10 +418,9 @@ class Deisa:
 
     def set(
         self,
-        key: Hashable,
-        *,
+        key: str,
         value: Any,
-        timestep: Timestep,
+        timestep: int,
     ) -> None:
         """
         Publish a feedback value for bridges.

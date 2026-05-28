@@ -1,3 +1,4 @@
+import os
 import dask.array as da
 import pytest
 import ray
@@ -13,16 +14,14 @@ NB_ITERATIONS = 5
 def head_script(partitioning_strategy: str) -> None:
     """The head node checks that the values are correct"""
     from deisa.ray.window_handler import Deisa
-    from deisa.ray.types import WindowSpec
+    from deisa.ray.types import Window
 
-    import deisa.ray as deisa
-
-    deisa.config.enable_experimental_distributed_scheduling(True)
+    os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1"
 
     d = Deisa()
 
     def simulation_callback(array: list[DeisaArray]):
-        x = array[0].dask.sum().compute(deisa_ray_partitioning_strategy=partitioning_strategy)
+        x = array[0].sum().compute(deisa_ray_partitioning_strategy=partitioning_strategy)
         assert x == 10 * array[0].t
 
         # Test with a full Dask computation
@@ -30,7 +29,7 @@ def head_script(partitioning_strategy: str) -> None:
 
     d.register_callback(
         simulation_callback,
-        [WindowSpec("array")],
+        *[Window("array")],
     )
     d.execute_callbacks()
 
@@ -48,7 +47,6 @@ def test_partitioning(partitioning_strategy: str, ray_cluster) -> None:  # noqa:
                 rank=rank,
                 position=(rank // 2, rank % 2),
                 chunks_per_dim=(2, 2),
-                nb_chunks_of_node=1,
                 chunk_size=(1, 1),
                 nb_iterations=NB_ITERATIONS,
                 node_id=f"node_{rank % 4}",

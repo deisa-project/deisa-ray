@@ -1,7 +1,6 @@
 import time
 import pytest
 import ray
-import numpy as np
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 from ray.cluster_utils import Cluster
 from deisa.ray.types import DeisaArray
@@ -75,7 +74,7 @@ def test_sim_start_first_and_analytics_can_start_after_x_secs(ray_multinode_clus
     )
     def head_script() -> bool:
         """The head node checks that the values are correct"""
-        from deisa.ray.types import WindowSpec
+        from deisa.ray.types import Window
         from deisa.ray.window_handler import Deisa
 
         d = Deisa()
@@ -85,7 +84,7 @@ def test_sim_start_first_and_analytics_can_start_after_x_secs(ray_multinode_clus
 
         d.register_callback(
             simulation_callback,
-            [WindowSpec("array")],
+            *[Window("array")],
         )
         d.execute_callbacks()
         return True
@@ -94,23 +93,26 @@ def test_sim_start_first_and_analytics_can_start_after_x_secs(ray_multinode_clus
     @ray.remote
     def start_sim(rank, chunk_pos, port):
         from deisa.ray.bridge import Bridge
+        from deisa.ray.comm import init_gloo_comm
 
         arrays_md = {
             "array": {
+                "global_shape": (2, 2),
                 "chunk_shape": (1, 1),
-                "nb_chunks_per_dim": (2, 2),
-                "nb_chunks_of_node": 1,
-                "dtype": np.int32,
                 "chunk_position": chunk_pos,
             }
         }
 
-        sys_md = {"world_size": 4, "master_address": "127.0.0.1", "master_port": port}
         try:
+            comm = init_gloo_comm(
+                4,
+                rank,
+                "127.0.0.1",
+                port,
+            )
             b = Bridge(
-                bridge_id=rank,
                 arrays_metadata=arrays_md,
-                system_metadata=sys_md,
+                comm=comm,
                 _node_id=None,
             )  # type:ignore
             b.close(timestep=0)
@@ -162,7 +164,7 @@ def test_analytics_start_first_and_sim_can_start_after_x_secs(ray_multinode_clus
     )
     def head_script() -> bool:
         """The head node checks that the values are correct"""
-        from deisa.ray.types import WindowSpec
+        from deisa.ray.types import Window
         from deisa.ray.window_handler import Deisa
 
         d = Deisa()
@@ -172,7 +174,7 @@ def test_analytics_start_first_and_sim_can_start_after_x_secs(ray_multinode_clus
 
         d.register_callback(
             simulation_callback,
-            [WindowSpec("array")],
+            *[Window("array")],
         )
         d.execute_callbacks()
         return True
@@ -181,23 +183,26 @@ def test_analytics_start_first_and_sim_can_start_after_x_secs(ray_multinode_clus
     @ray.remote
     def start_sim(rank, chunk_pos, port):
         from deisa.ray.bridge import Bridge
+        from deisa.ray.comm import init_gloo_comm
 
         arrays_md = {
             "array": {
+                "global_shape": (2, 2),
                 "chunk_shape": (1, 1),
-                "nb_chunks_per_dim": (2, 2),
-                "nb_chunks_of_node": 1,
-                "dtype": np.int32,
                 "chunk_position": chunk_pos,
             }
         }
 
-        sys_md = {"world_size": 4, "master_address": "127.0.0.1", "master_port": port}
         try:
+            comm = init_gloo_comm(
+                4,
+                rank,
+                "127.0.0.1",
+                port,
+            )
             b = Bridge(
-                bridge_id=rank,
                 arrays_metadata=arrays_md,
-                system_metadata=sys_md,
+                comm=comm,
                 _node_id=None,
             )  # type:ignore
             b.close(timestep=0)
@@ -247,7 +252,7 @@ def test_sim_raise_if_not_enough_bridges_connect(ray_multinode_cluster):
         )
         def head_script() -> bool:
             """The head node checks that the values are correct"""
-            from deisa.ray.types import WindowSpec
+            from deisa.ray.types import Window
             from deisa.ray.window_handler import Deisa
 
             d = Deisa()
@@ -257,7 +262,7 @@ def test_sim_raise_if_not_enough_bridges_connect(ray_multinode_cluster):
 
             d.register_callback(
                 simulation_callback,
-                [WindowSpec("array")],
+                *[Window("array")],
             )
             d.execute_callbacks()
             return True
@@ -265,24 +270,27 @@ def test_sim_raise_if_not_enough_bridges_connect(ray_multinode_cluster):
         @ray.remote
         def start_sim(rank, chunk_pos, port):
             from deisa.ray.bridge import Bridge
+            from deisa.ray.comm import init_gloo_comm
 
             arrays_md = {
                 "array": {
+                    "global_shape": (2, 2),
                     "chunk_shape": (1, 1),
-                    "nb_chunks_per_dim": (2, 2),
-                    "nb_chunks_of_node": 1,
-                    "dtype": np.int32,
                     "chunk_position": chunk_pos,
                 }
             }
-            sys_md = {"world_size": 4, "master_address": "127.0.0.1", "master_port": port}
             try:
+                comm = init_gloo_comm(
+                    4,
+                    rank,
+                    "127.0.0.1",
+                    port,
+                    timeout_s=10,
+                )
                 b = Bridge(
-                    bridge_id=rank,
                     arrays_metadata=arrays_md,
-                    system_metadata=sys_md,
+                    comm=comm,
                     _node_id=None,
-                    _comm_timeout=10,
                 )  # type:ignore
                 b.close(timestep=0)
             except Exception:

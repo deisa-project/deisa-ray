@@ -6,34 +6,25 @@ top of Ray.
 """
 
 from __future__ import annotations
+import copy
 import logging
-from typing import Any, Dict, Mapping, Optional
+from typing import Any, Dict, Mapping, Optional, Union
 import numpy as np
 import ray
 from ray.actor import ActorClass
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
-from deisa.ray import Timestep
+from deisa.core import ICommunicator, IBridge, validate_arrays_metadata
+from deisa.ray.comm import normalize_comm
+from deisa.ray.errors import ContractError, _default_exception_handler
 from deisa.ray.scheduling_actor import SchedulingActor as _RealSchedulingActor
 from deisa.ray.types import RayActorHandle
-from deisa.ray.errors import ContractError, _default_exception_handler
-from deisa.ray.comm import init_gloo_comm, normalize_comm
-from deisa.ray.validate import _validate_arrays_meta, _validate_system_meta
 from deisa.ray.utils import get_node_actor_options
-import torch.distributed as dist
+import sys
 
 logger = logging.getLogger(__name__)
 
-_GLOO_RENDEZVOUS_ERRORS = tuple(
-    err
-    for err in (
-        getattr(dist, "DistStoreError", None),
-        getattr(dist, "DistNetworkError", None),
-    )
-    if err is not None
-)
 
-
-class Bridge:
+class Bridge(IBridge):
     """
     Bridge between MPI ranks and Ray cluster for distributed array processing.
 
@@ -43,19 +34,12 @@ class Bridge:
 
     Parameters
     ----------
-    bridge_id : int
-        Identifier of the MPI rank that owns this bridge instance.
+    comm : deisa.core.ICommunicator
+        Communication backend for the simulation ranks. The bridge ID is
+        derived from ``comm.Get_rank()``. Raw ``mpi4py`` communicators are
+        wrapped in :class:`deisa.ray.comm.MPICommAdapter`.
     arrays_metadata : Mapping[str, Mapping[str, Any]]
         Metadata describing the array layout managed by this bridge.
-    system_metadata : Mapping[str, Any] or None
-        Cluster-wide metadata (e.g., world size, master address/port). This is
-        required only when ``comm`` is ``None`` and Bridge must initialize the
-        default Gloo communicator.
-    comm : Comm or mpi4py.MPI.Comm, optional
-        Custom communication backend to use instead of the default Gloo
-        communicator. Raw ``mpi4py`` communicators are wrapped in
-        :class:`deisa.ray.comm.MPICommAdapter`. If ``None``,
-        ``init_gloo_comm`` runs with ``system_metadata``.
     _node_id : str or None, optional
         Node identifier used for testing or custom scheduling. Defaults to ``None``.
     scheduling_actor_cls : Type, optional
@@ -63,9 +47,6 @@ class Bridge:
         :class:`deisa.ray.scheduling_actor.SchedulingActor`.
     _init_retries : int, optional
         Number of attempts to create and ready the node actor. Defaults to 3.
-    _comm_timeout : int or None, optional
-        Timeout (in seconds) for Gloo rendezvous during communicator
-        initialization. Defaults to 120.
 
     Attributes
     ----------
@@ -85,22 +66,14 @@ class Bridge:
 
         arrays_metadata = {
             "temperature": {
+                "global_shape": (40, 40),
                 "chunk_shape": (10, 10),
-                "nb_chunks_per_dim": (4, 4),
-                "nb_chunks_of_node": 1,
-                "dtype": np.float64,
                 "chunk_position": (0, 0),
             }
         }
-        system_metadata = {
-            "nb_ranks": 4,
-            "ray_address": "auto",
-        }
-
         bridge = Bridge(
-            id=0,
             arrays_metadata=arrays_metadata,
-            system_metadata=system_metadata
+            comm=comm,
         )
 
         bridge.send(
@@ -114,51 +87,25 @@ class Bridge:
     # should sim crash? Keep going?
     def __init__(
         self,
-        bridge_id: int,
-        arrays_metadata: Mapping[str, Mapping[str, Any]],
-        system_metadata: Mapping[str, Any] | None = None,
-        comm: Any = None,
-        *,
-        _node_id: str | None = None,
-        scheduling_actor_cls: ActorClass = _RealSchedulingActor,
-        _init_retries: int = 3,
-        _comm_timeout: Optional[int] = None,
-    ) -> None:
+        comm: ICommunicator,
+        arrays_metadata: Dict[str, Dict],
+        *args: Any,
+        **kwargs: Any,
+    ):
         """
         Initialize the Bridge to connect MPI rank to Ray cluster.
 
         Parameters
         ----------
-        bridge_id : int
-            Unique identifier of this Bridge.
-        arrays_metadata : Mapping[str, Mapping[str, Any]]
+        comm : deisa.core.ICommunicator
+            Communication backend to use. The unique bridge identifier is
+            derived from ``comm.Get_rank()``. Raw ``mpi4py`` communicators are
+            wrapped in :class:`deisa.ray.comm.MPICommAdapter`.
+        arrays_metadata : Dict[str, Dict]
             Dictionary that describes the arrays being shared by the simulation.
             Keys represent the name of the array while the values are
             dictionaries that must at least declare the metadata expected by
             :meth:`validate_arrays_meta`.
-        system_metadata : Mapping[str, Any] or None, optional
-            System metadata such as address of Ray cluster, number of MPI
-            ranks, and other general information that describes the system.
-            This is required only when ``comm`` is ``None`` and Bridge must
-            initialize the default Gloo communicator.
-        comm : Comm or mpi4py.MPI.Comm, optional
-            Communication backend to use. Raw ``mpi4py`` communicators are
-            wrapped in :class:`deisa.ray.comm.MPICommAdapter`. If ``None``, a
-            Gloo communicator configured from ``system_metadata`` is
-            initialized.
-        _node_id : str or None, optional
-            The ID of the node. If None, the ID is taken from the Ray runtime
-            context. Useful for testing with several scheduling actors on a
-            single machine. Default is None.
-        scheduling_actor_cls : Type, optional
-            The class to use for creating the scheduling actor. Default is
-            `_RealSchedulingActor`.
-        _init_retries : int, optional
-            Number of retry attempts when initializing the scheduling actor.
-            Default is 3.
-        _comm_timeout : int or None, optional
-            Timeout in seconds for Gloo rendezvous. Default is 120 when not
-            provided.
 
         Raises
         ------
@@ -166,9 +113,9 @@ class Bridge:
             If the scheduling actor cannot be created or initialized after
             the specified number of retries.
         ValueError
-            If ``system_metadata`` is omitted while ``comm`` is ``None``.
-        ValueError
-            If ``_comm_timeout`` is provided and is not strictly positive.
+            If ``comm`` is ``None``.
+        TypeError
+            If ``comm`` does not implement :class:`deisa.core.ICommunicator`.
 
         Notes
         -----
@@ -177,11 +124,27 @@ class Bridge:
         node affinity scheduling when `_node_id` is None. The first remote call
         to the scheduling actor serves as a readiness check.
         """
-        self.bridge_id = bridge_id
-        self._init_retries = _init_retries
+        if args:
+            raise TypeError(f"Bridge.__init__() takes 3 positional arguments but {len(args) + 3} were given")
 
-        self.arrays_metadata = _validate_arrays_meta(arrays_metadata)
+        _node_id: str | None = kwargs.pop("_node_id", None)
+        scheduling_actor_cls: ActorClass = kwargs.pop("scheduling_actor_cls", _RealSchedulingActor)
+        _init_retries: int = kwargs.pop("_init_retries", 3)
+        if kwargs:
+            unexpected = next(iter(kwargs))
+            raise TypeError(f"Bridge.__init__() got an unexpected keyword argument '{unexpected}'")
+
+        self._init_retries = _init_retries
+        self._closed = False
+
+        self.arrays_metadata = copy.deepcopy(validate_arrays_metadata(arrays_metadata))
         comm = normalize_comm(comm)
+        if comm is None:
+            raise ValueError("comm is required")
+        if not isinstance(comm, ICommunicator):
+            raise TypeError("comm must implement deisa.core.ICommunicator")
+        self.comm = comm
+        self.bridge_id = self.comm.Get_rank()
 
         # NOTE : Possible error : if two bridges have different first array it will have different
         # shape and will be declared twice.
@@ -190,45 +153,12 @@ class Bridge:
         # note we only need the metadata so that it can pass through the entire pipeline correctly and
         # in sequential order, so we just replicate the first metadata we have.
 
-        self.system_metadata = _validate_system_meta(system_metadata) if system_metadata is not None else None
         if self.bridge_id == 0:
             self.arrays_metadata["__deisa_last_iteration_array"] = {
+                "global_shape": (1, 1),
                 "chunk_shape": (1, 1),
-                "nb_chunks_per_dim": (1, 1),
-                "nb_chunks_of_node": 1,
-                "dtype": np.int16,
                 "chunk_position": (0, 0),
             }
-        self._comm_timeout = 120 if _comm_timeout is None else int(_comm_timeout)
-        if self._comm_timeout <= 0:
-            raise ValueError(f"_comm_timeout must be > 0 seconds, got {self._comm_timeout}")
-
-        if comm is None:
-            if self.system_metadata is None:
-                raise ValueError("system_metadata is required when comm is None")
-            try:
-                comm = init_gloo_comm(
-                    self.system_metadata["world_size"],
-                    self.bridge_id,
-                    self.system_metadata["master_address"],
-                    self.system_metadata["master_port"],
-                    self._comm_timeout,
-                )
-            except _GLOO_RENDEZVOUS_ERRORS as e:
-                e.add_note(
-                    "Gloo rendezvous timeout.\n"
-                    f"Rank: {self.bridge_id}\n"
-                    f"Expected world size: {self.system_metadata['world_size']}\n"
-                    f"Master: {self.system_metadata['master_address']}:{self.system_metadata['master_port']}\n"
-                    "Not all Bridge processes connected before the deadline.\n"
-                    "This usually indicates that one or more Bridge instances crashed, "
-                    "never started, or are blocked during initialization."
-                )
-                raise
-        elif self.system_metadata is None:
-            logger.debug("Bridge %s initialized with custom communicator and no system_metadata", self.bridge_id)
-
-        self.comm = comm
 
         if not ray.is_initialized():
             ray.init(address="auto", log_to_driver=False, logging_level=logging.ERROR)
@@ -249,7 +179,7 @@ class Bridge:
         # create node actor
         self._create_node_actor(scheduling_actor_cls, node_actor_options)
         self.head_actor: RayActorHandle | None = None
-        # exchange meta with node actor
+        # exchange meta with node actor (blocking call)
         self._exchange_chunks_meta_with_node_actor()
         # make sure node actor is ready
         ray.get(self.node_actor.ready.remote())
@@ -263,6 +193,9 @@ class Bridge:
         # 3. all bridges have connected
         # 4. all node actors have been created
         # 5. all node actors have received description of arrays_md
+
+        # ray method calls are sequential on same actor
+        ray.get(self.node_actor.finalize_registration.remote())
 
     def _exchange_chunks_meta_with_node_actor(self):
         """
@@ -282,9 +215,7 @@ class Bridge:
                     # global info of array (same across bridges)
                     array_name=array_name,
                     chunk_shape=meta["chunk_shape"],
-                    nb_chunks_per_dim=meta["nb_chunks_per_dim"],
-                    nb_chunks_of_node=meta["nb_chunks_of_node"],
-                    dtype=meta["dtype"],
+                    global_shape=meta["global_shape"],
                     # local info of array specific to bridge
                     bridge_id=self.bridge_id,
                     chunk_position=meta["chunk_position"],
@@ -294,13 +225,9 @@ class Bridge:
 
     def send(
         self,
-        *,
         array_name: str,
         chunk: np.ndarray,
         timestep: int,
-        chunked: bool = True,
-        store_externally: bool = False,
-        test_mode: bool = False,
     ) -> None:
         """
         Make a chunk of data available to the analytics.
@@ -317,15 +244,6 @@ class Bridge:
             The chunk of data to be sent to the analytics.
         timestep : int
             The timestep index for this chunk of data.
-        chunked : bool, optional
-            Whether the chunk was produced by the internal chunking logic.
-            Currently reserved for future use. Default is True.
-        store_externally : bool, optional
-            If True, the data is stored externally. Not implemented yet.
-            Default is False.
-        test_mode : bool, optional
-            Reserved flag for future testing or validation hooks. Currently
-            ignored. Default is False.
 
         Notes
         -----
@@ -345,15 +263,15 @@ class Bridge:
             Blocks until the node actor processes the chunk.
         """
         try:
+            chunk_dtype = chunk.dtype
             # Setting the owner allows keeping the reference when the simulation script terminates.
             ref = ray.put(chunk, _owner=self.node_actor)
             future: ray.ObjectRef = self.node_actor.add_chunk.remote(
                 bridge_id=self.bridge_id,
                 array_name=array_name,
                 chunk_ref=[ref],
+                dtype=chunk_dtype,
                 timestep=timestep,
-                chunked=True,
-                store_externally=store_externally,
             )  # type: ignore
             # Wait until the data is processed before returning to the simulation
             ray.get(future)
@@ -362,12 +280,17 @@ class Bridge:
         except Exception as e:
             _default_exception_handler(e)
 
+    def __del__(self) -> None:
+        try:
+            if hasattr(self, "comm") and hasattr(self, "node_actor"):
+                self.close(sys.maxsize)
+        except Exception:
+            logger.debug("Ignoring exception while finalizing Bridge", exc_info=True)
+
     def close(
         self,
-        *,
         timestep: int,
-        store_externally: bool = False,
-    ) -> int:
+    ) -> None:
         """
         Close the bridge by signaling analytics that the simulation finished.
 
@@ -375,31 +298,30 @@ class Bridge:
         ----------
         timestep : int
             The timestep index corresponding to the sentinel chunk.
-        store_externally : bool, optional
-            Reserved for future external storage handling. Default is False.
 
-        Returns
-        -------
-        int
-            The final timestep after the sentinel chunk is known by the node actor.
         """
+        if self._closed:
+            return
+        self._closed = True
+
         self.comm.barrier()
         if self.bridge_id == 0:
             try:
-                ref = ray.put(0, _owner=self.node_actor)
+                chunk = np.asarray(0)
+                chunk_dtype = chunk.dtype
+                ref = ray.put(chunk, _owner=self.node_actor)
                 future: ray.ObjectRef = self.node_actor.add_chunk.remote(
                     bridge_id=self.bridge_id,
                     array_name="__deisa_last_iteration_array",
                     chunk_ref=[ref],
+                    dtype=chunk_dtype,
                     timestep=timestep,
-                    chunked=True,
-                    store_externally=store_externally,
                 )  # type: ignore
                 ray.get(future)
                 logger.info("Bridge %s closed at timestep %s", self.bridge_id, timestep)
             except Exception as e:
                 _default_exception_handler(e)
-        return timestep
+        return
 
     def _create_node_actor(
         self,
@@ -465,10 +387,10 @@ class Bridge:
 
     def get(
         self,
-        name: str,
-        *,
-        timestep: Timestep | None = None,
-    ) -> Any | None:
+        key: str,
+        timestep: Optional[int] = None,
+        default: Any = None,
+    ) -> Optional[Union[list, Any]]:
         """
         Retrieve feedback from analytics to influence the simulation.
 
@@ -477,11 +399,14 @@ class Bridge:
 
         Parameters
         ----------
-        name : str
-            The name of the key that is being retrieved from the Analytics.
-        timestep : Timestep | None, optional
+        key : str
+            The key that is being retrieved from the Analytics.
+        timestep : Optional[int], optional
             Timestep associated with the requested feedback value. When
-            omitted, returns the entire retained queue for ``name``.
+            omitted, returns the entire retained queue for ``key``.
+        default : Any, optional
+            Value returned when no feedback exists for ``key`` and
+            ``timestep``. Defaults to ``None``.
 
         Notes
         -----
@@ -499,7 +424,7 @@ class Bridge:
         -------
         Any | None
             The feedback value for ``timestep``, the full retained queue when
-            ``timestep`` is omitted, or ``None`` when no feedback exists.
+            ``timestep`` is omitted, or ``default`` when no feedback exists.
 
         Warning
         -------
@@ -513,9 +438,10 @@ class Bridge:
         """
         message = None
         if self.bridge_id == 0:
-            found, value = ray.get(self._get_head_actor().get_feedback.remote(name, timestep))
+            found, value = ray.get(self._get_head_actor().get_feedback.remote(key, timestep))
             message = {"found": found, "value": value}
 
-        message = self.comm.broadcast_object(message, src=0)
-        # NOTE: should it return message["found"]?
-        return message["value"]  # will be value or None
+        message = self.comm.bcast(message, root=0)
+        if not message["found"]:
+            return default
+        return message["value"]

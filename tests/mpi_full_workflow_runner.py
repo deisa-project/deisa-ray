@@ -15,14 +15,14 @@ NB_ITERATIONS = 5
 
 @ray.remote(num_cpus=0, max_retries=0)
 def head_script() -> None:
-    from deisa.ray.types import DeisaArray, WindowSpec
+    from deisa.ray.types import DeisaArray, Window
     from deisa.ray.window_handler import Deisa
 
     d = Deisa()
 
-    @d.callback(WindowSpec("array"))
+    @d.register(Window("array"))
     def simulation_callback(array: list[DeisaArray]):
-        x = array[0].dask.sum().compute()
+        x = array[0].sum().compute()
         assert x == 10 * array[0].t
 
     d.execute_callbacks()
@@ -33,7 +33,6 @@ def main() -> None:
 
     mpi_comm = MPI.COMM_WORLD
     rank = mpi_comm.Get_rank()
-    world_size = mpi_comm.Get_size()
     ray_address = os.environ.get("DEISA_RAY_ADDRESS", "auto")
 
     if not ray.is_initialized():
@@ -43,17 +42,13 @@ def main() -> None:
 
     arrays_md = {
         "array": {
+            "global_shape": (2, 2),
             "chunk_shape": (1, 1),
-            "nb_chunks_per_dim": (2, 2),
-            "nb_chunks_of_node": world_size,
-            "dtype": np.int32,
             "chunk_position": (rank // 2, rank % 2),
         }
     }
     bridge = Bridge(
-        bridge_id=rank,
         arrays_metadata=arrays_md,
-        system_metadata=None,
         comm=mpi_comm,
         _node_id="mpi-node",
     )
@@ -63,7 +58,7 @@ def main() -> None:
     for timestep in range(NB_ITERATIONS):
         bridge.send(array_name="array", chunk=timestep * array, timestep=timestep)
 
-    assert bridge.close(timestep=NB_ITERATIONS) == NB_ITERATIONS
+    assert bridge.close(timestep=NB_ITERATIONS) is None
 
     mpi_comm.Barrier()
 

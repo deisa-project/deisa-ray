@@ -1,3 +1,4 @@
+import os
 import pytest
 import ray
 
@@ -13,22 +14,21 @@ NB_ITERATIONS = 5
 def head_script(enable_distributed_scheduling, assert_error: bool = False) -> None:
     """The head node checks that the values are correct"""
     from deisa.ray.window_handler import Deisa
-    from deisa.ray.types import WindowSpec
-    import deisa.ray as deisa
+    from deisa.ray.types import Window
 
-    deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
+    os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
 
     d = Deisa()
 
     # TODO : modify assert to test the actual error handler
     def simulation_callback(array: list[DeisaArray]):
-        array[0].dask.compute()
+        array[0].compute()
         if assert_error:
             assert False
 
     d.register_callback(
         simulation_callback,
-        [WindowSpec("array")],
+        *[Window("array")],
     )
     d.execute_callbacks()
 
@@ -52,7 +52,6 @@ def test_exception_handler_not_bypass_computation(enable_distributed_scheduling:
                     rank=rank,
                     position=(rank // 2, rank % 2),
                     chunks_per_dim=(2, 2),
-                    nb_chunks_of_node=1,
                     chunk_size=(1, 1),
                     nb_iterations=NB_ITERATIONS,
                     node_id=f"node_{rank}",
@@ -82,7 +81,6 @@ def test_contract_error(enable_distributed_scheduling: bool, ray_cluster) -> Non
                     rank=rank,
                     position=(rank // 2, rank % 2),
                     chunks_per_dim=(2, 2),
-                    nb_chunks_of_node=1,
                     chunk_size=(1, 1),
                     nb_iterations=NB_ITERATIONS,
                     node_id=f"node_{rank}",
@@ -112,7 +110,6 @@ def test_contract_error(enable_distributed_scheduling: bool, ray_cluster) -> Non
 #                    rank=rank,
 #                    position=(rank // 2, rank % 2),
 #                    chunks_per_dim=(2, 2),
-#                    nb_chunks_of_node=4 // nb_nodes,
 #                    chunk_size=(1, 1),
 #                    nb_iterations=NB_ITERATIONS,
 #                    node_id=f"node_{rank % nb_nodes}",

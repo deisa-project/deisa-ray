@@ -41,15 +41,18 @@ class ArrayPerTimestep:
         Mapping of ``bridge_id`` to the double ObjectRef for that chunk. Once
         forwarded to the head actor the value is replaced with pickled bytes
         to free memory.
+    dtype : np.dtype or None
+        Dtype shared by all chunks received for this array timestep.
     """
 
     def __init__(self):
         """Create the readiness event and the async storage for local chunks."""
         # Triggered when all the chunks are ready
-        self.chunks_ready_event: asyncio.Event = asyncio.Event()
+        self.chunks_ready_event: asyncio.Lock = asyncio.Lock()
 
         # {bridgeID: chunk}
         self.local_chunks: AsyncDict[int, ray.ObjectRef | bytes] = AsyncDict()
+        self.dtype: np.dtype | None = None
 
 
 class PartialArray:
@@ -175,7 +178,7 @@ class ChunkRef:
 
 
 @dataclass
-class WindowSpec:
+class Window:
     """
     Description of an array with optional windowing support.
 
@@ -186,7 +189,7 @@ class WindowSpec:
     window_size : int or None, optional
         If specified, creates a sliding window of arrays for this array name.
         The window will contain the last `window_size` timesteps. If None,
-        only the current timestep array is provided. Default is None.
+        only the current timestep array is provided. Default is 1.
 
     Examples
     --------
@@ -199,13 +202,22 @@ class WindowSpec:
     """
 
     name: str
-    window_size: int | None = None
+    size: int = 1
 
 
-@dataclass(frozen=True)
-class DeisaArray:
-    dask: da.Array
-    t: int
+type CallbackArgs = Window | str
+
+
+class DeisaArray(da.Array):
+    def __new__(cls, dask, name, chunks, t: int, dtype=None, meta=None, shape=None):
+        return super().__new__(cls, dask, name, chunks, dtype=dtype, meta=meta, shape=shape)
+
+    def __init__(self, dask, name, chunks, t: int, dtype=None, meta=None, shape=None):
+        self.t = t
+
+    @property
+    def timestep(self) -> int:
+        return self.t
 
     def to_zarr(
         self, url, component=None, storage_options=None, region=None, compute=True, return_stored=False, mode="a"
@@ -222,7 +234,7 @@ class DeisaArray:
 
         full_path = pathlib.Path(url).expanduser().resolve()
         return da.to_zarr(
-            self.dask.persist(),
+            self.persist(),
             full_path,
             component=component,
             storage_options=storage_options,
@@ -380,7 +392,7 @@ def to_hdf5(fname: str, sources: dict[str, DeisaArray]) -> None:
     for dataset, deisa_array in sources.items():
         # dask.to_delayed() be able to have a reference to the chunks
         # and to be able to iterate through them.
-        delayed_grid = deisa_array.dask.to_delayed()
+        delayed_grid = deisa_array.to_delayed()
 
         for block_id in np.ndindex(delayed_grid.shape):
             chunk = delayed_grid[block_id]
@@ -395,10 +407,10 @@ def to_hdf5(fname: str, sources: dict[str, DeisaArray]) -> None:
         create_vds(
             full_path,
             dataset,
-            deisa_array.dask.chunksize,
-            deisa_array.dask.shape,
-            deisa_array.dask.numblocks,
-            deisa_array.dask.dtype,
+            deisa_array.chunksize,
+            deisa_array.shape,
+            deisa_array.numblocks,
+            deisa_array.dtype,
         )
 
     dask.compute(*writing_tasks)
@@ -407,7 +419,7 @@ def to_hdf5(fname: str, sources: dict[str, DeisaArray]) -> None:
 @dataclass
 class _CallbackConfig:
     simulation_callback: Callable
-    arrays_description: list[WindowSpec]
+    arrays_description: list[Window]
     exception_handler: Callable
     when: Literal["AND", "OR"]
 
@@ -439,9 +451,8 @@ class DaskArrayData:
     chunks_size : list[list[int | None]] or None
         For each dimension, the size of chunks in that dimension. None
         values indicate unknown chunk sizes.
-    dtype : np.dtype or None
-        The numpy dtype of the array chunks. Set when first chunk owner
-        is registered.
+    dtype_by_timestep : dict[Timestep, np.dtype]
+        NumPy dtype for each timestep, set when chunk data arrives.
     position_to_node_actorID : dict[tuple[int, ...], int]
         Mapping from chunk position to the scheduling actor responsible
         for that chunk.
@@ -480,8 +491,8 @@ class DaskArrayData:
         # For each dimension, the size of the chunks in this dimension
         self.chunks_size: list[list[int | None]] | None = None
 
-        # Type of the numpy arrays
-        self.dtype: np.dtype | None = None
+        # Type of the numpy arrays, scoped to each timestep.
+        self.dtype_by_timestep: dict[Timestep, np.dtype] = {}
 
         # ID of the scheduling actor in charge of the chunk at each position
         self.position_to_node_actorID: dict[tuple[int, ...], int] = {}
@@ -503,7 +514,6 @@ class DaskArrayData:
     def update_meta(
         self,
         nb_chunks_per_dim: tuple[int, ...],
-        dtype: np.dtype,
         position: tuple[int, ...],
         size: tuple[int, ...],
         node_actor_id: int,
@@ -514,14 +524,12 @@ class DaskArrayData:
 
         This method records which scheduling actor is responsible for a chunk
         and updates the array metadata. If this is the first chunk registered,
-        it initializes the array dimensions and dtype.
+        it initializes the array dimensions.
 
         Parameters
         ----------
         nb_chunks_per_dim : tuple[int, ...]
             Number of chunks per dimension in the array decomposition.
-        dtype : np.dtype
-            The numpy dtype of the chunk.
         position : tuple[int, ...]
             The position of the chunk in the array decomposition.
         size : tuple[int, ...]
@@ -535,19 +543,16 @@ class DaskArrayData:
         ------
         AssertionError
             If the chunk position is out of bounds, or if subsequent chunks
-            have inconsistent dimensions, dtype, or sizes compared to the
-            first chunk.
+            have inconsistent dimensions or sizes compared to the first chunk.
         """
         # TODO should be done just once
         if self.nb_chunks_per_dim is None:
             self.nb_chunks_per_dim = nb_chunks_per_dim
             self.nb_chunks = math.prod(nb_chunks_per_dim)
 
-            self.dtype = dtype
             self.chunks_size = [[None for _ in range(n)] for n in nb_chunks_per_dim]
         else:
             assert self.nb_chunks_per_dim == nb_chunks_per_dim
-            assert self.dtype == dtype
             assert self.chunks_size is not None
 
         # TODO this actually should be done each time
@@ -559,6 +564,12 @@ class DaskArrayData:
                 self.chunks_size[i][pos] = size[i]
             else:
                 assert self.chunks_size[i][pos] == size[i]
+
+    def update_dtype(self, timestep: Timestep, dtype: np.dtype) -> None:
+        if timestep not in self.dtype_by_timestep:
+            self.dtype_by_timestep[timestep] = dtype
+        else:
+            assert self.dtype_by_timestep[timestep] == dtype
 
     def add_chunk_ref(
         self, chunk_ref: ray.ObjectRef, timestep: Timestep, pos_to_ref: dict[tuple, ray.ObjectRef]
@@ -637,10 +648,12 @@ class DaskArrayData:
         """
         assert len(self.position_to_node_actorID) == self.nb_chunks
         assert self.nb_chunks is not None and self.nb_chunks_per_dim is not None
+        assert timestep in self.dtype_by_timestep
 
         # We need to add the timestep since the same name can be used several times for different
         # timesteps
         dask_name = f"{self.name}_{timestep}"
+        dtype = self.dtype_by_timestep.pop(timestep)
 
         del self.chunk_refs[timestep]
 
@@ -666,11 +679,12 @@ class DaskArrayData:
 
         dsk = HighLevelGraph.from_collections(dask_name, graph, dependencies=())
 
-        full_array = da.Array(
+        full_array = DeisaArray(
             dsk,
             dask_name,
             chunks=self.chunks_size,
-            dtype=self.dtype,
+            dtype=dtype,
+            t=timestep,
         )
 
         return full_array

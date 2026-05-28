@@ -14,11 +14,9 @@ NB_ITERATIONS = 100  # Should be enough to saturate the memory in case the chunk
 def head_script(enable_distributed_scheduling) -> None:
     """The head node checks that the values are correct"""
     from deisa.ray.window_handler import Deisa
-    from deisa.ray.types import WindowSpec
+    from deisa.ray.types import Window
 
-    import deisa.ray as deisa
-
-    deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
+    os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
 
     d = Deisa()
 
@@ -27,7 +25,7 @@ def head_script(enable_distributed_scheduling) -> None:
 
     d.register_callback(
         simulation_callback,
-        [WindowSpec("array")],
+        *[Window("array")],
     )
     d.execute_callbacks()
 
@@ -56,7 +54,6 @@ def test_memory_release(enable_distributed_scheduling, ray_spilling_cluster: str
         rank=0,
         position=(0, 0),
         chunks_per_dim=(1, 1),
-        nb_chunks_of_node=1,
         chunk_size=(1024, 1024),
         nb_iterations=NB_ITERATIONS,
         nb_nodes=1,

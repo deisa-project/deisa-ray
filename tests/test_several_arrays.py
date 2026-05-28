@@ -1,3 +1,4 @@
+import os
 import ray
 import pytest
 
@@ -11,16 +12,14 @@ NB_ITERATIONS = 5
 def head_script(enable_distributed_scheduling) -> None:
     """The head node checks that the values are correct"""
     from deisa.ray.window_handler import Deisa
-    from deisa.ray.types import WindowSpec
+    from deisa.ray.types import Window
 
-    import deisa.ray as deisa
-
-    deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
+    os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
 
     d = Deisa()
 
     def simulation_callback(a: list[DeisaArray], b: list[DeisaArray]):
-        assert b[0].dask.sum().compute() == 10 * b[0].t
+        assert b[0].sum().compute() == 10 * b[0].t
 
         assert len(b) == 1
         if a[-1].t == 0:
@@ -28,18 +27,18 @@ def head_script(enable_distributed_scheduling) -> None:
             return
         assert len(a) == 2
 
-        assert a[0].dask.sum().compute() == 10 * a[0].t
-        assert a[1].dask.sum().compute() == 10 * a[1].t
+        assert a[0].sum().compute() == 10 * a[0].t
+        assert a[1].sum().compute() == 10 * a[1].t
 
         # Test a computation where the two arrays are used at the same time.
         # This checks that they are defined with different names.
-        assert (a[1].dask - a[0].dask).sum().compute() == 10
+        assert (a[1] - a[0]).sum().compute() == 10
 
     d.register_callback(
         simulation_callback,
-        [
-            WindowSpec("a", window_size=2),
-            WindowSpec("b", window_size=1),
+        *[
+            Window("a", size=2),
+            Window("b", size=1),
         ],
     )
     d.execute_callbacks()
@@ -58,7 +57,6 @@ def test_several_arrays(enable_distributed_scheduling, ray_cluster) -> None:  # 
                 rank=rank,
                 position=(rank // 2, rank % 2),
                 chunks_per_dim=(2, 2),
-                nb_chunks_of_node=1,
                 chunk_size=(1, 1),
                 nb_iterations=NB_ITERATIONS,
                 node_id=f"node_{rank}",

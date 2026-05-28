@@ -26,11 +26,9 @@ def test_dask_save_hdf5(fname, enable_distributed_scheduling, ray_cluster) -> No
     def head_script(fname, enable_distributed_scheduling) -> None:
         """The head node checks that the values are correct"""
         from deisa.ray.window_handler import Deisa
-        from deisa.ray.types import WindowSpec
+        from deisa.ray.types import Window
 
-        import deisa.ray as deisa
-
-        deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
+        os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
 
         d = Deisa()
 
@@ -40,7 +38,7 @@ def test_dask_save_hdf5(fname, enable_distributed_scheduling, ray_cluster) -> No
 
         d.register_callback(
             simulation_callback,
-            [WindowSpec("array")],
+            *[Window("array")],
         )
         d.execute_callbacks()
 
@@ -66,7 +64,6 @@ def test_dask_save_hdf5(fname, enable_distributed_scheduling, ray_cluster) -> No
                 rank=rank,
                 position=(rank // 2, rank % 2),
                 chunks_per_dim=(2, 2),
-                nb_chunks_of_node=1,
                 chunk_size=(1, 1),
                 nb_iterations=NB_ITERATIONS,
                 node_id=f"node_{rank}",
@@ -103,11 +100,9 @@ def test_dask_save_several_timesteps_hdf5(fname, enable_distributed_scheduling, 
     def head_script(fname, enable_distributed_scheduling) -> None:
         """The head node checks that the values are correct"""
         from deisa.ray.window_handler import Deisa
-        from deisa.ray.types import WindowSpec
+        from deisa.ray.types import Window
 
-        import deisa.ray as deisa
-
-        deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
+        os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
 
         d = Deisa()
 
@@ -116,7 +111,7 @@ def test_dask_save_several_timesteps_hdf5(fname, enable_distributed_scheduling, 
 
         d.register_callback(
             simulation_callback,
-            [WindowSpec("array")],
+            *[Window("array")],
         )
         d.execute_callbacks()
 
@@ -142,7 +137,6 @@ def test_dask_save_several_timesteps_hdf5(fname, enable_distributed_scheduling, 
                 rank=rank,
                 position=(rank // 2, rank % 2),
                 chunks_per_dim=(2, 2),
-                nb_chunks_of_node=1,
                 chunk_size=(1, 1),
                 nb_iterations=NB_ITERATIONS,
                 node_id=f"node_{rank}",
@@ -177,11 +171,9 @@ def test_dask_save_several_arrays_hdf5(fname, enable_distributed_scheduling, ray
     def head_script(fname, enable_distributed_scheduling) -> None:
         """The head node checks that the values are correct"""
         from deisa.ray.window_handler import Deisa
-        from deisa.ray.types import WindowSpec, to_hdf5
+        from deisa.ray.types import Window, to_hdf5
 
-        import deisa.ray as deisa
-
-        deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
+        os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
 
         d = Deisa()
 
@@ -191,7 +183,7 @@ def test_dask_save_several_arrays_hdf5(fname, enable_distributed_scheduling, ray
 
         d.register_callback(
             simulation_callback,
-            [WindowSpec("a"), WindowSpec("b")],
+            *[Window("a"), Window("b")],
         )
         d.execute_callbacks()
 
@@ -217,7 +209,6 @@ def test_dask_save_several_arrays_hdf5(fname, enable_distributed_scheduling, ray
                 rank=rank,
                 position=(rank // 2, rank % 2),
                 chunks_per_dim=(2, 2),
-                nb_chunks_of_node=1,
                 chunk_size=(1, 1),
                 nb_iterations=NB_ITERATIONS,
                 array_name=["a", "b"],
@@ -262,11 +253,9 @@ def test_dask_save_zarr(fname, enable_distributed_scheduling, ray_cluster) -> No
     def head_script(fname, enable_distributed_scheduling) -> None:
         """The head node checks that the values are correct"""
         from deisa.ray.window_handler import Deisa
-        from deisa.ray.types import WindowSpec
+        from deisa.ray.types import Window
 
-        import deisa.ray as deisa
-
-        deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
+        os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
 
         d = Deisa()
 
@@ -277,7 +266,7 @@ def test_dask_save_zarr(fname, enable_distributed_scheduling, ray_cluster) -> No
 
         d.register_callback(
             simulation_callback,
-            [WindowSpec("array")],
+            *[Window("array")],
         )
         d.execute_callbacks()
 
@@ -300,7 +289,6 @@ def test_dask_save_zarr(fname, enable_distributed_scheduling, ray_cluster) -> No
                 rank=rank,
                 position=(rank // 2, rank % 2),
                 chunks_per_dim=(2, 2),
-                nb_chunks_of_node=1,
                 chunk_size=(1, 1),
                 nb_iterations=NB_ITERATIONS,
                 node_id=f"node_{rank}",
@@ -335,24 +323,23 @@ def test_dask_save_netcdf_xarray(fname, enable_distributed_scheduling, ray_clust
     def head_script(fname, enable_distributed_scheduling) -> None:
         """The head node checks that the values are correct"""
         from deisa.ray.window_handler import Deisa
-        from deisa.ray.types import WindowSpec
+        from deisa.ray.types import Window
 
-        import deisa.ray as deisa
         import xarray as xr
 
-        deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
+        os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
 
         d = Deisa()
 
         def simulation_callback(array: list[DeisaArray]):
             if array[0].t == 5:
-                xarray_da = xr.DataArray(array[0].dask, dims=["x", "y"], name="data").compute()
+                xarray_da = xr.DataArray(array[0], dims=["x", "y"], name="data").compute()
 
                 xarray_da.to_netcdf(fname)
 
         d.register_callback(
             simulation_callback,
-            [WindowSpec("array")],
+            *[Window("array")],
         )
         d.execute_callbacks()
 
@@ -377,7 +364,6 @@ def test_dask_save_netcdf_xarray(fname, enable_distributed_scheduling, ray_clust
                 rank=rank,
                 position=(rank // 2, rank % 2),
                 chunks_per_dim=(2, 2),
-                nb_chunks_of_node=1,
                 chunk_size=(1, 1),
                 nb_iterations=NB_ITERATIONS,
                 node_id=f"node_{rank}",
@@ -403,7 +389,7 @@ def test_dask_save_netcdf_xarray(fname, enable_distributed_scheduling, ray_clust
 # test_feedback_loop previously leaked a Dask scheduler change into this file.
 # The leak happened in the pytest driver process: Deisa.set() called
 # _ensure_connected(), which globally set Dask's scheduler to ray_dask_get. The
-# enable_experimental_distributed_scheduling() calls in this file happen inside
+# DEISA_DISTRIBUTED_SCHEDULING is set in this file inside
 # Ray remote head_script tasks, so they configure those Ray worker processes, not
 # the pytest driver process that later opens HDF5/Zarr output and calls
 # data.sum().compute() or data.compute().

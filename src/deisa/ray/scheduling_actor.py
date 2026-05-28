@@ -29,7 +29,7 @@ class NodeActorBase:
     - Collecting chunks of arrays sent by simulation nodes (via :class:`Bridge`)
     - Registering its owned chunks with the head node
     - Providing a small key/value channel (``set``, ``get``, ``delete``) for
-      non-chunked feedback between analytics and simulation.
+      feedback between analytics and simulation.
 
     The :class:`SchedulingActor` subclass adds graph-scheduling behaviour on
     top of this base functionality.
@@ -51,9 +51,9 @@ class NodeActorBase:
     partial_arrays : AsyncDict[str, PartialArray]
         Per-array containers that capture metadata and chunk references owned
         by this node actor.
-    feedback_non_chunked : dict
-        Dictionary for storing non-chunked feedback values shared between
-        analytics and simulation.
+    feedback : dict
+        Dictionary for storing feedback values shared between analytics and
+        simulation.
     """
 
     async def __init__(self, actor_id: int, arrays_metadata: Dict[str, Dict] = {}) -> None:
@@ -72,7 +72,6 @@ class NodeActorBase:
         Registers the actor with the head node immediately so it can start
         receiving metadata and chunk notifications.
         """
-        self.nb_chunks_of_node: dict[str, int] = {}
         self.actor_id = actor_id
         self.actor_handle = ray.get_runtime_context().current_actor
 
@@ -83,99 +82,14 @@ class NodeActorBase:
         # TODO: I think these two responsabilities could be separated.
         self.partial_arrays: AsyncDict[str, PartialArray] = AsyncDict()
 
-        # For non-chunked feedback between analytics and simulation
-        self.feedback_non_chunked: Dict[Hashable, Any] = {}
         self.should_persist: Dict[Hashable, bool] = {}
+        self.is_finalized = False
+        self.finalization_lock = asyncio.Lock()
+        # the number of chunks per array that a physical node (and therefore this actor) owns.
+        self.local_nb_chunks: dict[str, int] = {}
+        self.nb_chunks_per_dim: dict[str, tuple[int, ...]] = {}
 
-    def set(self, *args, key: Hashable, value: Any, chunked: bool = False, persist: bool, **kwargs) -> None:
-        """
-        Store a feedback value shared between analytics and simulation.
-
-        Parameters
-        ----------
-        key : Hashable
-            Identifier for the feedback value.
-        value : Any
-            Value to store.
-        chunked : bool, optional
-            Placeholder for future chunked feedback support. Must remain
-            ``False`` today. Default is ``False``.
-        persist : bool
-            Whether the stored value should survive the next ``get`` call.
-            ``True`` retains the value until explicitly deleted.
-
-        Notes
-        -----
-        The ``*args`` and ``**kwargs`` parameters are accepted for forward
-        compatibility with future signatures but are currently unused.
-        """
-        if not chunked:
-            self.feedback_non_chunked[key] = value
-            self.should_persist[key] = persist
-        else:
-            # TODO: implement chunked version
-            raise NotImplementedError()
-
-    def get(
-        self,
-        key,
-        default=None,
-        chunked=False,
-    ) -> Any:
-        """
-        Retrieve a feedback value previously stored with :meth:`set`.
-
-        Parameters
-        ----------
-        key : Hashable
-            Identifier of the requested value.
-        default : Any, optional
-            Value returned when ``key`` is not present. Default is ``None``.
-        chunked : bool, optional
-            Placeholder for chunked feedback retrieval. Must remain
-            ``False`` today. Default is ``False``.
-
-        Returns
-        -------
-        Any
-            Stored value or ``default`` if missing.
-
-        Raises
-        ------
-        NotImplementedError
-            Chunked feedback retrieval is not yet implemented.
-        """
-        val = self.feedback_non_chunked.get(key, default)
-        persist = self.should_persist.get(key, False)
-        if not chunked:
-            if not persist:
-                self.delete(key=key)
-            return val
-        else:
-            raise NotImplementedError()
-
-    def delete(
-        self,
-        *args,
-        key: Hashable,
-        **kwargs,
-    ) -> None:
-        """
-        Delete a feedback value if present.
-
-        Parameters
-        ----------
-        key : Hashable
-            Identifier to remove from the non-chunked feedback store.
-
-        Notes
-        -----
-        Missing keys are ignored to keep the call idempotent.
-        """
-        self.feedback_non_chunked.pop(key, None)
-        self.should_persist.pop(key, None)
-
-    def _create_or_retrieve_partial_array(self, array_name: str, nb_chunks_of_node: int) -> PartialArray:
+    def _create_or_retrieve_partial_array(self, array_name: str) -> PartialArray:
         """
         Return the partial-array container for ``array_name``, creating it if missing.
 
@@ -183,9 +97,6 @@ class NodeActorBase:
         ----------
         array_name : str
             Name of the array being assembled on this node.
-        nb_chunks_of_node : int
-            Number of chunks contributed by this node. Stored on the actor for
-            later sanity checks when receiving payloads.
 
         Returns
         -------
@@ -194,72 +105,60 @@ class NodeActorBase:
         """
         if array_name not in self.partial_arrays:
             self.partial_arrays[array_name] = PartialArray()
-            self.nb_chunks_of_node[array_name] = nb_chunks_of_node
+            self.local_nb_chunks[array_name] = 0
         return self.partial_arrays[array_name]
 
-    async def register_chunk_meta(
+    def register_chunk_meta(
         self,
         bridge_id: int,
         array_name: str,
         chunk_shape,
-        nb_chunks_per_dim,
-        nb_chunks_of_node: int,
-        dtype,
+        global_shape,
         chunk_position,
     ) -> None:
-        """
-        Register chunk metadata contributed by a bridge on this node.
-
-        Parameters
-        ----------
-        bridge_id : int
-            Identifier of the bridge sending the chunk.
-        array_name : str
-            Name of the array being populated.
-        chunk_shape : tuple[int, ...]
-            Shape of the chunk owned by this bridge.
-        nb_chunks_per_dim : tuple[int, ...]
-            Number of chunks per dimension in the global decomposition.
-        nb_chunks_of_node : int
-            Number of chunks contributed by this node for the array.
-        dtype : Any
-            NumPy dtype of the chunk.
-        chunk_position : tuple[int, ...]
-            Position of this chunk in the global grid.
-
-        Notes
-        -----
-        Once all bridges on the node have registered, the node actor forwards
-        the consolidated metadata to the head actor and toggles the per-array
-        event so concurrent callers can proceed. Until that point additional
-        callers block on ``ready_event``.
-        """
-        await self.head.wait_until_analytics_ready.remote()
-
-        partial_array = self._create_or_retrieve_partial_array(array_name, nb_chunks_of_node)
+        partial_array = self._create_or_retrieve_partial_array(array_name)
 
         # add metadata for this array
         partial_array.chunks_contained_meta.add((bridge_id, chunk_position, chunk_shape))
         partial_array.bid_to_pos[bridge_id] = chunk_position
 
-        # Technically, no race conditions should happen since its calls to the same actor method
-        # happen synchrnously (in ray). Since the method is async, it will run the method one a at
-        # a time, and give control to async runtime when it encounters await below.
-        # HOWEVER - with certain implementation of MPI, there have been problems here.
-        if len(partial_array.chunks_contained_meta) == nb_chunks_of_node:
-            await self.head.register_partial_array.options(enable_task_events=False).remote(
-                self.actor_id,
-                array_name,
-                dtype,
-                # TODO I could figure this out from the global size and the chunk shape
-                nb_chunks_per_dim,
-                list(partial_array.chunks_contained_meta),
-            )
-            # per array async event
-            partial_array.ready_event.set()
-            partial_array.ready_event.clear()
+        # increase the counter of chunks of the node for this array.
+        self.local_nb_chunks[array_name] += 1
+        nb_chunks_per_dim = tuple(global_dim // chunk_dim for global_dim, chunk_dim in zip(global_shape, chunk_shape))
+        if array_name in self.nb_chunks_per_dim:
+            assert self.nb_chunks_per_dim[array_name] == nb_chunks_per_dim
         else:
-            await partial_array.ready_event.wait()
+            self.nb_chunks_per_dim[array_name] = nb_chunks_per_dim
+
+    # it also should be blocking in the sense that all bridges should call it, but only the first one should trigger the registration with the head actor,
+    # and all other bridges in the meantime should wait for the registration to be done without proceeding further.
+    async def finalize_registration(
+        self,
+    ) -> None:
+        if self.is_finalized:
+            return
+
+        async with self.finalization_lock:
+            if self.is_finalized:
+                return
+
+            await self.head.wait_until_analytics_ready.remote()
+
+            for name, partial_array in self.partial_arrays._data.items():
+                # since this method is called after barrier, we are sure all the chunks have been registered.
+                local_chunks = self.local_nb_chunks[name]
+                assert len(partial_array.chunks_contained_meta) == local_chunks, (
+                    "Sanity check failed: number of registered chunks does not match expected count for this node."
+                )
+
+                await self.head.register_partial_array.options(enable_task_events=False).remote(
+                    self.actor_id,
+                    name,
+                    # TODO I could figure this out from the global size and the chunk shape
+                    self.nb_chunks_per_dim[name],
+                    list(partial_array.chunks_contained_meta),
+                )
+            self.is_finalized = True
 
     def ready(self) -> None:
         """
@@ -286,10 +185,8 @@ class NodeActorBase:
         bridge_id: int,
         array_name: str,
         chunk_ref: list[ray.ObjectRef],
+        dtype,
         timestep: int,
-        chunked: bool = True,
-        *args,
-        **kwargs,
     ) -> None:
         """
         Add a chunk of data to this node actor.
@@ -307,12 +204,10 @@ class NodeActorBase:
         chunk_ref : list[ray.ObjectRef]
             Single-element list containing the Ray ObjectRef to the chunk
             data. The extra list level is kept for Dask compatibility.
+        dtype : np.dtype
+            NumPy dtype read from the chunk before it was stored in Ray.
         timestep : int
             Timestep index the chunk belongs to.
-        chunked : bool, optional
-            Reserved for future multi-chunk sends. Must remain ``True`` for
-            the current workflow. Default is ``True``.
-
         Returns
         -------
         None
@@ -347,30 +242,34 @@ class NodeActorBase:
 
         if timestep not in partial_array.per_timestep_arrays.keys():
             partial_array.per_timestep_arrays[timestep] = ArrayPerTimestep()
+            partial_array.per_timestep_arrays[timestep].chunks_ready_future = asyncio.Future()
         array_timestep = partial_array.per_timestep_arrays[timestep]
 
         chunk_ref: ray.ObjectRef = chunk_ref[0]
         array_timestep.local_chunks[bridge_id] = chunk_ref
+        if array_timestep.dtype is None:
+            array_timestep.dtype = dtype
+        else:
+            assert array_timestep.dtype == dtype
 
-        if len(array_timestep.local_chunks) == self.nb_chunks_of_node[array_name]:
+        if len(array_timestep.local_chunks) == self.local_nb_chunks[array_name]:
             pos_to_ref: dict[tuple, ray.ObjectRef] = {}
+            assert array_timestep.dtype is not None
 
             for bridge_id, ref in array_timestep.local_chunks._data.items():
                 assert isinstance(ref, ray.ObjectRef)
 
                 pos_to_ref[partial_array.bid_to_pos[bridge_id]] = ref
-
                 array_timestep.local_chunks[bridge_id] = pickle.dumps(ref)
 
             # TODO rename
             await self.head.chunks_ready.options(enable_task_events=False).remote(
-                array_name, timestep, pos_to_ref, self.actor_id
+                array_name, timestep, pos_to_ref, self.actor_id, array_timestep.dtype
             )
 
-            array_timestep.chunks_ready_event.set()
-            array_timestep.chunks_ready_event.clear()
+            array_timestep.chunks_ready_future.set_result(True)
         else:
-            await array_timestep.chunks_ready_event.wait()
+            await array_timestep.chunks_ready_future.wait()
 
 
 @ray.remote

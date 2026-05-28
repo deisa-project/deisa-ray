@@ -1,3 +1,4 @@
+import os
 import pytest
 import ray
 
@@ -12,10 +13,9 @@ START_ITERATION = 3
 def head_script(enable_distributed_scheduling) -> None:
     """The head node checks that the values are correct"""
     from deisa.ray.window_handler import Deisa
-    from deisa.ray.types import WindowSpec
-    import deisa.ray as deisa
+    from deisa.ray.types import Window
 
-    deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
+    os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
 
     d = Deisa()
 
@@ -23,11 +23,11 @@ def head_script(enable_distributed_scheduling) -> None:
         if len(array) == 1:
             assert array[0].t == START_ITERATION
 
-        array[0].dask.compute()
+        array[0].compute()
 
     d.register_callback(
         simulation_callback,
-        [WindowSpec("array", window_size=2)],
+        *[Window("array", size=2)],
     )
     d.execute_callbacks()
 
@@ -48,7 +48,6 @@ def test_start_any_timestep(enable_distributed_scheduling: bool, ray_cluster) ->
                 rank=rank,
                 position=(rank // 2, rank % 2),
                 chunks_per_dim=(2, 2),
-                nb_chunks_of_node=1,
                 chunk_size=(1, 1),
                 nb_iterations=NB_ITERATIONS,
                 node_id=f"node_{rank}",

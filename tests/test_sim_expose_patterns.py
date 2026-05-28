@@ -1,3 +1,4 @@
+import os
 # Design different tests to see if various possible expose patterns are safe
 # We have two arrays "A" and "B".
 
@@ -32,16 +33,15 @@ def test_typical(nb_nodes: int, enable_distributed_scheduling: bool, ray_cluster
     def head_script(enable_distributed_scheduling) -> None:
         """The head node checks that the values are correct"""
         from deisa.ray.window_handler import Deisa
-        from deisa.ray.types import WindowSpec
-        import deisa.ray as deisa
+        from deisa.ray.types import Window
 
-        deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
+        os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
         d = Deisa()
 
-        @d.callback(WindowSpec("A"), WindowSpec("B"))
+        @d.register(Window("A"), Window("B"))
         def simulation_callback(A: list[DeisaArray], B: list[DeisaArray]):
-            x = A[0].dask.sum().compute()
-            y = B[0].dask.sum().compute()
+            x = A[0].sum().compute()
+            y = B[0].sum().compute()
             assert x == A[0].t
             assert y == B[0].t
 
@@ -57,7 +57,6 @@ def test_typical(nb_nodes: int, enable_distributed_scheduling: bool, ray_cluster
             rank=0,
             position=(0, 0),
             chunks_per_dim=(1, 1),
-            nb_chunks_of_node=1,
             chunk_size=(1, 1),
             nb_iterations=NB_ITERATIONS,
             node_id="node_0",
@@ -86,15 +85,14 @@ def test_rank_ahead(nb_nodes: int, enable_distributed_scheduling: bool, ray_clus
     def head_script(enable_distributed_scheduling) -> None:
         """The head node checks that the values are correct"""
         from deisa.ray.window_handler import Deisa
-        from deisa.ray.types import WindowSpec
-        import deisa.ray as deisa
+        from deisa.ray.types import Window
 
-        deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
+        os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
         d = Deisa()
 
-        @d.callback(WindowSpec("A"))
+        @d.register(Window("A"))
         def simulation_callback(A: list[DeisaArray]):
-            x = A[0].dask.sum().compute()
+            x = A[0].sum().compute()
             assert x == 3 * A[0].t
 
         d.execute_callbacks()
@@ -110,7 +108,6 @@ def test_rank_ahead(nb_nodes: int, enable_distributed_scheduling: bool, ray_clus
                 rank=rank,
                 position=(rank // 2, rank % 2),
                 chunks_per_dim=(1, 2),
-                nb_chunks_of_node=2 // nb_nodes,
                 chunk_size=(1, 1),
                 nb_iterations=NB_ITERATIONS,
                 node_id=f"node_{rank % nb_nodes}",
@@ -140,16 +137,15 @@ def test_out_of_sync(nb_nodes: int, enable_distributed_scheduling: bool, ray_clu
     def head_script(enable_distributed_scheduling) -> None:
         """The head node checks that the values are correct"""
         from deisa.ray.window_handler import Deisa
-        from deisa.ray.types import WindowSpec
-        import deisa.ray as deisa
+        from deisa.ray.types import Window
 
-        deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
+        os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
         d = Deisa()
 
-        @d.callback(WindowSpec("A"), WindowSpec("B"))
+        @d.register(Window("A"), Window("B"))
         def simulation_callback(A: list[DeisaArray], B: list[DeisaArray]):
-            x = A[0].dask.sum().compute()
-            y = B[0].dask.sum().compute()
+            x = A[0].sum().compute()
+            y = B[0].sum().compute()
             assert x == 3 * A[0].t
             assert y == 3 * B[0].t
 
@@ -165,7 +161,6 @@ def test_out_of_sync(nb_nodes: int, enable_distributed_scheduling: bool, ray_clu
             rank=0,
             position=(0, 0),
             chunks_per_dim=(1, 2),
-            nb_chunks_of_node=1,
             chunk_size=(1, 1),
             nb_iterations=NB_ITERATIONS,
             node_id="node_0",
@@ -179,7 +174,6 @@ def test_out_of_sync(nb_nodes: int, enable_distributed_scheduling: bool, ray_clu
             rank=1,
             position=(0, 1),
             chunks_per_dim=(1, 2),
-            nb_chunks_of_node=1,
             chunk_size=(1, 1),
             nb_iterations=NB_ITERATIONS,
             node_id="node_1",
@@ -212,16 +206,16 @@ def test_out_of_sync(nb_nodes: int, enable_distributed_scheduling: bool, ray_clu
 #     def head_script(enable_distributed_scheduling) -> None:
 #         """The head node checks that the values are correct"""
 #         from deisa.ray.window_handler import Deisa
-#         from deisa.ray.types import WindowSpec
+#         from deisa.ray.types import Window
 #         import deisa.ray as deisa
 #
-#         deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
+#         os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
 #         d = Deisa()
 #
-#         @d.callback(WindowSpec("A"), WindowSpec("B"))
+#         @d.register(Window("A"), Window("B"))
 #         def simulation_callback(A: list[DeisaArray], B: list[DeisaArray]):
-#             x = A[0].dask.sum().compute()
-#             y = B[0].dask.sum().compute()
+#             x = A[0].sum().compute()
+#             y = B[0].sum().compute()
 #             assert x == 3 * A[0].t
 #             assert y == 7 * B[0].t
 #
@@ -236,7 +230,6 @@ def test_out_of_sync(nb_nodes: int, enable_distributed_scheduling: bool, ray_clu
 #             rank=0,
 #             position=(0, 0),
 #             chunks_per_dim=(1, 2),
-#             nb_chunks_of_node=1,
 #             chunk_size=(1, 1),
 #             nb_iterations=NB_ITERATIONS,
 #             node_id="node_0",
@@ -248,7 +241,6 @@ def test_out_of_sync(nb_nodes: int, enable_distributed_scheduling: bool, ray_clu
 #             rank=1,
 #             position=(0, 1),
 #             chunks_per_dim=(1, 2),
-#             nb_chunks_of_node=1,
 #             chunk_size=(1, 1),
 #             nb_iterations=NB_ITERATIONS,
 #             node_id="node_1",
@@ -263,7 +255,6 @@ def test_out_of_sync(nb_nodes: int, enable_distributed_scheduling: bool, ray_clu
 #             rank=2,
 #             position=(0, 0),
 #             chunks_per_dim=(1, 2),
-#             nb_chunks_of_node=1,
 #             chunk_size=(1, 1),
 #             nb_iterations=NB_ITERATIONS,
 #             node_id="node_2",
@@ -278,7 +269,6 @@ def test_out_of_sync(nb_nodes: int, enable_distributed_scheduling: bool, ray_clu
 #             rank=3,
 #             position=(0, 1),
 #             chunks_per_dim=(1, 2),
-#             nb_chunks_of_node=1,
 #             chunk_size=(1, 1),
 #             nb_iterations=NB_ITERATIONS,
 #             node_id="node_3",

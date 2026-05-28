@@ -1,13 +1,14 @@
+import os
 import pytest
 import ray
-import numpy as np
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 from tests.stubs import StubSchedulingActor
 from deisa.ray.bridge import Bridge
+from deisa.ray.comm import NoOpComm
 from ray.util.state import list_actors
 from deisa.ray.types import DeisaArray
 from ray.cluster_utils import Cluster
-from tests.utils import wait_for_head_node, pick_free_port
+from tests.utils import wait_for_head_node
 
 
 @pytest.fixture
@@ -87,11 +88,9 @@ def test_actor_placement(enable_distributed_scheduling, ray_multinode_cluster):
     def head_script(enable_distributed_scheduling) -> None:
         """The head node checks that the values are correct"""
         from deisa.ray.window_handler import Deisa
-        from deisa.ray.types import WindowSpec
+        from deisa.ray.types import Window
 
-        import deisa.ray as deisa
-
-        deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
+        os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
 
         d = Deisa()
 
@@ -100,7 +99,7 @@ def test_actor_placement(enable_distributed_scheduling, ray_multinode_cluster):
 
         d.register_callback(
             simulation_callback,
-            [WindowSpec("array")],
+            *[Window("array")],
         )
 
     # submit head script (analogous to submitting analytics to head node)
@@ -119,20 +118,15 @@ def test_actor_placement(enable_distributed_scheduling, ray_multinode_cluster):
     def make_client_and_return_ids():
         arrays_md = {
             "array": {
+                "global_shape": (1, 1),
                 "chunk_shape": (1, 1),
-                "nb_chunks_per_dim": (1, 1),
-                "nb_chunks_of_node": 1,
-                "dtype": np.int32,
                 "chunk_position": (0, 0),
             }
         }
 
-        port = pick_free_port()
-        sys_md = {"world_size": 1, "master_address": "127.0.0.1", "master_port": port}
         c = Bridge(
-            bridge_id=0,
             arrays_metadata=arrays_md,
-            system_metadata=sys_md,
+            comm=NoOpComm(0, 1),
             _node_id=None,
             scheduling_actor_cls=StubSchedulingActor,
         )  # type:ignore

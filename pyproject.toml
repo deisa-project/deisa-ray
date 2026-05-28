@@ -13,6 +13,7 @@ dependencies = [
     "zarr>=3.1.5",
     "xarray",
     "h5netcdf",
+    "deisa-core>=0.5.0",
 ]
 
 [project.optional-dependencies]

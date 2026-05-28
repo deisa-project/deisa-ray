@@ -40,30 +40,6 @@ def _normalize_int_sequence(value: Any, *, field_name: str, array_name: str) -> 
     raise TypeError(f"arrays_metadata['{array_name}']['{field_name}'] must be a sequence of ints, got {value!r}")
 
 
-def _validate_system_meta(system_meta: Mapping[str, Any]) -> dict[str, Any]:
-    """
-    Validate and normalize the ``system_metadata`` argument.
-
-    Parameters
-    ----------
-    system_meta : Mapping[str, Any]
-        User-provided system-level metadata.
-
-    Returns
-    -------
-    dict[str, Any]
-        A shallow-copied version of the input mapping.
-
-    Raises
-    ------
-    TypeError
-        If ``system_meta`` is not a mapping.
-    """
-    if not isinstance(system_meta, Mapping):
-        raise TypeError(f"system_metadata must be a mapping, got {type(system_meta).__name__}")
-    return dict(system_meta)
-
-
 def _validate_single_array_metadata(
     name: str,
     meta: Mapping[str, Any],
@@ -78,10 +54,8 @@ def _validate_single_array_metadata(
     meta : Mapping[str, Any]
         Metadata for this array. Must contain at least:
 
+        - ``global_shape``: sequence of positive ints
         - ``chunk_shape``: sequence of positive ints
-        - ``nb_chunks_per_dim``: sequence of positive ints
-        - ``nb_chunks_of_node``: positive int
-        - ``dtype``: NumPy dtype or anything accepted by ``np.dtype``
         - ``chunk_position``: sequence of ints of same length as
           ``chunk_shape``
 
@@ -94,6 +68,14 @@ def _validate_single_array_metadata(
     """
     normalized_meta = dict(meta)
 
+    # global_shape: tuple/list/1d ndarray of positive ints
+    global_shape = _normalize_int_sequence(meta["global_shape"], field_name="global_shape", array_name=name)
+    if not all(n > 0 for n in global_shape):
+        raise TypeError(
+            f"arrays_metadata['{name}']['global_shape'] must be a sequence of positive ints, got {global_shape!r}"
+        )
+    normalized_meta["global_shape"] = global_shape
+
     # chunk_shape: tuple/list/1d ndarray of positive ints
     chunk_shape = _normalize_int_sequence(meta["chunk_shape"], field_name="chunk_shape", array_name=name)
     if not all(n > 0 for n in chunk_shape):
@@ -102,33 +84,13 @@ def _validate_single_array_metadata(
         )
     normalized_meta["chunk_shape"] = chunk_shape
 
-    # nb_chunks_per_dim: same pattern
-    nb_chunks_per_dim = _normalize_int_sequence(
-        meta["nb_chunks_per_dim"],
-        field_name="nb_chunks_per_dim",
-        array_name=name,
-    )
-    if not all(n > 0 for n in nb_chunks_per_dim):
-        raise TypeError(
-            f"arrays_metadata['{name}']['nb_chunks_per_dim'] must be a "
-            f"sequence of positive ints, got {nb_chunks_per_dim!r}"
-        )
-    normalized_meta["nb_chunks_per_dim"] = nb_chunks_per_dim
+    if len(global_shape) != len(chunk_shape):
+        raise ValueError(f"arrays_metadata['{name}']['global_shape'] must have the same length as 'chunk_shape'")
 
-    # nb_chunks_of_node: positive int
-    try:
-        nb_chunks_of_node = int(meta["nb_chunks_of_node"])
-    except (TypeError, ValueError):
-        raise TypeError(
-            f"arrays_metadata['{name}']['nb_chunks_of_node'] must be a positive int, "
-            f"got {type(meta['nb_chunks_of_node']).__name__}"
-        )
-    if nb_chunks_of_node <= 0:
-        raise TypeError(
-            f"arrays_metadata['{name}']['nb_chunks_of_node'] must be a positive int, "
-            f"got {type(meta['nb_chunks_of_node']).__name__}"
-        )
-    normalized_meta["nb_chunks_of_node"] = nb_chunks_of_node
+    if any(global_dim % chunk_dim != 0 for global_dim, chunk_dim in zip(global_shape, chunk_shape)):
+        raise ValueError(f"arrays_metadata['{name}']['global_shape'] must be evenly divisible by 'chunk_shape'")
+
+    nb_chunks_per_dim = tuple(global_dim // chunk_dim for global_dim, chunk_dim in zip(global_shape, chunk_shape))
 
     # chunk_position: sequence of ints of same length as chunk_shape
     chunk_position = _normalize_int_sequence(
@@ -175,10 +137,8 @@ def _validate_arrays_meta(
         raise TypeError(f"arrays_metadata must be a mapping from str to dict, got {type(arrays_metadata).__name__}")
 
     required_keys = {
+        "global_shape",
         "chunk_shape",
-        "nb_chunks_per_dim",
-        "nb_chunks_of_node",
-        "dtype",
         "chunk_position",
     }
 
@@ -197,6 +157,10 @@ def _validate_arrays_meta(
         missing = required_keys - meta.keys()
         if missing:
             raise ValueError(f"arrays_metadata['{array_name}'] is missing required keys: {missing}")
+
+        extra = meta.keys() - required_keys
+        if extra:
+            raise ValueError(f"arrays_metadata['{array_name}'] has unknown keys: {extra}")
 
         validated[array_name] = _validate_single_array_metadata(array_name, meta)
 

@@ -153,8 +153,8 @@ def greedy_partitioning(dsk, scheduling_actors: dict) -> dict[str, int]:
             dict_key, data_node = data_item
             if data_node is not None:
                 chunkref: ChunkRef = data_node.value
-                partition[key] = chunkref.actorid
-                dsk[k].args[0][dict_key] = DataNode(key, chunkref.ref)
+                partition[k] = chunkref.actorid
+                dsk[k].args[0][dict_key] = DataNode(k, chunkref.ref)
             else:
                 partition[k] = random.choice(actor_names)
         else:

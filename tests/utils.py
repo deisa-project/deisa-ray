@@ -1,9 +1,10 @@
+import os
+import socket
 import time
 
 import numpy as np
 import pytest
 import ray
-import socket
 
 
 def pick_free_port():
@@ -17,10 +18,15 @@ def pick_free_port():
 # @pytest.fixture(scope = "session")
 @pytest.fixture()
 def ray_cluster():
-    """Start a Ray cluster for this test"""
+    if ray.is_initialized():
+        ray.shutdown()
+    os.environ.setdefault("RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO", "0")
     ray.init()
-    yield ray.get_runtime_context().gcs_address
-    ray.shutdown()
+    try:
+        yield ray.get_runtime_context().gcs_address
+    finally:
+        if ray.is_initialized():
+            ray.shutdown()
 
 
 def wait_for_head_node() -> None:
@@ -40,7 +46,6 @@ def simple_worker(
     rank: int,
     position: tuple[int, ...],
     chunks_per_dim: tuple[int, ...],
-    nb_chunks_of_node: int,
     chunk_size: tuple[int, ...],
     nb_iterations: int,
     nb_nodes: int,
@@ -54,25 +59,29 @@ def simple_worker(
 ) -> None:
     """Worker node sending chunks of data"""
     from deisa.ray.bridge import Bridge
+    from deisa.ray.comm import init_gloo_comm
 
     if isinstance(array_name, str):
         array_name = [array_name]
 
     start_iteration = kwargs.get("start_iteration", 0)
 
-    sys_md = {"world_size": nb_nodes, "master_address": "127.0.0.1", "master_port": port}
     arrays_md = {
         name: {
+            "global_shape": tuple(n * c for n, c in zip(chunks_per_dim, chunk_size)),
             "chunk_shape": chunk_size,
-            "nb_chunks_per_dim": chunks_per_dim,
-            "nb_chunks_of_node": nb_chunks_of_node,
-            "dtype": dtype,
             "chunk_position": position,
         }
         for name in array_name
     }
 
-    client = Bridge(bridge_id=rank, arrays_metadata=arrays_md, system_metadata=sys_md, _node_id=node_id)
+    comm = init_gloo_comm(
+        nb_nodes,
+        rank,
+        "127.0.0.1",
+        port,
+    )
+    client = Bridge(arrays_metadata=arrays_md, comm=comm, _node_id=node_id)
 
     array = (rank + 1) * np.ones(chunk_size, dtype=dtype)
 
@@ -81,7 +90,7 @@ def simple_worker(
         time.sleep(_sleep_intra_send)
         for array_described in list(arrays_md.keys()):
             chunk = i * array
-            client.send(array_name=array_described, chunk=chunk, timestep=i, chunked=True)
+            client.send(array_name=array_described, chunk=chunk, timestep=i)
 
     client.close(timestep=nb_iterations)
 
@@ -92,7 +101,6 @@ def simple_worker_error_test(
     rank: int,
     position: tuple[int, ...],
     chunks_per_dim: tuple[int, ...],
-    nb_chunks_of_node: int,
     chunk_size: tuple[int, ...],
     nb_iterations: int,
     nb_nodes: int,
@@ -103,26 +111,30 @@ def simple_worker_error_test(
 ) -> None:
     """Worker node sending chunks of data"""
     from deisa.ray.bridge import Bridge
+    from deisa.ray.comm import init_gloo_comm
 
-    sys_md = {"world_size": nb_nodes, "master_address": "127.0.0.1", "master_port": port}
     arrays_md = {
         array_name: {
+            "global_shape": tuple(n * c for n, c in zip(chunks_per_dim, chunk_size)),
             "chunk_shape": chunk_size,
-            "nb_chunks_per_dim": chunks_per_dim,
-            "nb_chunks_of_node": nb_chunks_of_node,
-            "dtype": dtype,
             "chunk_position": position,
         }
     }
 
-    client = Bridge(bridge_id=rank, arrays_metadata=arrays_md, system_metadata=sys_md, _node_id=node_id)
+    comm = init_gloo_comm(
+        nb_nodes,
+        rank,
+        "127.0.0.1",
+        port,
+    )
+    client = Bridge(arrays_metadata=arrays_md, comm=comm, _node_id=node_id)
 
     array = (rank + 1) * np.ones(chunk_size, dtype=dtype)
 
     for i in range(nb_iterations):
         chunk = i * array
         if i == nb_iterations // 2:
-            client.send(array_name="error", chunk=chunk, timestep=i, chunked=True)
+            client.send(array_name="error", chunk=chunk, timestep=i)
         else:
-            client.send(array_name=array_name, chunk=chunk, timestep=i, chunked=True)
+            client.send(array_name=array_name, chunk=chunk, timestep=i)
     client.close(timestep=nb_iterations)

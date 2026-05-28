@@ -482,11 +482,25 @@ dataframe = [
 ]
 
 [[package]]
+name = "deisa-core"
+version = "0.5.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "dask" },
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/4d/f0/7b30ae93bc78816365288ea0e66cae9d512f8ba91bc416469ee2e840d8e1/deisa_core-0.5.0.tar.gz", hash = "sha256:abd96c7c792359c2b45a9e4d375274526a6450386be16980da6b1efad06a9818", size = 7841, upload-time = "2026-05-07T09:35:27.072Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7d/35/af64c759c07d90878b199397c7718752c76821d8eed9be103fa8c542682a/deisa_core-0.5.0-py3-none-any.whl", hash = "sha256:8ee1c7994f299e5382758ee593e28011b0e2a7e936667fa75c571b7812f6c14b", size = 7665, upload-time = "2026-05-07T09:35:25.85Z" },
+]
+
+[[package]]
 name = "deisa-ray"
 version = "0.1.2"
 source = { editable = "." }
 dependencies = [
     { name = "dask", extra = ["dataframe"] },
+    { name = "deisa-core" },
     { name = "h5netcdf" },
     { name = "h5py" },
     { name = "numpy" },
@@ -520,6 +534,7 @@ docs = [
 [package.metadata]
 requires-dist = [
     { name = "dask", extras = ["dataframe"], specifier = "==2025.5.0" },
+    { name = "deisa-core", specifier = ">=0.5.0" },
     { name = "h5netcdf" },
     { name = "h5py", specifier = ">=3.15.1" },
     { name = "mpi4py", marker = "extra == 'mpi'" },

@@ -1,3 +1,4 @@
+import os
 import pytest
 import ray
 
@@ -15,7 +16,6 @@ def strange_worker(
     rank: int,
     position: tuple[int, ...],
     chunks_per_dim: tuple[int, ...],
-    nb_chunks_of_node: int,
     chunk_size: tuple[int, ...],
     nb_iterations: int,
     nb_nodes: int,
@@ -27,43 +27,47 @@ def strange_worker(
 ) -> None:
     """Strange worker that sends nodes out of order!"""
     from deisa.ray.bridge import Bridge
+    from deisa.ray.comm import init_gloo_comm
 
     if isinstance(array_name, str):
         array_name = [array_name]
 
     start_iteration = kwargs.get("start_iteration", 0)
 
-    sys_md = {"world_size": nb_nodes, "master_address": "127.0.0.1", "master_port": port}
     arrays_md = {
         name: {
+            "global_shape": tuple(n * c for n, c in zip(chunks_per_dim, chunk_size)),
             "chunk_shape": chunk_size,
-            "nb_chunks_per_dim": chunks_per_dim,
-            "nb_chunks_of_node": nb_chunks_of_node,
-            "dtype": dtype,
             "chunk_position": position,
         }
         for name in array_name
     }
 
-    client = Bridge(bridge_id=rank, arrays_metadata=arrays_md, system_metadata=sys_md, _node_id=node_id)
+    comm = init_gloo_comm(
+        nb_nodes,
+        rank,
+        "127.0.0.1",
+        port,
+    )
+    client = Bridge(arrays_metadata=arrays_md, comm=comm, _node_id=node_id)
 
     array = (rank + 1) * np.ones(chunk_size, dtype=dtype)
 
     for i in range(start_iteration, nb_iterations // 2):
         for array_described in list(arrays_md.keys()):
             chunk = i * array
-            client.send(array_name=array_described, chunk=chunk, timestep=i, chunked=True)
+            client.send(array_name=array_described, chunk=chunk, timestep=i)
     mid_t = i
     # skip 2 iterations
     i += 3
     for array_described in list(arrays_md.keys()):
         chunk = i * array
-        client.send(array_name=array_described, chunk=chunk, timestep=i, chunked=True)
+        client.send(array_name=array_described, chunk=chunk, timestep=i)
     # send rest from mid_t (duplicating a step but doesnt matter)
     for i in range(mid_t, nb_iterations):
         for array_described in list(arrays_md.keys()):
             chunk = i * array
-            client.send(array_name=array_described, chunk=chunk, timestep=i, chunked=True)
+            client.send(array_name=array_described, chunk=chunk, timestep=i)
     client.close(timestep=nb_iterations)
 
 
@@ -71,10 +75,9 @@ def strange_worker(
 def head_script(enable_distributed_scheduling, nb_nodes) -> None:
     """The head node checks that the values are correct"""
     from deisa.ray.window_handler import Deisa
-    from deisa.ray.types import WindowSpec
-    import deisa.ray as deisa
+    from deisa.ray.types import Window
 
-    deisa.config.enable_experimental_distributed_scheduling(enable_distributed_scheduling)
+    os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
 
     d = Deisa()
 
@@ -83,7 +86,7 @@ def head_script(enable_distributed_scheduling, nb_nodes) -> None:
 
     d.register_callback(
         simulation_callback,
-        [WindowSpec("array")],
+        *[Window("array")],
     )
     d.execute_callbacks()
 
@@ -110,7 +113,6 @@ def test_arrays_sent_out_of_order_fails_analytics(
                     rank=rank,
                     position=(rank // 2, rank % 2),
                     chunks_per_dim=(2, 2),
-                    nb_chunks_of_node=4 // nb_nodes,
                     chunk_size=(1, 1),
                     nb_iterations=NB_ITERATIONS,
                     node_id=f"node_{rank % nb_nodes}",

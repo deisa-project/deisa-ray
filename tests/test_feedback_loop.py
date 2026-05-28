@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 import ray
 
-import deisa.ray as deisa
+from deisa.ray.config import DEISA_DISTRIBUTED_SCHEDULING_ENV
 from tests.utils import pick_free_port, ray_cluster, wait_for_head_node  # noqa: F401
 
 # I need to test:
@@ -22,11 +22,11 @@ from tests.utils import pick_free_port, ray_cluster, wait_for_head_node  # noqa:
 
 
 @pytest.fixture(autouse=True)
-def reset_process_state():
+def reset_process_state(monkeypatch):
     scheduler = dask.config.get("scheduler", default=None)
-    deisa.config._reset_for_tests()
+    monkeypatch.delenv(DEISA_DISTRIBUTED_SCHEDULING_ENV, raising=False)
     yield
-    deisa.config._reset_for_tests()
+    monkeypatch.delenv(DEISA_DISTRIBUTED_SCHEDULING_ENV, raising=False)
     dask.config.set(scheduler=scheduler)
 
 
@@ -67,6 +67,7 @@ def test_bridge_zero_queries_head_actor_directly(monkeypatch) -> None:
     bridge.comm = NoOpComm()
     bridge.head_actor = _RecordingHeadActor()
     bridge.node_actor = _FailingNodeActor()
+    bridge._closed = True
 
     def fake_ray_get(object_ref):
         assert object_ref == "head-feedback-ref"
@@ -75,6 +76,27 @@ def test_bridge_zero_queries_head_actor_directly(monkeypatch) -> None:
     monkeypatch.setattr(ray, "get", fake_ray_get)
 
     assert bridge.get("foo", timestep=7) == "direct"
+    assert bridge.head_actor.get_feedback.calls == [("foo", 7)]
+
+
+def test_bridge_get_returns_default_when_feedback_missing(monkeypatch) -> None:
+    from deisa.ray.bridge import Bridge
+    from deisa.ray.comm import NoOpComm
+
+    bridge = Bridge.__new__(Bridge)
+    bridge.bridge_id = 0
+    bridge.comm = NoOpComm()
+    bridge.head_actor = _RecordingHeadActor()
+    bridge.node_actor = _FailingNodeActor()
+    bridge._closed = True
+
+    def fake_ray_get(object_ref):
+        assert object_ref == "head-feedback-ref"
+        return False, None
+
+    monkeypatch.setattr(ray, "get", fake_ray_get)
+
+    assert bridge.get("foo", timestep=7, default="fallback") == "fallback"
     assert bridge.head_actor.get_feedback.calls == [("foo", 7)]
 
 
@@ -150,7 +172,7 @@ def test_feedback_set_does_not_leak_dask_scheduler(ray_cluster) -> None:  # noqa
 
 @ray.remote(max_retries=0)
 def feedback_head() -> bool:
-    from deisa.ray.types import DeisaArray, WindowSpec
+    from deisa.ray.types import DeisaArray, Window
     from deisa.ray.window_handler import Deisa
 
     deisa = Deisa(feedback_queue_size=2)
@@ -162,7 +184,7 @@ def feedback_head() -> bool:
         if latest.t == 1:
             deisa.set(key="foo", value=latest.t, timestep=latest.t)
 
-    deisa.register_callback(callback, [WindowSpec("array")])
+    deisa.register_callback(callback, *[Window("array")])
     deisa.execute_callbacks()
     return True
 
@@ -170,19 +192,23 @@ def feedback_head() -> bool:
 @ray.remote(num_cpus=0, max_retries=0)
 def feedback_worker(*, rank: int, port: int) -> tuple[int, str, int]:
     from deisa.ray.bridge import Bridge
+    from deisa.ray.comm import init_gloo_comm
 
-    sys_md = {"world_size": 2, "master_address": "127.0.0.1", "master_port": port}
     arrays_md = {
         "array": {
+            "global_shape": (2,),
             "chunk_shape": (1,),
-            "nb_chunks_per_dim": (2,),
-            "nb_chunks_of_node": 1,
-            "dtype": np.int32,
             "chunk_position": (rank,),
         }
     }
 
-    bridge = Bridge(bridge_id=rank, arrays_metadata=arrays_md, system_metadata=sys_md, _node_id=f"node_{rank}")
+    comm = init_gloo_comm(
+        2,
+        rank,
+        "127.0.0.1",
+        port,
+    )
+    bridge = Bridge(arrays_metadata=arrays_md, comm=comm, _node_id=f"node_{rank}")
 
     for timestep in range(2):
         bridge.send(

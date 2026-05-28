@@ -44,18 +44,6 @@ def get_node_actor_options(name: str, namespace: str) -> Dict[str, Any]:
     }
 
 
-def get_system_metadata() -> Dict:
-    """
-    Return system-level metadata placeholder.
-
-    Notes
-    -----
-    Currently returns an empty dictionary; the hook exists to keep backward
-    compatibility with callers expecting environment metadata.
-    """
-    return {}
-
-
 async def get_ready_actor_with_retry(name, namespace, deadline_s=180):
     """
     Get a Ray actor by name with retry logic and readiness check.

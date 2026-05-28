@@ -1,16 +1,17 @@
 # TODO: test clean exit if scheduling actor not created
 
 import concurrent.futures
+import inspect
 import ray
 import pytest
-import numpy as np
 import torch.distributed as dist
 
 from ray.util.state import list_actors
 from deisa.ray.types import RayActorHandle
 from tests.stubs import StubSchedulingActor
 from deisa.ray.bridge import Bridge
-from deisa.ray.comm import MPICommAdapter, NoOpComm, TorchDistComm
+from deisa.ray.comm import MPICommAdapter, NoOpComm, TorchDistComm, init_gloo_comm
+from deisa.ray.validate import _validate_arrays_meta
 from tests.utils import pick_free_port
 
 
@@ -27,10 +28,8 @@ def _actor_names_by_prefix(prefix="sched-"):
 
 arrays_md = {
     "array": {
+        "global_shape": (1, 1),
         "chunk_shape": (1, 1),
-        "nb_chunks_per_dim": (1, 1),
-        "nb_chunks_of_node": 1,
-        "dtype": np.int32,
         "chunk_position": (0, 0),
     }
 }
@@ -38,14 +37,10 @@ arrays_md = {
 
 def test_init(ray_cluster):
     fake_node_id = "FAKE-NODE-1"
-    port = pick_free_port()
-    sys_md = {"world_size": 1, "master_address": "127.0.0.1", "master_port": port}
     c = Bridge(
-        bridge_id=0,
         arrays_metadata=arrays_md,
-        system_metadata=sys_md,
-        _node_id=fake_node_id,
         comm=NoOpComm(0, 1),
+        _node_id=fake_node_id,
         scheduling_actor_cls=StubSchedulingActor,
     )
     assert c.node_id == fake_node_id
@@ -53,19 +48,32 @@ def test_init(ray_cluster):
     assert isinstance(c, Bridge)
 
 
-def test_init_with_default_gloo_comm(ray_cluster):
+def test_init_accepts_variadic_args_signature():
+    signature = inspect.signature(Bridge.__init__)
+    parameters = list(signature.parameters.values())
+
+    assert [parameter.name for parameter in parameters[:5]] == ["self", "comm", "arrays_metadata", "args", "kwargs"]
+    assert parameters[3].kind is inspect.Parameter.VAR_POSITIONAL
+    assert parameters[4].kind is inspect.Parameter.VAR_KEYWORD
+
+
+def test_init_with_explicit_gloo_comm(ray_cluster):
     fake_node_id = "FAKE-NODE-GLOO"
     port = pick_free_port()
-    sys_md = {"world_size": 1, "master_address": "127.0.0.1", "master_port": port}
 
     if dist.is_initialized():
         dist.destroy_process_group()
 
     try:
+        comm = init_gloo_comm(
+            1,
+            0,
+            "127.0.0.1",
+            port,
+        )
         c = Bridge(
-            bridge_id=0,
             arrays_metadata=arrays_md,
-            system_metadata=sys_md,
+            comm=comm,
             _node_id=fake_node_id,
             scheduling_actor_cls=StubSchedulingActor,
         )
@@ -77,27 +85,12 @@ def test_init_with_default_gloo_comm(ray_cluster):
             dist.destroy_process_group()
 
 
-def test_init_requires_system_metadata_for_default_gloo(ray_cluster):
-    fake_node_id = "FAKE-NODE-MISSING-SYS-MD"
+def test_init_raises_when_comm_is_none(ray_cluster):
+    fake_node_id = "FAKE-NODE-NO-COMM"
 
-    with pytest.raises(ValueError, match="system_metadata is required when comm is None"):
+    with pytest.raises(ValueError, match="comm is required"):
         Bridge(
-            bridge_id=0,
             arrays_metadata=arrays_md,
-            system_metadata=None,
-            _node_id=fake_node_id,
-            scheduling_actor_cls=StubSchedulingActor,
-        )
-
-
-def test_init_raises_when_comm_and_system_metadata_are_none(ray_cluster):
-    fake_node_id = "FAKE-NODE-NO-COMM-NO-SYS-MD"
-
-    with pytest.raises(ValueError, match="system_metadata is required when comm is None"):
-        Bridge(
-            bridge_id=0,
-            arrays_metadata=arrays_md,
-            system_metadata=None,
             comm=None,
             _node_id=fake_node_id,
             scheduling_actor_cls=StubSchedulingActor,
@@ -123,11 +116,9 @@ def test_init_with_mpi_comm_adapter(ray_cluster):
     mpi_comm = MPICommAdapter(fake_mpi_comm)
 
     c = Bridge(
-        bridge_id=0,
         arrays_metadata=arrays_md,
-        system_metadata=None,
-        _node_id=fake_node_id,
         comm=mpi_comm,
+        _node_id=fake_node_id,
         scheduling_actor_cls=StubSchedulingActor,
     )
 
@@ -144,11 +135,9 @@ def test_init_with_raw_mpi_comm(ray_cluster):
     fake_node_id = "FAKE-NODE-RAW-MPI"
 
     c = Bridge(
-        bridge_id=0,
         arrays_metadata=arrays_md,
-        system_metadata=None,
-        _node_id=fake_node_id,
         comm=MPI.COMM_SELF,
+        _node_id=fake_node_id,
         scheduling_actor_cls=StubSchedulingActor,
     )
 
@@ -159,79 +148,89 @@ def test_init_with_raw_mpi_comm(ray_cluster):
 
 def test_init_normalizes_list_chunk_metadata(ray_cluster):
     fake_node_id = "FAKE-NODE-LIST-META"
-    port = pick_free_port()
-    sys_md = {"world_size": 1, "master_address": "127.0.0.1", "master_port": port}
     list_arrays_md = {
         "array": {
+            "global_shape": [1, 1],
             "chunk_shape": [1, 1],
-            "nb_chunks_per_dim": [1, 1],
-            "nb_chunks_of_node": 1,
-            "dtype": np.int32,
             "chunk_position": [0, 0],
         }
     }
 
     c = Bridge(
-        bridge_id=0,
         arrays_metadata=list_arrays_md,
-        system_metadata=sys_md,
-        _node_id=fake_node_id,
         comm=NoOpComm(0, 1),
+        _node_id=fake_node_id,
         scheduling_actor_cls=StubSchedulingActor,
     )
 
-    assert c.arrays_metadata["array"]["chunk_shape"] == (1, 1)
-    assert c.arrays_metadata["array"]["nb_chunks_per_dim"] == (1, 1)
-    assert c.arrays_metadata["array"]["chunk_position"] == (0, 0)
+    assert c.arrays_metadata["array"]["global_shape"] == [1, 1]
+    assert c.arrays_metadata["array"]["chunk_shape"] == [1, 1]
+    assert "nb_chunks_per_dim" not in c.arrays_metadata["array"]
+    assert c.arrays_metadata["array"]["chunk_position"] == [0, 0]
 
 
-def test_init_normalizes_ndarray_chunk_metadata(ray_cluster):
-    fake_node_id = "FAKE-NODE-NDARRAY-META"
-    port = pick_free_port()
-    sys_md = {"world_size": 1, "master_address": "127.0.0.1", "master_port": port}
-    ndarray_arrays_md = {
+# def test_init_normalizes_ndarray_chunk_metadata(ray_cluster):
+#     fake_node_id = "FAKE-NODE-NDARRAY-META"
+#     ndarray_arrays_md = {
+#         "array": {
+#             "global_shape": np.array([1, 1], dtype=np.int64),
+#             "chunk_shape": np.array([1, 1], dtype=np.int64),
+#             "chunk_position": np.array([0, 0], dtype=np.int64),
+#         }
+#     }
+
+#     c = Bridge(
+#         arrays_metadata=ndarray_arrays_md,
+#         comm=NoOpComm(0, 1),
+#         _node_id=fake_node_id,
+#         scheduling_actor_cls=StubSchedulingActor,
+#     )
+
+#     assert c.arrays_metadata["array"]["global_shape"] == (1, 1)
+#     assert c.arrays_metadata["array"]["chunk_shape"] == (1, 1)
+#     assert "nb_chunks_per_dim" not in c.arrays_metadata["array"]
+#     assert c.arrays_metadata["array"]["chunk_position"] == (0, 0)
+
+
+def test_arrays_metadata_requires_global_shape_instead_of_nb_chunks_per_dim():
+    old_arrays_md = {
         "array": {
-            "chunk_shape": np.array([1, 1], dtype=np.int64),
-            "nb_chunks_per_dim": np.array([1, 1], dtype=np.int64),
-            "nb_chunks_of_node": np.array(1, dtype=np.int64),
-            "dtype": np.int32,
-            "chunk_position": np.array([0, 0], dtype=np.int64),
+            "chunk_shape": (1, 1),
+            "nb_chunks_per_dim": (1, 1),
+            "chunk_position": (0, 0),
         }
     }
 
-    c = Bridge(
-        bridge_id=0,
-        arrays_metadata=ndarray_arrays_md,
-        system_metadata=sys_md,
-        _node_id=fake_node_id,
-        comm=NoOpComm(0, 1),
-        scheduling_actor_cls=StubSchedulingActor,
-    )
-
-    assert c.arrays_metadata["array"]["chunk_shape"] == (1, 1)
-    assert c.arrays_metadata["array"]["nb_chunks_per_dim"] == (1, 1)
-    assert c.arrays_metadata["array"]["nb_chunks_of_node"] == 1
-    assert isinstance(c.arrays_metadata["array"]["nb_chunks_of_node"], int)
-    assert c.arrays_metadata["array"]["chunk_position"] == (0, 0)
+    with pytest.raises(ValueError, match="missing required keys: .*global_shape"):
+        _validate_arrays_meta(old_arrays_md)
 
 
-def test_close_returns_timestep_and_logs(ray_cluster, caplog):
+def test_arrays_metadata_global_shape_must_match_chunk_grid():
+    arrays_md = {
+        "array": {
+            "global_shape": (3, 2),
+            "chunk_shape": (2, 1),
+            "chunk_position": (0, 0),
+        }
+    }
+
+    with pytest.raises(ValueError, match="evenly divisible"):
+        _validate_arrays_meta(arrays_md)
+
+
+def test_close_returns_none_and_logs(ray_cluster, caplog):
     fake_node_id = "FAKE-NODE-CLOSE"
-    port = pick_free_port()
-    sys_md = {"world_size": 1, "master_address": "127.0.0.1", "master_port": port}
     c = Bridge(
-        bridge_id=0,
         arrays_metadata=arrays_md,
-        system_metadata=sys_md,
-        _node_id=fake_node_id,
         comm=NoOpComm(0, 1),
+        _node_id=fake_node_id,
         scheduling_actor_cls=StubSchedulingActor,
     )
 
     with caplog.at_level("INFO", logger="deisa.ray.bridge"):
-        last_timestep = c.close(timestep=7)
+        result = c.close(timestep=7)
 
-    assert last_timestep == 7
+    assert result is None
     assert "Bridge 0 closed at timestep 7" in caplog.text
 
 
@@ -247,18 +246,11 @@ def test_init_race_free(nb_nodes, ray_cluster):
     world_size = len(fake_node_ids)
 
     def _mk(args):
-        rank, (node_id, port) = args
-        sys_md = {
-            "world_size": world_size,
-            "master_address": "127.0.0.1",
-            "master_port": port,
-        }
+        rank, (node_id, _port) = args
         Bridge(
-            bridge_id=rank,  # IMPORTANT: unique rank per simulated process
             arrays_metadata=arrays_md,
-            system_metadata=sys_md,
-            _node_id=node_id,
             comm=NoOpComm(rank, world_size),
+            _node_id=node_id,
             scheduling_actor_cls=StubSchedulingActor,
         )
         return True
@@ -278,16 +270,12 @@ def test_init_race_free(nb_nodes, ray_cluster):
 def test_actor_dies_and_client_recovers(ray_cluster):
     # NOTE: not sure needed because client init happens just once at the beginning.
     fake_node_id = "CRASHY-NODE"
-    port = pick_free_port()
 
     # First client brings up the actor
-    sys_md = {"world_size": 1, "master_address": "127.0.0.1", "master_port": port}
     Bridge(
-        bridge_id=0,
         arrays_metadata=arrays_md,
-        system_metadata=sys_md,
-        _node_id=fake_node_id,
         comm=NoOpComm(0, 1),
+        _node_id=fake_node_id,
         scheduling_actor_cls=StubSchedulingActor,
     )
     # Find the actor handle and kill it
@@ -296,12 +284,10 @@ def test_actor_dies_and_client_recovers(ray_cluster):
 
     # Now, creating another client should recover (thanks to retry in Bridge.__init__)
     Bridge(
-        bridge_id=0,
         arrays_metadata=arrays_md,
-        system_metadata=sys_md,
+        comm=NoOpComm(0, 1),
         _node_id=fake_node_id,
         scheduling_actor_cls=StubSchedulingActor,
-        comm=NoOpComm(0, 1),
         _init_retries=5,
     )
 

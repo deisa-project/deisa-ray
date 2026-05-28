@@ -75,7 +75,7 @@ class HeadNodeActor:
         self.scheduling_actors: dict[str, RayActorHandle] = {}
 
         # TODO: document what this event signals and update documentation
-        self.new_array_created: dict[str, asyncio.Event] = {}
+        self.new_array_created: dict[str, asyncio.Lock] = {}
         self.max_simulation_ahead = max_simulation_ahead
         self.semaphore_per_array = {}
 
@@ -147,7 +147,6 @@ class HeadNodeActor:
         self,
         actor_id_who_owns: int,
         array_name: str,
-        dtype: np.dtype,
         nb_chunks_per_dim: tuple[int, ...],
         chunks_meta: list[tuple[int, tuple[int, ...], tuple[int, ...]]],  # [(chunk position, chunk size), ...]
     ):
@@ -160,8 +159,6 @@ class HeadNodeActor:
             Scheduling actor ID that owns the provided chunks.
         array_name : str
             Name of the array being registered.
-        dtype : np.dtype
-            NumPy dtype for all chunks owned by the actor.
         nb_chunks_per_dim : tuple[int, ...]
             Global chunk grid shape (number of chunks per dimension).
         chunks_meta : list[tuple[int, tuple[int, ...], tuple[int, ...]]]
@@ -178,15 +175,15 @@ class HeadNodeActor:
 
         if array_name not in self.registered_arrays:
             self.registered_arrays[array_name] = DaskArrayData(array_name)
-            self.semaphore_per_array[array_name] = asyncio.Semaphore(self.max_simulation_ahead + 1)
-            self.new_array_created[array_name] = asyncio.Event()
+            self.semaphore_per_array[array_name] = asyncio.Semaphore(self.max_simulation_ahead)
+            self.new_array_created[array_name] = asyncio.Lock()
 
         array = self.registered_arrays[array_name]
         # TODO no checks done for when all nodeactors have called this
         # TODO missing check that analytics and sim have required/set same name of arrays, otherwise array is created and nothing happens
 
         for bridge_id, position, size in chunks_meta:
-            array.update_meta(nb_chunks_per_dim, dtype, position, size, actor_id_who_owns, bridge_id)
+            array.update_meta(nb_chunks_per_dim, position, size, actor_id_who_owns, bridge_id)
 
     def exchange_config(self, config: dict) -> None:
         """
@@ -281,7 +278,12 @@ class HeadNodeActor:
         return False, None
 
     async def chunks_ready(
-        self, array_name: str, timestep: Timestep, pos_to_ref: dict[tuple, ray.ObjectRef], actor_id: str
+        self,
+        array_name: str,
+        timestep: Timestep,
+        pos_to_ref: dict[tuple, ray.ObjectRef],
+        actor_id: str,
+        dtype: np.dtype,
     ) -> None:
         """
         Receive chunk references for a timestep and enqueue the full array when complete.
@@ -311,47 +313,38 @@ class HeadNodeActor:
         semaphore is released when analytics later consume the array.
         """
         array = self.registered_arrays[array_name]
+        array.update_dtype(timestep, dtype)
         semaphore = self.semaphore_per_array[array_name]
-        created_event = self.new_array_created[array_name]
+        lock = self.new_array_created[array_name]
+        creator = False
+        future = None
 
-        # Ensure the timestep entry exists
-        while timestep not in array.chunk_refs:
-            try_to_create_timestep_task = asyncio.create_task(semaphore.acquire())
-            wait_for_another_to_create_task = asyncio.create_task(created_event.wait())
+        async with lock:
+            entry = array.chunk_refs.get(timestep)
+            if entry is None:
+                # Timestep not yet created, become creator here
+                future = asyncio.get_event_loop().create_future()
+                array.chunk_refs[timestep] = future  # placeholder reservation
+                creator = True
+            elif isinstance(entry, asyncio.Future):
+                # not creator we will wait on the future
+                future = entry
 
-            done, pending = await asyncio.wait(
-                {try_to_create_timestep_task, wait_for_another_to_create_task},
-                return_when=asyncio.FIRST_COMPLETED,
-            )
+        if creator:
+            await semaphore.acquire()
+            async with lock:
+                array.chunk_refs[timestep] = []
+                future.set_result(True)
+        elif future is not None:  # we wait the creation of the timestep here
+            await future
 
-            for task in pending:
-                task.cancel()
-
-            if try_to_create_timestep_task in done:
-                if timestep in array.chunk_refs:
-                    # NOTE : cannot happen since that in the stalling case,
-                    # one of the scheduling actor dont add his chunks
-                    # -> is_ready is always false
-                    # -> nothing is put in the queue, get_next_array() never executed
-                    # -> semaphore never released
-                    # -> so try_to_create_timestep_task cant finish and wait_for_another_to_create_task keep waiting -> stall forever
-                    #
-                    # Another actor created the entry while we were waiting
-                    semaphore.release()
-                else:
-                    array.chunk_refs[timestep] = []
-                    created_event.set()
-                    # NOTE : If the first scheduling actor that create the timestep
-                    # clear the event before one of the others scheduling actors create
-                    # the asyncio task that wait on it it will wait forever
-                    #
-                    created_event.clear()
-                    #
-                # NOTE : possible solution :
-                # - release semaphore at different place
-                # - clear the event later ?
-
+        # NOTE : If future is None -> necesseraly means that the timestep is created and ready
+        # `future` is determined by `entry` which can be :
+        #   -> None => we are the creator and create the future and timestep
+        #   -> future => enter in ` await future`
+        #   -> [] => timestep created, can add chunk_refs
         # Collect chunk refs and store them in Ray
+
         chunks = list(pos_to_ref.values())
         ref_to_list_of_chunks = ray.put(chunks)
 
