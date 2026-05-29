@@ -1,7 +1,7 @@
 import dask.array as da
 import ray
 from deisa.ray.types import DeisaArray
-from tests.utils import ray_cluster, simple_worker, wait_for_head_node, pick_free_port  # noqa: F401
+from tests.utils import WorkerSpec
 import pytest
 
 import numpy as np
@@ -10,6 +10,24 @@ import pathlib
 import os
 
 NB_ITERATIONS = 10
+
+
+def run_save_workflow(ray_workflow, head_script, path: pathlib.Path, enable_distributed_scheduling, array_name="array"):
+    ray_workflow.start_head(head_script, str(path), enable_distributed_scheduling)
+    ray_workflow.start_simple_workers(
+        WorkerSpec(
+            rank=rank,
+            position=(rank // 2, rank % 2),
+            chunks_per_dim=(2, 2),
+            chunk_size=(1, 1),
+            nb_iterations=NB_ITERATIONS,
+            array_name=array_name,
+            node_id=f"node_{rank}",
+            nb_nodes=4,
+        )
+        for rank in range(4)
+    )
+    ray_workflow.wait()
 
 
 @pytest.mark.parametrize(
@@ -21,7 +39,7 @@ NB_ITERATIONS = 10
         ("~/interesting-event.h5", False),
     ],
 )
-def test_dask_save_hdf5(fname, enable_distributed_scheduling, ray_cluster) -> None:  # noqa: F811
+def test_dask_save_hdf5(fname, enable_distributed_scheduling, ray_workflow) -> None:
     @ray.remote(max_retries=0)
     def head_script(fname, enable_distributed_scheduling) -> None:
         """The head node checks that the values are correct"""
@@ -51,28 +69,7 @@ def test_dask_save_hdf5(fname, enable_distributed_scheduling, ray_cluster) -> No
         save_dir = full_name.parent
         os.system(f"rm -f {save_dir}/*.h5 {save_dir}/.*h5")
 
-    # Resolve on the driver so the Ray task writes to the same absolute path
-    # that this test later reads, regardless of task working directory.
-    head_ref = head_script.remote(str(full_name), enable_distributed_scheduling)
-    wait_for_head_node()
-    port = pick_free_port()
-
-    worker_refs = []
-    for rank in range(4):
-        worker_refs.append(
-            simple_worker.remote(
-                rank=rank,
-                position=(rank // 2, rank % 2),
-                chunks_per_dim=(2, 2),
-                chunk_size=(1, 1),
-                nb_iterations=NB_ITERATIONS,
-                node_id=f"node_{rank}",
-                nb_nodes=4,
-                port=port,
-            )
-        )
-
-    ray.get([head_ref] + worker_refs)
+    run_save_workflow(ray_workflow, head_script, full_name, enable_distributed_scheduling)
 
     x = h5py.File(full_name)["data"]
     data = da.from_array(x, chunks=2)
@@ -95,7 +92,7 @@ def test_dask_save_hdf5(fname, enable_distributed_scheduling, ray_cluster) -> No
         ("interesting-event.h5", True),
     ],
 )
-def test_dask_save_several_timesteps_hdf5(fname, enable_distributed_scheduling, ray_cluster) -> None:  # noqa: F811
+def test_dask_save_several_timesteps_hdf5(fname, enable_distributed_scheduling, ray_workflow) -> None:
     @ray.remote(max_retries=0)
     def head_script(fname, enable_distributed_scheduling) -> None:
         """The head node checks that the values are correct"""
@@ -124,28 +121,7 @@ def test_dask_save_several_timesteps_hdf5(fname, enable_distributed_scheduling, 
         save_dir = full_name.parent
         os.system(f"rm -f {save_dir}/*.h5 {save_dir}/.*h5")
 
-    # Resolve on the driver so the Ray task writes to the same absolute path
-    # that this test later reads, regardless of task working directory.
-    head_ref = head_script.remote(str(full_name), enable_distributed_scheduling)
-    wait_for_head_node()
-    port = pick_free_port()
-
-    worker_refs = []
-    for rank in range(4):
-        worker_refs.append(
-            simple_worker.remote(
-                rank=rank,
-                position=(rank // 2, rank % 2),
-                chunks_per_dim=(2, 2),
-                chunk_size=(1, 1),
-                nb_iterations=NB_ITERATIONS,
-                node_id=f"node_{rank}",
-                nb_nodes=4,
-                port=port,
-            )
-        )
-
-    ray.get([head_ref] + worker_refs)
+    run_save_workflow(ray_workflow, head_script, full_name, enable_distributed_scheduling)
 
     for i in range(NB_ITERATIONS):
         x = h5py.File(full_name)[str(i)]
@@ -166,7 +142,7 @@ def test_dask_save_several_timesteps_hdf5(fname, enable_distributed_scheduling, 
         ("interesting-event.h5", True),
     ],
 )
-def test_dask_save_several_arrays_hdf5(fname, enable_distributed_scheduling, ray_cluster) -> None:  # noqa: F811
+def test_dask_save_several_arrays_hdf5(fname, enable_distributed_scheduling, ray_workflow) -> None:
     @ray.remote(max_retries=0)
     def head_script(fname, enable_distributed_scheduling) -> None:
         """The head node checks that the values are correct"""
@@ -196,29 +172,7 @@ def test_dask_save_several_arrays_hdf5(fname, enable_distributed_scheduling, ray
         save_dir = full_name.parent
         os.system(f"rm -f {save_dir}/*.h5 {save_dir}/.*h5")
 
-    # Resolve on the driver so the Ray task writes to the same absolute path
-    # that this test later reads, regardless of task working directory.
-    head_ref = head_script.remote(str(full_name), enable_distributed_scheduling)
-    wait_for_head_node()
-    port = pick_free_port()
-
-    worker_refs = []
-    for rank in range(4):
-        worker_refs.append(
-            simple_worker.remote(
-                rank=rank,
-                position=(rank // 2, rank % 2),
-                chunks_per_dim=(2, 2),
-                chunk_size=(1, 1),
-                nb_iterations=NB_ITERATIONS,
-                array_name=["a", "b"],
-                node_id=f"node_{rank}",
-                nb_nodes=4,
-                port=port,
-            )
-        )
-
-    ray.get([head_ref] + worker_refs)
+    run_save_workflow(ray_workflow, head_script, full_name, enable_distributed_scheduling, array_name=["a", "b"])
 
     a = h5py.File(full_name)["a"]
     data_a = da.from_array(a, chunks=2)
@@ -248,7 +202,7 @@ def test_dask_save_several_arrays_hdf5(fname, enable_distributed_scheduling, ray
         ("~/interesting-event.zarr", True),
     ],
 )
-def test_dask_save_zarr(fname, enable_distributed_scheduling, ray_cluster) -> None:  # noqa: F811
+def test_dask_save_zarr(fname, enable_distributed_scheduling, ray_workflow) -> None:
     @ray.remote(max_retries=0)
     def head_script(fname, enable_distributed_scheduling) -> None:
         """The head node checks that the values are correct"""
@@ -276,28 +230,7 @@ def test_dask_save_zarr(fname, enable_distributed_scheduling, ray_cluster) -> No
     if os.path.exists(full_path):
         shutil.rmtree(full_path)
 
-    # Resolve on the driver so the Ray task writes to the same absolute path
-    # that this test later reads, regardless of task working directory.
-    head_ref = head_script.remote(str(full_path), enable_distributed_scheduling)
-    wait_for_head_node()
-    port = pick_free_port()
-
-    worker_refs = []
-    for rank in range(4):
-        worker_refs.append(
-            simple_worker.remote(
-                rank=rank,
-                position=(rank // 2, rank % 2),
-                chunks_per_dim=(2, 2),
-                chunk_size=(1, 1),
-                nb_iterations=NB_ITERATIONS,
-                node_id=f"node_{rank}",
-                nb_nodes=4,
-                port=port,
-            )
-        )
-
-    ray.get([head_ref] + worker_refs)
+    run_save_workflow(ray_workflow, head_script, full_path, enable_distributed_scheduling)
 
     data = da.from_zarr(full_path, component="data")
 
@@ -318,7 +251,7 @@ def test_dask_save_zarr(fname, enable_distributed_scheduling, ray_cluster) -> No
         ("interesting-event.nc", True),
     ],
 )
-def test_dask_save_netcdf_xarray(fname, enable_distributed_scheduling, ray_cluster) -> None:  # noqa: F811
+def test_dask_save_netcdf_xarray(fname, enable_distributed_scheduling, ray_workflow) -> None:
     @ray.remote(max_retries=0)
     def head_script(fname, enable_distributed_scheduling) -> None:
         """The head node checks that the values are correct"""
@@ -351,28 +284,7 @@ def test_dask_save_netcdf_xarray(fname, enable_distributed_scheduling, ray_clust
     if os.path.exists(full_name):
         os.system(f"rm -f {full_name}")
 
-    # Resolve on the driver so the Ray task writes to the same absolute path
-    # that this test later reads, regardless of task working directory.
-    head_ref = head_script.remote(str(full_name), enable_distributed_scheduling)
-    wait_for_head_node()
-    port = pick_free_port()
-
-    worker_refs = []
-    for rank in range(4):
-        worker_refs.append(
-            simple_worker.remote(
-                rank=rank,
-                position=(rank // 2, rank % 2),
-                chunks_per_dim=(2, 2),
-                chunk_size=(1, 1),
-                nb_iterations=NB_ITERATIONS,
-                node_id=f"node_{rank}",
-                nb_nodes=4,
-                port=port,
-            )
-        )
-
-    ray.get([head_ref] + worker_refs)
+    run_save_workflow(ray_workflow, head_script, full_name, enable_distributed_scheduling)
 
     data = xr.open_dataarray(full_name)
 

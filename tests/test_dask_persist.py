@@ -2,7 +2,7 @@ import os
 import dask.array as da
 import ray
 from deisa.ray.types import DeisaArray
-from tests.utils import ray_cluster, simple_worker, wait_for_head_node, pick_free_port  # noqa: F401
+from tests.utils import WorkerSpec
 import pytest
 
 
@@ -42,25 +42,20 @@ def head_script(enable_distributed_scheduling) -> None:
 
 
 @pytest.mark.parametrize("enable_distributed_scheduling", [True, False])
-def test_dask_persist(enable_distributed_scheduling, ray_cluster) -> None:  # noqa: F811
-    head_ref = head_script.remote(enable_distributed_scheduling)
-    wait_for_head_node()
-    port = pick_free_port()
-
-    worker_refs = []
+def test_dask_persist(enable_distributed_scheduling, ray_workflow) -> None:
     nb_nodes = 4
-    for rank in range(nb_nodes):
-        worker_refs.append(
-            simple_worker.remote(
-                rank=rank,
-                position=(rank // 2, rank % 2),
-                chunks_per_dim=(2, 2),
-                chunk_size=(1, 1),
-                nb_iterations=NB_ITERATIONS,
-                node_id=f"node_{rank}",
-                nb_nodes=nb_nodes,
-                port=port,
-            )
+    ray_workflow.start_head(head_script, enable_distributed_scheduling)
+    ray_workflow.start_simple_workers(
+        WorkerSpec(
+            rank=rank,
+            position=(rank // 2, rank % 2),
+            chunks_per_dim=(2, 2),
+            chunk_size=(1, 1),
+            nb_iterations=NB_ITERATIONS,
+            node_id=f"node_{rank}",
+            nb_nodes=nb_nodes,
         )
+        for rank in range(nb_nodes)
+    )
 
-    ray.get([head_ref] + worker_refs)
+    ray_workflow.wait()

@@ -10,7 +10,7 @@ from tests.utils import pick_free_port
 NB_ITERATIONS = 5
 
 
-@ray.remote(num_cpus=0, max_retries=0)
+@ray.remote(num_cpus=0, max_retries=0, max_calls=1)
 def strange_worker(
     *,
     rank: int,
@@ -121,8 +121,8 @@ def test_arrays_sent_out_of_order_fails_analytics(
                 )
             )
 
-        ray.get([head_ref] + worker_refs)
+        ray.get([head_ref] + worker_refs, timeout=45)
 
         # Check that the right number of scheduling actors were created
         simulation_head = ray.get_actor("simulation_head", namespace="deisa_ray")
-        assert len(ray.get(simulation_head.list_scheduling_actors.remote())) == nb_nodes
+        assert len(ray.get(simulation_head.list_scheduling_actors.remote(), timeout=45)) == nb_nodes

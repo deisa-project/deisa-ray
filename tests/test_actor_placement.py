@@ -8,11 +8,14 @@ from deisa.ray.comm import NoOpComm
 from ray.util.state import list_actors
 from deisa.ray.types import DeisaArray
 from ray.cluster_utils import Cluster
-from tests.utils import wait_for_head_node
+from tests.utils import cleanup_deisa_actors, wait_for_head_node
 
 
 @pytest.fixture
 def ray_multinode_cluster():
+    if ray.is_initialized():
+        ray.shutdown()
+
     cluster_node_ids = {
         "head": "f64704987dec54e6c20445dc6a063ad34de1cd777d5c7e0779d1100a",
         "node1": "f64704987dec54e6c20445dc6a063ad34de1cd777d5c7e0779d1100b",
@@ -29,20 +32,23 @@ def ray_multinode_cluster():
 
     cluster.add_node(num_cpus=1, env_vars={"RAY_OVERRIDE_NODE_ID_FOR_TESTING": cluster_node_ids["node1"]})
 
+    os.environ["RAY_ADDRESS"] = cluster.address
     # Connect driver to this cluster (IMPORTANT)
     ray.init(
         address=cluster.address,
-        include_dashboard=False,
+        include_dashboard=True,
         log_to_driver=True,
         ignore_reinit_error=True,
     )
 
+    cleanup_deisa_actors()
     yield {
         "cluster": cluster,
         "ids": cluster_node_ids,
         "address": cluster.address,
     }
 
+    cleanup_deisa_actors()
     ray.shutdown()
     cluster.shutdown()
 
@@ -85,12 +91,14 @@ def test_actor_placement(enable_distributed_scheduling, ray_multinode_cluster):
         max_retries=0,
         scheduling_strategy=NodeAffinitySchedulingStrategy(node_id=head_node_id, soft=False),
     )
-    def head_script(enable_distributed_scheduling) -> None:
+    def head_script(enable_distributed_scheduling, head_node_id) -> None:
         """The head node checks that the values are correct"""
+        import deisa.ray.utils as ray_utils
         from deisa.ray.window_handler import Deisa
         from deisa.ray.types import Window
 
         os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
+        ray_utils.get_head_node_id = lambda: head_node_id
 
         d = Deisa()
 
@@ -103,7 +111,7 @@ def test_actor_placement(enable_distributed_scheduling, ray_multinode_cluster):
         )
 
     # submit head script (analogous to submitting analytics to head node)
-    ray.get(head_script.remote(enable_distributed_scheduling))
+    ray.get(head_script.remote(enable_distributed_scheduling, head_node_id), timeout=120)
     # just a ray.get_actor() wrapped in while loop
     wait_for_head_node()
     # check that head actor is running in mock head node
@@ -133,6 +141,6 @@ def test_actor_placement(enable_distributed_scheduling, ray_multinode_cluster):
 
         return (c.node_id, f"sched-{c.node_id}")
 
-    client_node_id, sched_name = ray.get(make_client_and_return_ids.remote())
+    client_node_id, sched_name = ray.get(make_client_and_return_ids.remote(), timeout=120)
     assert client_node_id == worker_node_id
     assert actor_node_id_by_name(sched_name) == worker_node_id

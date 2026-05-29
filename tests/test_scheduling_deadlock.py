@@ -1,3 +1,4 @@
+import os
 from typing import Any
 
 import pytest
@@ -9,6 +10,7 @@ from deisa.ray.head_node import HeadNodeActor
 from deisa.ray.scheduling_actor import SchedulingActor
 from deisa.ray.types import ScheduledByOtherActor
 from deisa.ray.utils import get_head_actor_options
+from tests.utils import cleanup_deisa_actors
 
 
 @pytest.fixture
@@ -21,6 +23,9 @@ def ray_three_node_cluster() -> dict[str, Any]:
     dict[str, Any]
         Mapping containing the cluster handle and stable node IDs.
     """
+    if ray.is_initialized():
+        ray.shutdown()
+
     cluster_node_ids = {
         "head": "f64704987dec54e6c20445dc6a063ad34de1cd777d5c7e0779d1100a",
         "node1": "f64704987dec54e6c20445dc6a063ad34de1cd777d5c7e0779d1100b",
@@ -39,15 +44,18 @@ def ray_three_node_cluster() -> dict[str, Any]:
     cluster.add_node(num_cpus=1, env_vars={"RAY_OVERRIDE_NODE_ID_FOR_TESTING": cluster_node_ids["node1"]})
     cluster.add_node(num_cpus=1, env_vars={"RAY_OVERRIDE_NODE_ID_FOR_TESTING": cluster_node_ids["node2"]})
 
+    os.environ["RAY_ADDRESS"] = cluster.address
     ray.init(
         address=cluster.address,
-        include_dashboard=False,
+        include_dashboard=True,
         log_to_driver=True,
         ignore_reinit_error=True,
     )
 
+    cleanup_deisa_actors()
     yield {"cluster": cluster, "ids": cluster_node_ids}
 
+    cleanup_deisa_actors()
     ray.shutdown()
     cluster.shutdown()
 
@@ -64,7 +72,7 @@ def test_cross_actor_graph_no_deadlock(ray_three_node_cluster: dict[str, Any]) -
     node_ids = ray_three_node_cluster["ids"]
 
     head = HeadNodeActor.options(**get_head_actor_options()).remote()
-    ray.get(head.ready.remote())
+    ray.get(head.ready.remote(), timeout=30)
 
     a0 = SchedulingActor.options(
         name="a0",
@@ -77,7 +85,7 @@ def test_cross_actor_graph_no_deadlock(ray_three_node_cluster: dict[str, Any]) -
         scheduling_strategy=NodeAffinitySchedulingStrategy(node_id=node_ids["node2"], soft=False),
     ).remote("a1")
 
-    ray.get([a0.ready.remote(), a1.ready.remote()])
+    ray.get([a0.ready.remote(), a1.ready.remote()], timeout=30)
 
     graph_id = 123
 
@@ -94,5 +102,5 @@ def test_cross_actor_graph_no_deadlock(ray_three_node_cluster: dict[str, Any]) -
     res_k0 = a1.get_value.remote(graph_id, "k0")
     res_k1 = a0.get_value.remote(graph_id, "k1")
 
-    vals = ray.get([res_k0, res_k1])
+    vals = ray.get([res_k0, res_k1], timeout=30)
     assert vals == [0, 1]

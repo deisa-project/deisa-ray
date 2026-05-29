@@ -16,7 +16,7 @@ import pytest
 import ray
 
 from deisa.ray.types import DeisaArray
-from tests.utils import ray_cluster, simple_worker, wait_for_head_node, pick_free_port  # noqa: F401
+from tests.utils import WorkerSpec
 
 NB_ITERATIONS = 5
 
@@ -28,7 +28,7 @@ NB_ITERATIONS = 5
         (1, False),
     ],
 )
-def test_typical(nb_nodes: int, enable_distributed_scheduling: bool, ray_cluster) -> None:  # noqa: F811
+def test_typical(nb_nodes: int, enable_distributed_scheduling: bool, ray_workflow) -> None:
     @ray.remote(max_retries=0)
     def head_script(enable_distributed_scheduling) -> None:
         """The head node checks that the values are correct"""
@@ -47,30 +47,24 @@ def test_typical(nb_nodes: int, enable_distributed_scheduling: bool, ray_cluster
 
         d.execute_callbacks()
 
-    head_ref = head_script.remote(enable_distributed_scheduling)
-    wait_for_head_node()
-    port = pick_free_port()
-
-    worker_refs = []
-    worker_refs.append(
-        simple_worker.remote(
-            rank=0,
-            position=(0, 0),
-            chunks_per_dim=(1, 1),
-            chunk_size=(1, 1),
-            nb_iterations=NB_ITERATIONS,
-            node_id="node_0",
-            nb_nodes=nb_nodes,
-            array_name=["A", "B"],
-            port=port,
-        )
+    ray_workflow.start_head(head_script, enable_distributed_scheduling)
+    ray_workflow.start_simple_workers(
+        [
+            WorkerSpec(
+                rank=0,
+                position=(0, 0),
+                chunks_per_dim=(1, 1),
+                chunk_size=(1, 1),
+                nb_iterations=NB_ITERATIONS,
+                node_id="node_0",
+                nb_nodes=nb_nodes,
+                array_name=["A", "B"],
+            )
+        ]
     )
 
-    ray.get([head_ref] + worker_refs)
-
-    # Check that the right number of scheduling actors were created
-    simulation_head = ray.get_actor("simulation_head", namespace="deisa_ray")
-    assert len(ray.get(simulation_head.list_scheduling_actors.remote())) == nb_nodes
+    ray_workflow.wait()
+    ray_workflow.assert_scheduling_actor_count(nb_nodes)
 
 
 @pytest.mark.parametrize(
@@ -80,7 +74,7 @@ def test_typical(nb_nodes: int, enable_distributed_scheduling: bool, ray_cluster
         (2, False),
     ],
 )
-def test_rank_ahead(nb_nodes: int, enable_distributed_scheduling: bool, ray_cluster) -> None:  # noqa: F811
+def test_rank_ahead(nb_nodes: int, enable_distributed_scheduling: bool, ray_workflow) -> None:
     @ray.remote(max_retries=0)
     def head_script(enable_distributed_scheduling) -> None:
         """The head node checks that the values are correct"""
@@ -97,32 +91,24 @@ def test_rank_ahead(nb_nodes: int, enable_distributed_scheduling: bool, ray_clus
 
         d.execute_callbacks()
 
-    head_ref = head_script.remote(enable_distributed_scheduling)
-    wait_for_head_node()
-    port = pick_free_port()
-
-    worker_refs = []
-    for rank in range(2):
-        worker_refs.append(
-            simple_worker.remote(
-                rank=rank,
-                position=(rank // 2, rank % 2),
-                chunks_per_dim=(1, 2),
-                chunk_size=(1, 1),
-                nb_iterations=NB_ITERATIONS,
-                node_id=f"node_{rank % nb_nodes}",
-                nb_nodes=nb_nodes,
-                port=port,
-                array_name=["A"],
-                _sleep_b4_send=5,
-            )
+    ray_workflow.start_head(head_script, enable_distributed_scheduling)
+    ray_workflow.start_simple_workers(
+        WorkerSpec(
+            rank=rank,
+            position=(rank // 2, rank % 2),
+            chunks_per_dim=(1, 2),
+            chunk_size=(1, 1),
+            nb_iterations=NB_ITERATIONS,
+            node_id=f"node_{rank % nb_nodes}",
+            nb_nodes=nb_nodes,
+            array_name=["A"],
+            sleep_before_send=0.25,
         )
+        for rank in range(2)
+    )
 
-    ray.get([head_ref] + worker_refs)
-
-    # Check that the right number of scheduling actors were created
-    simulation_head = ray.get_actor("simulation_head", namespace="deisa_ray")
-    assert len(ray.get(simulation_head.list_scheduling_actors.remote())) == nb_nodes
+    ray_workflow.wait()
+    ray_workflow.assert_scheduling_actor_count(nb_nodes)
 
 
 @pytest.mark.parametrize(
@@ -132,7 +118,7 @@ def test_rank_ahead(nb_nodes: int, enable_distributed_scheduling: bool, ray_clus
         (2, True),
     ],
 )
-def test_out_of_sync(nb_nodes: int, enable_distributed_scheduling: bool, ray_cluster) -> None:  # noqa: F811
+def test_out_of_sync(nb_nodes: int, enable_distributed_scheduling: bool, ray_workflow) -> None:
     @ray.remote(max_retries=0)
     def head_script(enable_distributed_scheduling) -> None:
         """The head node checks that the values are correct"""
@@ -151,44 +137,35 @@ def test_out_of_sync(nb_nodes: int, enable_distributed_scheduling: bool, ray_clu
 
         d.execute_callbacks()
 
-    head_ref = head_script.remote(enable_distributed_scheduling)
-    wait_for_head_node()
-    port = pick_free_port()
-
-    worker_refs = []
-    worker_refs.append(
-        simple_worker.remote(
-            rank=0,
-            position=(0, 0),
-            chunks_per_dim=(1, 2),
-            chunk_size=(1, 1),
-            nb_iterations=NB_ITERATIONS,
-            node_id="node_0",
-            nb_nodes=nb_nodes,
-            port=port,
-            array_name=["A", "B"],
-        )
-    )
-    worker_refs.append(
-        simple_worker.remote(
-            rank=1,
-            position=(0, 1),
-            chunks_per_dim=(1, 2),
-            chunk_size=(1, 1),
-            nb_iterations=NB_ITERATIONS,
-            node_id="node_1",
-            nb_nodes=nb_nodes,
-            port=port,
-            array_name=["A", "B"],
-            _sleep_b4_send=5,
-        )
+    ray_workflow.start_head(head_script, enable_distributed_scheduling)
+    ray_workflow.start_simple_workers(
+        [
+            WorkerSpec(
+                rank=0,
+                position=(0, 0),
+                chunks_per_dim=(1, 2),
+                chunk_size=(1, 1),
+                nb_iterations=NB_ITERATIONS,
+                node_id="node_0",
+                nb_nodes=nb_nodes,
+                array_name=["A", "B"],
+            ),
+            WorkerSpec(
+                rank=1,
+                position=(0, 1),
+                chunks_per_dim=(1, 2),
+                chunk_size=(1, 1),
+                nb_iterations=NB_ITERATIONS,
+                node_id="node_1",
+                nb_nodes=nb_nodes,
+                array_name=["A", "B"],
+                sleep_before_send=0.25,
+            ),
+        ]
     )
 
-    ray.get([head_ref] + worker_refs)
-
-    # Check that the right number of scheduling actors were created
-    simulation_head = ray.get_actor("simulation_head", namespace="deisa_ray")
-    assert len(ray.get(simulation_head.list_scheduling_actors.remote())) == nb_nodes
+    ray_workflow.wait()
+    ray_workflow.assert_scheduling_actor_count(nb_nodes)
 
 
 # NOTE : As Expected This test tests something else :

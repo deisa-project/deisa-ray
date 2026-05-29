@@ -3,7 +3,7 @@ import pytest
 import ray
 
 from deisa.ray.types import DeisaArray
-from tests.utils import ray_cluster, simple_worker, wait_for_head_node, pick_free_port  # noqa: F401
+from tests.utils import WorkerSpec
 
 NB_ITERATIONS = 5
 START_ITERATION = 3
@@ -36,25 +36,20 @@ def head_script(enable_distributed_scheduling) -> None:
     "enable_distributed_scheduling",
     [False, True],
 )
-def test_start_any_timestep(enable_distributed_scheduling: bool, ray_cluster) -> None:  # noqa: F811
-    head_ref = head_script.remote(enable_distributed_scheduling)
-    wait_for_head_node()
-    port = pick_free_port()
-
-    worker_refs = []
-    for rank in range(4):
-        worker_refs.append(
-            simple_worker.remote(
-                rank=rank,
-                position=(rank // 2, rank % 2),
-                chunks_per_dim=(2, 2),
-                chunk_size=(1, 1),
-                nb_iterations=NB_ITERATIONS,
-                node_id=f"node_{rank}",
-                start_iteration=START_ITERATION,
-                nb_nodes=4,
-                port=port,
-            )
+def test_start_any_timestep(enable_distributed_scheduling: bool, ray_workflow) -> None:
+    ray_workflow.start_head(head_script, enable_distributed_scheduling)
+    ray_workflow.start_simple_workers(
+        WorkerSpec(
+            rank=rank,
+            position=(rank // 2, rank % 2),
+            chunks_per_dim=(2, 2),
+            chunk_size=(1, 1),
+            nb_iterations=NB_ITERATIONS,
+            node_id=f"node_{rank}",
+            start_iteration=START_ITERATION,
+            nb_nodes=4,
         )
+        for rank in range(4)
+    )
 
-    ray.get([head_ref] + worker_refs)
+    ray_workflow.wait()

@@ -1,3 +1,4 @@
+import os
 import time
 import pytest
 import ray
@@ -5,7 +6,7 @@ from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 from ray.cluster_utils import Cluster
 from deisa.ray.types import DeisaArray
 import torch.distributed as dist
-from tests.utils import pick_free_port
+from tests.utils import cleanup_deisa_actors, pick_free_port
 
 
 DIST_TIMEOUT_ERRORS = tuple(
@@ -20,6 +21,9 @@ DIST_TIMEOUT_ERRORS = tuple(
 
 @pytest.fixture
 def ray_multinode_cluster():
+    if ray.is_initialized():
+        ray.shutdown()
+
     cluster = Cluster(
         initialize_head=True,
         connect=False,
@@ -30,19 +34,22 @@ def ray_multinode_cluster():
     cluster.add_node(num_cpus=1)
     cluster.add_node(num_cpus=1)
 
+    os.environ["RAY_ADDRESS"] = cluster.address
     # Connect driver to this cluster (IMPORTANT)
     ray.init(
         address=cluster.address,
-        include_dashboard=False,
+        include_dashboard=True,
         log_to_driver=True,
         ignore_reinit_error=True,
     )
 
+    cleanup_deisa_actors()
     yield {
         "cluster": cluster,
         "address": cluster.address,
     }
 
+    cleanup_deisa_actors()
     ray.shutdown()
     cluster.shutdown()
 
@@ -50,17 +57,20 @@ def ray_multinode_cluster():
 NAMESPACE = "deisa_ray"
 
 
-@pytest.mark.parametrize("sleep_t", [15])
+@pytest.mark.parametrize("sleep_t", [1])
 def test_sim_start_first_and_analytics_can_start_after_x_secs(ray_multinode_cluster, sleep_t):
     port = pick_free_port()
     cluster = ray_multinode_cluster["cluster"]
     head_node_id = None
     worker_nodes = []
     alive_nodes = 5
-    while True:
+    deadline = time.monotonic() + 15
+    while time.monotonic() < deadline:
         alive = [n for n in ray.nodes() if n["Alive"]]
         if len(alive) == alive_nodes:
             break
+    else:
+        raise TimeoutError(f"Expected {alive_nodes} live Ray nodes")
 
     for node in cluster.list_all_nodes():
         if node.is_head():
@@ -72,11 +82,13 @@ def test_sim_start_first_and_analytics_can_start_after_x_secs(ray_multinode_clus
         max_retries=0,
         scheduling_strategy=NodeAffinitySchedulingStrategy(node_id=head_node_id, soft=False),
     )
-    def head_script() -> bool:
+    def head_script(head_node_id) -> bool:
         """The head node checks that the values are correct"""
+        import deisa.ray.utils as ray_utils
         from deisa.ray.types import Window
         from deisa.ray.window_handler import Deisa
 
+        ray_utils.get_head_node_id = lambda: head_node_id
         d = Deisa()
 
         def simulation_callback(array: list[DeisaArray]):
@@ -132,25 +144,28 @@ def test_sim_start_first_and_analytics_can_start_after_x_secs(ray_multinode_clus
 
     # submit analytics after sleep_t seconds
     time.sleep(sleep_t)
-    ref_analytics = head_script.remote()
+    ref_analytics = head_script.remote(head_node_id)
 
-    sim_res = ray.get(ref_sim)
+    sim_res = ray.get(ref_sim, timeout=120)
     for i, (n_id, _) in enumerate(sim_res):
         assert n_id == worker_nodes[i]
-    assert ray.get(ref_analytics)
+    assert ray.get(ref_analytics, timeout=120)
 
 
-@pytest.mark.parametrize("sleep_t", [15])
+@pytest.mark.parametrize("sleep_t", [1])
 def test_analytics_start_first_and_sim_can_start_after_x_secs(ray_multinode_cluster, sleep_t):
     port = pick_free_port()
     cluster = ray_multinode_cluster["cluster"]
     head_node_id = None
     worker_nodes = []
     alive_nodes = 5
-    while True:
+    deadline = time.monotonic() + 15
+    while time.monotonic() < deadline:
         alive = [n for n in ray.nodes() if n["Alive"]]
         if len(alive) == alive_nodes:
             break
+    else:
+        raise TimeoutError(f"Expected {alive_nodes} live Ray nodes")
 
     for node in cluster.list_all_nodes():
         if node.is_head():
@@ -162,11 +177,13 @@ def test_analytics_start_first_and_sim_can_start_after_x_secs(ray_multinode_clus
         max_retries=0,
         scheduling_strategy=NodeAffinitySchedulingStrategy(node_id=head_node_id, soft=False),
     )
-    def head_script() -> bool:
+    def head_script(head_node_id) -> bool:
         """The head node checks that the values are correct"""
+        import deisa.ray.utils as ray_utils
         from deisa.ray.types import Window
         from deisa.ray.window_handler import Deisa
 
+        ray_utils.get_head_node_id = lambda: head_node_id
         d = Deisa()
 
         def simulation_callback(array: list[DeisaArray]):
@@ -211,7 +228,7 @@ def test_analytics_start_first_and_sim_can_start_after_x_secs(ray_multinode_clus
         return b.node_id, f"sched-{b.node_id}"
 
     # submit analytics first
-    ref_analytics = head_script.remote()
+    ref_analytics = head_script.remote(head_node_id)
     time.sleep(sleep_t)
     # submit sim after sleep_t seconds
     ref_sim = []
@@ -222,10 +239,10 @@ def test_analytics_start_first_and_sim_can_start_after_x_secs(ray_multinode_clus
             )
         )
 
-    sim_res = ray.get(ref_sim)
+    sim_res = ray.get(ref_sim, timeout=120)
     for i, (n_id, _) in enumerate(sim_res):
         assert n_id == worker_nodes[i]
-    assert ray.get(ref_analytics)
+    assert ray.get(ref_analytics, timeout=120)
 
 
 def test_sim_raise_if_not_enough_bridges_connect(ray_multinode_cluster):
@@ -235,10 +252,13 @@ def test_sim_raise_if_not_enough_bridges_connect(ray_multinode_cluster):
         head_node_id = None
         worker_nodes = []
         alive_nodes = 5
-        while True:
+        deadline = time.monotonic() + 15
+        while time.monotonic() < deadline:
             alive = [n for n in ray.nodes() if n["Alive"]]
             if len(alive) == alive_nodes:
                 break
+        else:
+            raise TimeoutError(f"Expected {alive_nodes} live Ray nodes")
 
         for node in cluster.list_all_nodes():
             if node.is_head():
@@ -250,11 +270,13 @@ def test_sim_raise_if_not_enough_bridges_connect(ray_multinode_cluster):
             max_retries=0,
             scheduling_strategy=NodeAffinitySchedulingStrategy(node_id=head_node_id, soft=False),
         )
-        def head_script() -> bool:
+        def head_script(head_node_id) -> bool:
             """The head node checks that the values are correct"""
+            import deisa.ray.utils as ray_utils
             from deisa.ray.types import Window
             from deisa.ray.window_handler import Deisa
 
+            ray_utils.get_head_node_id = lambda: head_node_id
             d = Deisa()
 
             def simulation_callback(array: list[DeisaArray]):
@@ -285,7 +307,7 @@ def test_sim_raise_if_not_enough_bridges_connect(ray_multinode_cluster):
                     rank,
                     "127.0.0.1",
                     port,
-                    timeout_s=10,
+                    timeout_s=2,
                 )
                 b = Bridge(
                     arrays_metadata=arrays_md,
@@ -299,7 +321,7 @@ def test_sim_raise_if_not_enough_bridges_connect(ray_multinode_cluster):
             return b.node_id, f"sched-{b.node_id}"
 
         # submit analytics first
-        ref_analytics = head_script.remote()
+        ref_analytics = head_script.remote(head_node_id)
         # submit sim after sleep_t seconds
         ref_sim = []
 
@@ -311,10 +333,10 @@ def test_sim_raise_if_not_enough_bridges_connect(ray_multinode_cluster):
                 )
             )
 
-        sim_res = ray.get(ref_sim)
+        sim_res = ray.get(ref_sim, timeout=120)
         for i, (n_id, _) in enumerate(sim_res):
             assert n_id == worker_nodes[i]
-        assert ray.get(ref_analytics)
+        assert ray.get(ref_analytics, timeout=120)
 
 
 # # TODO use more specific timeoutError

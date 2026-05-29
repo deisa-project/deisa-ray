@@ -1,3 +1,5 @@
+import os
+
 import pytest
 import ray
 import dask.array as da
@@ -5,10 +7,14 @@ from ray.cluster_utils import Cluster
 import dask
 from ray.util.dask.scheduler import ray_dask_get
 import numpy as np
+from tests.utils import cleanup_deisa_actors
 
 
 @pytest.fixture
 def ray_multinode_cluster():
+    if ray.is_initialized():
+        ray.shutdown()
+
     cluster_node_ids = {
         "head": "f64704987dec54e6c20445dc6a063ad34de1cd777d5c7e0779d1100a",
         "node1": "f64704987dec54e6c20445dc6a063ad34de1cd777d5c7e0779d1100b",
@@ -27,15 +33,17 @@ def ray_multinode_cluster():
     cluster.add_node(num_cpus=1, env_vars={"RAY_OVERRIDE_NODE_ID_FOR_TESTING": cluster_node_ids["node1"]})
     cluster.add_node(num_cpus=1, env_vars={"RAY_OVERRIDE_NODE_ID_FOR_TESTING": cluster_node_ids["node2"]})
 
+    os.environ["RAY_ADDRESS"] = cluster.address
     # Connect driver to this cluster (IMPORTANT)
     ray.init(
         address=cluster.address,
-        include_dashboard=False,
+        include_dashboard=True,
         log_to_driver=True,
         ignore_reinit_error=True,
     )
 
     dask.config.set(scheduler=ray_dask_get)
+    cleanup_deisa_actors()
 
     yield {
         "cluster": cluster,
@@ -43,6 +51,7 @@ def ray_multinode_cluster():
         "address": cluster.address,
     }
 
+    cleanup_deisa_actors()
     dask.config.set(scheduler=None)
     ray.shutdown()
     cluster.shutdown()

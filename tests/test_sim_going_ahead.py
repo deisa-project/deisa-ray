@@ -4,7 +4,7 @@ import pytest
 import ray
 
 from deisa.ray.types import DeisaArray
-from tests.utils import ray_cluster, simple_worker, wait_for_head_node, pick_free_port  # noqa: F401
+from tests.utils import WorkerSpec
 
 NB_ITERATIONS = 5
 
@@ -23,7 +23,7 @@ def head_script(enable_distributed_scheduling, nb_nodes) -> None:
         if array[0].t == 0:
             # NOTE : With the way the current version of deisa handle sim go ahead,
             # sim can send 2 iterations before getting stuck waiting for analytics
-            time.sleep(10)
+            time.sleep(1)
         x = array[0].sum().compute()
         assert x == 10 * array[0].t
 
@@ -41,28 +41,23 @@ def head_script(enable_distributed_scheduling, nb_nodes) -> None:
         (4, False),
     ],
 )
-def test_sim_going_ahead(nb_nodes: int, enable_distributed_scheduling: bool, ray_cluster) -> None:  # noqa: F811
+def test_sim_going_ahead(nb_nodes: int, enable_distributed_scheduling: bool, ray_workflow) -> None:
     #
     # This test is only checking that despite simulation continue sending arrays
     # and at some point get stuck until analytics continue, the workflow is still working
     #
-    head_ref = head_script.remote(enable_distributed_scheduling, nb_nodes)
-    wait_for_head_node()
-    port = pick_free_port()
-
-    worker_refs = []
-    for rank in range(4):
-        worker_refs.append(
-            simple_worker.remote(
-                rank=rank,
-                position=(rank // 2, rank % 2),
-                chunks_per_dim=(2, 2),
-                chunk_size=(1, 1),
-                nb_iterations=NB_ITERATIONS,
-                node_id=f"node_{rank % nb_nodes}",
-                nb_nodes=nb_nodes,
-                port=port,
-            )
+    ray_workflow.start_head(head_script, enable_distributed_scheduling, nb_nodes)
+    ray_workflow.start_simple_workers(
+        WorkerSpec(
+            rank=rank,
+            position=(rank // 2, rank % 2),
+            chunks_per_dim=(2, 2),
+            chunk_size=(1, 1),
+            nb_iterations=NB_ITERATIONS,
+            node_id=f"node_{rank % nb_nodes}",
+            nb_nodes=nb_nodes,
         )
+        for rank in range(4)
+    )
 
-    ray.get([head_ref] + worker_refs)
+    ray_workflow.wait()

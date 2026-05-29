@@ -3,7 +3,7 @@ import pytest
 import ray
 
 from deisa.ray.types import DeisaArray
-from tests.utils import ray_cluster, simple_worker, wait_for_head_node, pick_free_port  # noqa: F401
+from tests.utils import WorkerSpec
 
 NB_ITERATIONS = 5
 
@@ -50,30 +50,25 @@ def head_script(enable_distributed_scheduling, dim_sq) -> None:
     "enable_distributed_scheduling",
     [True, False],
 )
-def test_multiple_callbacks(enable_distributed_scheduling: bool, ray_cluster) -> None:  # noqa: F811
+def test_multiple_callbacks(enable_distributed_scheduling: bool, ray_workflow) -> None:
     dim = 2
     dim_sq = dim * dim
-    head_ref = head_script.remote(enable_distributed_scheduling, dim_sq)
-    wait_for_head_node()
-    port = pick_free_port()
-
-    worker_refs = []
-    for rank in range(dim_sq):
-        worker_refs.append(
-            simple_worker.remote(
-                rank=rank,
-                position=(rank // dim, rank % dim),
-                chunks_per_dim=(dim, dim),
-                chunk_size=(1, 1),
-                nb_iterations=NB_ITERATIONS,
-                node_id=f"node_{rank}",
-                array_name=["array", "array1"],
-                nb_nodes=dim_sq,
-                port=port,
-            )
+    ray_workflow.start_head(head_script, enable_distributed_scheduling, dim_sq)
+    ray_workflow.start_simple_workers(
+        WorkerSpec(
+            rank=rank,
+            position=(rank // dim, rank % dim),
+            chunks_per_dim=(dim, dim),
+            chunk_size=(1, 1),
+            nb_iterations=NB_ITERATIONS,
+            node_id=f"node_{rank}",
+            array_name=["array", "array1"],
+            nb_nodes=dim_sq,
         )
+        for rank in range(dim_sq)
+    )
 
-    ray.get([head_ref] + worker_refs)
+    ray_workflow.wait()
 
 
 @ray.remote(max_retries=0)
@@ -109,27 +104,22 @@ def head_script2(enable_distributed_scheduling, dim_sq) -> None:
     "enable_distributed_scheduling",
     [True, False],
 )
-def test_multiple_callbacks_decorator(enable_distributed_scheduling: bool, ray_cluster) -> None:  # noqa: F811
+def test_multiple_callbacks_decorator(enable_distributed_scheduling: bool, ray_workflow) -> None:
     dim = 2
     dim_sq = dim * dim
-    head_ref = head_script.remote(enable_distributed_scheduling, dim_sq)
-    wait_for_head_node()
-    port = pick_free_port()
-
-    worker_refs = []
-    for rank in range(dim_sq):
-        worker_refs.append(
-            simple_worker.remote(
-                rank=rank,
-                position=(rank // dim, rank % dim),
-                chunks_per_dim=(dim, dim),
-                chunk_size=(1, 1),
-                nb_iterations=NB_ITERATIONS,
-                node_id=f"node_{rank}",
-                array_name=["array", "array1"],
-                nb_nodes=dim_sq,
-                port=port,
-            )
+    ray_workflow.start_head(head_script2, enable_distributed_scheduling, dim_sq)
+    ray_workflow.start_simple_workers(
+        WorkerSpec(
+            rank=rank,
+            position=(rank // dim, rank % dim),
+            chunks_per_dim=(dim, dim),
+            chunk_size=(1, 1),
+            nb_iterations=NB_ITERATIONS,
+            node_id=f"node_{rank}",
+            array_name=["array", "array1"],
+            nb_nodes=dim_sq,
         )
+        for rank in range(dim_sq)
+    )
 
-    ray.get([head_ref] + worker_refs)
+    ray_workflow.wait()

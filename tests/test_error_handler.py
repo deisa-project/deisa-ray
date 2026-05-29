@@ -60,7 +60,7 @@ def test_exception_handler_not_bypass_computation(enable_distributed_scheduling:
                 )
             )
 
-        ray.get([head_ref] + worker_refs)
+        ray.get([head_ref] + worker_refs, timeout=45)
 
 
 # TODO : To check Contract Error we need to re raise the exception in the _default_exception_handler but if we do that, Bridge crash.
@@ -89,7 +89,7 @@ def test_contract_error(enable_distributed_scheduling: bool, ray_cluster) -> Non
                 )
             )
 
-        ray.get([head_ref] + worker_refs)
+        ray.get([head_ref] + worker_refs, timeout=45)
 
 
 # @pytest.mark.parametrize(

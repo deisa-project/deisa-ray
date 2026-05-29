@@ -5,7 +5,7 @@ import pytest
 import ray
 
 from deisa.ray.types import DeisaArray
-from tests.utils import ray_cluster, simple_worker, wait_for_head_node, pick_free_port  # noqa: F401
+from tests.utils import RayWorkflowHarness, WorkerSpec, cleanup_deisa_actors, publish_current_ray_address
 
 NB_ITERATIONS = 100  # Should be enough to saturate the memory in case the chunks are not released
 
@@ -34,8 +34,14 @@ def head_script(enable_distributed_scheduling) -> None:
 def ray_spilling_cluster():
     spilling_path = f"/tmp/deisa_ray_spilling_test_{random.randint(0, 2**128 - 1)}"
 
-    ray.init(object_store_memory=100 * 1024 * 1024, object_spilling_directory=spilling_path)
+    if ray.is_initialized():
+        ray.shutdown()
+    os.environ.pop("RAY_ADDRESS", None)
+    ray.init(include_dashboard=True, object_store_memory=100 * 1024 * 1024, object_spilling_directory=spilling_path)
+    publish_current_ray_address()
+    cleanup_deisa_actors()
     yield spilling_path
+    cleanup_deisa_actors()
     ray.shutdown()
 
 
@@ -46,21 +52,21 @@ def test_memory_release(enable_distributed_scheduling, ray_spilling_cluster: str
     memory is not released correctly, the test will detect spilled objects on disk and
     fail.
     """
-    head_ref = head_script.remote(enable_distributed_scheduling)
-    wait_for_head_node()
-    port = pick_free_port()
-
-    worker = simple_worker.remote(
-        rank=0,
-        position=(0, 0),
-        chunks_per_dim=(1, 1),
-        chunk_size=(1024, 1024),
-        nb_iterations=NB_ITERATIONS,
-        nb_nodes=1,
-        port=port,
+    ray_workflow = RayWorkflowHarness(timeout_s=90)
+    ray_workflow.start_head(head_script, enable_distributed_scheduling)
+    ray_workflow.start_simple_workers(
+        [
+            WorkerSpec(
+                rank=0,
+                position=(0, 0),
+                chunks_per_dim=(1, 1),
+                chunk_size=(1024, 1024),
+                nb_iterations=NB_ITERATIONS,
+                nb_nodes=1,
+            )
+        ]
     )
-
-    ray.get([head_ref, worker])
+    ray_workflow.wait()
 
     # Make sure Ray didn't spill anything to disk
     total_size = 0  # in bytes

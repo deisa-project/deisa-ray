@@ -3,7 +3,7 @@ import pytest
 import ray
 
 from deisa.ray.types import DeisaArray
-from tests.utils import ray_cluster, simple_worker, wait_for_head_node, pick_free_port  # noqa: F401
+from tests.utils import WorkerSpec
 
 NB_ITERATIONS = 5
 
@@ -40,28 +40,20 @@ def head_script(enable_distributed_scheduling, nb_nodes) -> None:
         (4, False),
     ],
 )
-def test_deisa_ray(nb_nodes: int, enable_distributed_scheduling: bool, ray_cluster) -> None:  # noqa: F811
-    head_ref = head_script.remote(enable_distributed_scheduling, nb_nodes)
-    wait_for_head_node()
-    port = pick_free_port()
-
-    worker_refs = []
-    for rank in range(4):
-        worker_refs.append(
-            simple_worker.remote(
-                rank=rank,
-                position=(rank // 2, rank % 2),
-                chunks_per_dim=(2, 2),
-                chunk_size=(1, 1),
-                nb_iterations=NB_ITERATIONS,
-                node_id=f"node_{rank % nb_nodes}",
-                nb_nodes=nb_nodes,
-                port=port,
-            )
+def test_deisa_ray(nb_nodes: int, enable_distributed_scheduling: bool, ray_workflow) -> None:
+    ray_workflow.start_head(head_script, enable_distributed_scheduling, nb_nodes)
+    ray_workflow.start_simple_workers(
+        WorkerSpec(
+            rank=rank,
+            position=(rank // 2, rank % 2),
+            chunks_per_dim=(2, 2),
+            chunk_size=(1, 1),
+            nb_iterations=NB_ITERATIONS,
+            node_id=f"node_{rank % nb_nodes}",
+            nb_nodes=nb_nodes,
         )
+        for rank in range(4)
+    )
 
-    ray.get([head_ref] + worker_refs)
-
-    # Check that the right number of scheduling actors were created
-    simulation_head = ray.get_actor("simulation_head", namespace="deisa_ray")
-    assert len(ray.get(simulation_head.list_scheduling_actors.remote())) == nb_nodes
+    ray_workflow.wait()
+    ray_workflow.assert_scheduling_actor_count(nb_nodes)

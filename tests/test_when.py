@@ -3,14 +3,13 @@ import pytest
 import ray
 
 from deisa.ray.types import DeisaArray
-from tests.utils import wait_for_head_node  # noqa: F401
 import numpy as np
-from tests.utils import pick_free_port
+from tests.utils import WorkerSpec
 
 NB_ITERATIONS = 5
 
 
-@ray.remote(num_cpus=0, max_retries=0)
+@ray.remote(num_cpus=0, max_retries=0, max_calls=1)
 def strange_worker(
     *,
     rank: int,
@@ -103,15 +102,11 @@ def head_script(enable_distributed_scheduling, nb_nodes):
         (4, False),
     ],
 )
-def test_and_or_analytics_works_correctly(nb_nodes: int, enable_distributed_scheduling: bool, ray_cluster) -> None:  # noqa: F811
-    port = pick_free_port()
-    head_ref = head_script.remote(enable_distributed_scheduling, nb_nodes)
-    wait_for_head_node()
-
-    worker_refs = []
-    for rank in range(4):
-        worker_refs.append(
-            strange_worker.remote(
+def test_and_or_analytics_works_correctly(nb_nodes: int, enable_distributed_scheduling: bool, ray_workflow) -> None:
+    ray_workflow.start_head(head_script, enable_distributed_scheduling, nb_nodes)
+    ray_workflow.start_simple_workers(
+        (
+            WorkerSpec(
                 rank=rank,
                 position=(rank // 2, rank % 2),
                 chunks_per_dim=(2, 2),
@@ -119,15 +114,15 @@ def test_and_or_analytics_works_correctly(nb_nodes: int, enable_distributed_sche
                 nb_iterations=NB_ITERATIONS,
                 node_id=f"node_{rank % nb_nodes}",
                 nb_nodes=4,
-                port=port,
             )
-        )
+            for rank in range(4)
+        ),
+        worker=strange_worker,
+    )
 
-    results = ray.get([head_ref] + worker_refs)
+    results = ray_workflow.wait()
     or_count, and_count = results[0]
     assert or_count == 4
     assert and_count == 0
 
-    # Check that the right number of scheduling actors were created
-    simulation_head = ray.get_actor("simulation_head", namespace="deisa_ray")
-    assert len(ray.get(simulation_head.list_scheduling_actors.remote())) == nb_nodes
+    ray_workflow.assert_scheduling_actor_count(nb_nodes)
