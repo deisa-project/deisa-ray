@@ -1,6 +1,6 @@
 [project]
 name = "deisa-ray"
-version = "0.1.2"
+version = "0.1.3"
 description = "In Situ Analytics with Ray backend"
 requires-python = ">=3.12"
 readme = "README.md"
@@ -8,7 +8,6 @@ dependencies = [
     "dask[dataframe]==2025.5.0",
     "ray[default]>=2.48.0",
     "numpy",
-    "torch>=2.10.0",
     "h5py>=3.15.1",
     "zarr>=3.1.5",
     "xarray",
@@ -30,6 +29,7 @@ packages = ["src/deisa"]
 
 [dependency-groups]
 dev = [
+    "torch>=2.10.0",
     "ruff>=0.9.7,<0.10",
     "poethepoet>=0.32.2,<0.33",
     "pytest>=8.3.5,<9",
