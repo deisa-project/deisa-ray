@@ -29,9 +29,9 @@ actors to rendezvous, collect chunks, build Dask arrays, and execute Dask graphs
 close to the data.
 
 Bridges also use a communicator to coordinate with each other. Applications
-that already run under MPI can pass an MPI communicator directly; otherwise
-they can create a Gloo communicator with ``deisa.ray.comm.init_gloo_comm``
-before constructing the bridge. That communicator is used for fast, efficient
+that already run under MPI can pass an MPI communicator directly, which is the
+recommended path. Other applications can provide any communicator that
+implements ``deisa.core.ICommunicator``. That communicator is used for
 bridge-to-bridge coordination, including barriers and feedback broadcasts.
 
 Main imports
@@ -53,14 +53,9 @@ Simulation-side API
 
 .. code-block:: python
 
-    from deisa.ray.comm import init_gloo_comm
+    from mpi4py import MPI
 
-    comm = init_gloo_comm(
-        world_size,
-        rank,
-        master_address,
-        master_port,
-    )
+    comm = MPI.COMM_WORLD
     bridge = Bridge(
         arrays_metadata=arrays_metadata,
         comm=comm,
@@ -102,8 +97,8 @@ Arguments
     derived from ``comm.Get_rank()``. ``Bridge.get`` uses ``bcast`` so bridge
     ``0`` can query feedback once and share the result with all participating
     bridges. Passing an MPI communicator is the recommended option when the
-    simulation already has one; otherwise build a Gloo communicator with
-    ``deisa.ray.comm.init_gloo_comm`` before constructing the bridge.
+    simulation already has one. Non-MPI applications may pass any object that
+    implements ``deisa.core.ICommunicator``.
 
 ``_node_id``, ``scheduling_actor_cls``, ``_init_retries``
     Implementation and testing hooks. Normal users should not need them.
@@ -117,10 +112,8 @@ creates or reuses a detached scheduling actor on the local Ray node, registers
 the chunk metadata with that actor, waits for actor readiness, and finally
 enters a communicator barrier so all bridges start from a consistent point.
 
-If the default Gloo communicator is used and not all bridge processes connect
-before the timeout, construction raises the underlying torch distributed
-rendezvous error with extra context about the expected rank count and master
-address.
+If the communicator cannot synchronize all participating ranks, construction
+raises the underlying communicator error during the final barrier.
 
 ``Bridge.send``
 ^^^^^^^^^^^^^^^
@@ -495,7 +488,9 @@ Simulation:
 
 .. code-block:: python
 
-    comm = init_gloo_comm(world_size, rank, "127.0.0.1", 29500)
+    from mpi4py import MPI
+
+    comm = MPI.COMM_WORLD
     bridge = Bridge(
         arrays_metadata={
             "temperature": {

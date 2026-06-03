@@ -59,7 +59,7 @@ def simple_worker(
 ) -> None:
     """Worker node sending chunks of data"""
     from deisa.ray.bridge import Bridge
-    from deisa.ray.comm import init_gloo_comm
+    from tests.comm_utils import init_gloo_comm
 
     if isinstance(array_name, str):
         array_name = [array_name]
@@ -111,7 +111,7 @@ def simple_worker_error_test(
 ) -> None:
     """Worker node sending chunks of data"""
     from deisa.ray.bridge import Bridge
-    from deisa.ray.comm import init_gloo_comm
+    from tests.comm_utils import init_gloo_comm
 
     arrays_md = {
         array_name: {

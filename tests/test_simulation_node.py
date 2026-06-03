@@ -10,8 +10,9 @@ from ray.util.state import list_actors
 from deisa.ray.types import RayActorHandle
 from tests.stubs import StubSchedulingActor
 from deisa.ray.bridge import Bridge
-from deisa.ray.comm import MPICommAdapter, NoOpComm, TorchDistComm, init_gloo_comm
+from deisa.ray.comm import MPICommAdapter, NoOpComm
 from deisa.ray.validate import _validate_arrays_meta
+from tests.comm_utils import TorchDistComm, init_gloo_comm
 from tests.utils import pick_free_port
 
 

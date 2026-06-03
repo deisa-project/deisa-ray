@@ -27,7 +27,7 @@ def strange_worker(
 ) -> None:
     """Strange worker that sends nodes out of order!"""
     from deisa.ray.bridge import Bridge
-    from deisa.ray.comm import init_gloo_comm
+    from tests.comm_utils import init_gloo_comm
 
     if isinstance(array_name, str):
         array_name = [array_name]
