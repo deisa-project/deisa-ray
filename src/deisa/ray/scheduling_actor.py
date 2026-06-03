@@ -267,9 +267,10 @@ class NodeActorBase:
                 array_name, timestep, pos_to_ref, self.actor_id, array_timestep.dtype
             )
 
-            array_timestep.chunks_ready_future.set_result(True)
+            if not array_timestep.chunks_ready_future.done():
+                array_timestep.chunks_ready_future.set_result(True)
         else:
-            await array_timestep.chunks_ready_future.wait()
+            await array_timestep.chunks_ready_future
 
 
 @ray.remote
