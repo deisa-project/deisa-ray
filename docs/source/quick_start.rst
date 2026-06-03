@@ -53,7 +53,7 @@ The simulation creates one ``Bridge`` per participating rank and sends chunks.
 .. code-block:: python
 
     import numpy as np
-    from deisa.ray.bridge import Bridge
+    from deisa.ray import Bridge
 
     # 4 Bridges in total
     world_size = 4
@@ -98,7 +98,7 @@ standard Dask array methods directly, and ``DeisaArray.t`` is the timestep.
 
 .. code-block:: python
 
-    from deisa.ray.window_handler import Deisa
+    from deisa.ray import Deisa
     from deisa.ray.types import Window
 
     deisa = Deisa()
