@@ -1,60 +1,9 @@
-import datetime
-
-import torch.distributed as dist
 from deisa.core import ICommunicator
 
 try:
     from mpi4py import MPI as _MPI
 except ImportError:
     _MPI = None
-
-
-# TODO : Add test about comm size > declared wolrd size
-def init_gloo_comm(
-    world_size: int, rank: int, master_addr: str = "127.0.0.1", master_port: int = 29500, timeout_s: int = 120
-) -> ICommunicator:
-    """
-    Set up a Gloo communicator backed by a TCP store.
-
-    Parameters
-    ----------
-    world_size : int
-        Number of ranks participating in the communicator.
-    rank : int
-        Rank ID of the current process.
-    master_addr : str, optional
-        Hostname or IP address of the master rendezvous node. Defaults to
-        ``"127.0.0.1"``.
-    master_port : int, optional
-        Port of the master rendezvous node. Defaults to 29500.
-    timeout_s : int, optional
-        Timeout (seconds) for rendezvous setup. Defaults to 120.
-
-    Returns
-    -------
-    TorchDistComm
-        Wrapper around the initialized PyTorch process group.
-    """
-    timeout = datetime.timedelta(seconds=timeout_s)
-
-    # Rank 0 hosts the rendezvous store; everyone else connects.
-    store = dist.TCPStore(
-        host_name=master_addr,
-        port=master_port,
-        world_size=world_size,
-        is_master=(rank == 0),
-        timeout=timeout,
-        wait_for_workers=True,  # optional; OK to leave default
-    )
-
-    dist.init_process_group(
-        backend="gloo",
-        store=store,
-        world_size=world_size,
-        rank=rank,
-        timeout=timeout,
-    )
-    return TorchDistComm(rank=rank, world_size=world_size)
 
 
 def normalize_comm(comm) -> ICommunicator | None:
@@ -117,48 +66,6 @@ class MPICommAdapter(ICommunicator):
     def bcast(self, obj, root: int = 0):
         """Broadcast a Python object from ``root`` to all MPI ranks."""
         return self._comm.bcast(obj, root=root)
-
-
-class TorchDistComm(ICommunicator):
-    """Torch distributed communicator implementing the Comm protocol."""
-
-    def __init__(self, *, rank: int, world_size: int):
-        """
-        Initialize metadata for a torch distributed communicator.
-
-        Parameters
-        ----------
-        rank : int
-            Rank of the current process.
-        world_size : int
-            Total number of ranks in the communicator.
-        """
-        self.rank = rank
-        self.world_size = world_size
-
-    def Get_rank(self) -> int:
-        """Return this communicator rank."""
-        return self.rank
-
-    def Get_size(self) -> int:
-        """Return this communicator world size."""
-        return self.world_size
-
-    def gather(self, data, root: int = 0):
-        """Gather Python objects to ``root``."""
-        gathered = [None for _ in range(self.world_size)] if self.rank == root else None
-        dist.gather_object(data, gathered, dst=root)
-        return gathered
-
-    def barrier(self) -> None:
-        """Block until all Torch distributed ranks reach this barrier."""
-        dist.barrier()
-
-    def bcast(self, obj, root: int = 0):
-        """Broadcast a Python object from ``root`` to all Torch distributed ranks."""
-        objects = [obj]
-        dist.broadcast_object_list(objects, src=root)
-        return objects[0]
 
 
 class NoOpComm(ICommunicator):

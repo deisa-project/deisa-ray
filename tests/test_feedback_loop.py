@@ -192,7 +192,7 @@ def feedback_head() -> bool:
 @ray.remote(num_cpus=0, max_retries=0)
 def feedback_worker(*, rank: int, port: int) -> tuple[int, str, int]:
     from deisa.ray.bridge import Bridge
-    from deisa.ray.comm import init_gloo_comm
+    from tests.comm_utils import init_gloo_comm
 
     arrays_md = {
         "array": {

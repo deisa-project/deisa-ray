@@ -53,12 +53,10 @@ The simulation creates one ``Bridge`` per participating rank and sends chunks.
 .. code-block:: python
 
     import numpy as np
-    from deisa.ray.bridge import Bridge
+    from deisa.ray import Bridge
 
     # 4 Bridges in total
     world_size = 4
-    master_address = "127.0.0.1"  # localhost only works on a single machine
-    master_port = 29500
 
     # descriptio of arrays being shared
     arrays_md = {
@@ -73,14 +71,10 @@ The simulation creates one ``Bridge`` per participating rank and sends chunks.
         }
     }
 
-    from deisa.ray.comm import init_gloo_comm
+    from mpi4py import MPI
 
-    comm = init_gloo_comm(
-        world_size,
-        rank,
-        master_address,
-        master_port,
-    )
+    comm = MPI.COMM_WORLD
+    assert comm.Get_size() == world_size
 
     # this call should be repeated 4 times with a different rank
     bridge = Bridge(
@@ -104,7 +98,7 @@ standard Dask array methods directly, and ``DeisaArray.t`` is the timestep.
 
 .. code-block:: python
 
-    from deisa.ray.window_handler import Deisa
+    from deisa.ray import Deisa
     from deisa.ray.types import Window
 
     deisa = Deisa()

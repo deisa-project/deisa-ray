@@ -93,7 +93,7 @@ def test_sim_start_first_and_analytics_can_start_after_x_secs(ray_multinode_clus
     @ray.remote
     def start_sim(rank, chunk_pos, port):
         from deisa.ray.bridge import Bridge
-        from deisa.ray.comm import init_gloo_comm
+        from tests.comm_utils import init_gloo_comm
 
         arrays_md = {
             "array": {
@@ -183,7 +183,7 @@ def test_analytics_start_first_and_sim_can_start_after_x_secs(ray_multinode_clus
     @ray.remote
     def start_sim(rank, chunk_pos, port):
         from deisa.ray.bridge import Bridge
-        from deisa.ray.comm import init_gloo_comm
+        from tests.comm_utils import init_gloo_comm
 
         arrays_md = {
             "array": {
@@ -270,7 +270,7 @@ def test_sim_raise_if_not_enough_bridges_connect(ray_multinode_cluster):
         @ray.remote
         def start_sim(rank, chunk_pos, port):
             from deisa.ray.bridge import Bridge
-            from deisa.ray.comm import init_gloo_comm
+            from tests.comm_utils import init_gloo_comm
 
             arrays_md = {
                 "array": {
