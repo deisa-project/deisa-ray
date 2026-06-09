@@ -1,5 +1,4 @@
 import os
-import pytest
 import ray
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 from tests.stubs import StubSchedulingActor
@@ -7,62 +6,19 @@ from deisa.ray.bridge import Bridge
 from deisa.ray.comm import NoOpComm
 from ray.util.state import list_actors
 from deisa.ray.types import DeisaArray
-from ray.cluster_utils import Cluster
-from tests.utils import pick_free_port, wait_for_head_node
+from tests.utils import (
+    pick_free_port,
+    ray_multinode_cluster,  # noqa: F401
+    start_ray_multinode_cluster,
+    wait_for_head_node,
+)
 from deisa.ray.utils import DEISA_HEAD_ACTOR_NAME, DEISA_NAMESPACE
-
-# 1 head node + 2 worker nodes
-def _start_ray_multinode_cluster(head_node_gcs_server_port: int) -> Cluster:
-    cluster = Cluster(
-        initialize_head=True,
-        connect=False,
-        head_node_args={
-            "num_cpus": 1,
-            "gcs_server_port": head_node_gcs_server_port,
-            "dashboard_port": pick_free_port(),
-        },
-    )
-    cluster.add_node(num_cpus=1)
-    cluster.add_node(num_cpus=1)
-    return cluster
-
-
-@pytest.fixture
-def head_node_gcs_server_port() -> int:
-    return pick_free_port()
-
-
-@pytest.fixture
-def ray_multinode_cluster(head_node_gcs_server_port: int, monkeypatch):
-    cluster = _start_ray_multinode_cluster(head_node_gcs_server_port)
-    monkeypatch.setenv("DEISA_RAY_ADDRESS", cluster.address)
-    monkeypatch.setenv("RAY_ADDRESS", cluster.address)
-
-    ray.init(
-        address=cluster.address,
-        include_dashboard=False,
-        log_to_driver=True,
-        ignore_reinit_error=True,
-        runtime_env={
-            "env_vars": {
-                "DEISA_RAY_ADDRESS": cluster.address,
-                "RAY_ADDRESS": cluster.address,
-            }
-        },
-    )
-
-    yield {
-        "cluster": cluster,
-    }
-
-    ray.shutdown()
-    cluster.shutdown()
 
 
 def test_ray_multinode_clusters_can_start_in_parallel():
     clusters = [
-        _start_ray_multinode_cluster(pick_free_port()),
-        _start_ray_multinode_cluster(pick_free_port()),
+        start_ray_multinode_cluster(head_node_gcs_server_port=pick_free_port()),
+        start_ray_multinode_cluster(head_node_gcs_server_port=pick_free_port()),
     ]
 
     try:
@@ -86,7 +42,7 @@ def head_script(enable_distributed_scheduling: bool = False) -> None:
         return True
 
 @ray.remote
-def make_client_and_return_ids(rank):
+def bridge_script(rank):
     arrays_md = {
         "array": {
             "global_shape": (1, 2),
@@ -143,7 +99,7 @@ def test_actor_placement(ray_multinode_cluster):
     nodes_to_actor = []
     for i, node in enumerate(worker_node_ids):
         nodes_to_actor.append(ray.get(
-            make_client_and_return_ids.options(
+            bridge_script.options(
                 scheduling_strategy=NodeAffinitySchedulingStrategy(
                     node_id=node, soft=False)
                 ).remote(i)
