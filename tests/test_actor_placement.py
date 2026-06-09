@@ -8,19 +8,33 @@ from deisa.ray.comm import NoOpComm
 from ray.util.state import list_actors
 from deisa.ray.types import DeisaArray
 from ray.cluster_utils import Cluster
-from tests.utils import wait_for_head_node
+from tests.utils import pick_free_port, wait_for_head_node
 from deisa.ray.utils import DEISA_HEAD_ACTOR_NAME, DEISA_NAMESPACE
 
 # 1 head node + 2 worker nodes
-@pytest.fixture
-def ray_multinode_cluster():
+def _start_ray_multinode_cluster(head_node_gcs_server_port: int) -> Cluster:
     cluster = Cluster(
         initialize_head=True,
         connect=False,
-        head_node_args={"num_cpus": 1},
+        head_node_args={
+            "num_cpus": 1,
+            "gcs_server_port": head_node_gcs_server_port,
+            "dashboard_port": pick_free_port(),
+        },
     )
     cluster.add_node(num_cpus=1)
     cluster.add_node(num_cpus=1)
+    return cluster
+
+
+@pytest.fixture
+def head_node_gcs_server_port() -> int:
+    return pick_free_port()
+
+
+@pytest.fixture
+def ray_multinode_cluster(head_node_gcs_server_port: int):
+    cluster = _start_ray_multinode_cluster(head_node_gcs_server_port)
 
     ray.init(
         address=cluster.address,
@@ -35,6 +49,20 @@ def ray_multinode_cluster():
 
     ray.shutdown()
     cluster.shutdown()
+
+
+def test_ray_multinode_clusters_can_start_in_parallel():
+    clusters = [
+        _start_ray_multinode_cluster(pick_free_port()),
+        _start_ray_multinode_cluster(pick_free_port()),
+    ]
+
+    try:
+        addresses = [cluster.address for cluster in clusters]
+        assert len(set(addresses)) == len(addresses)
+    finally:
+        for cluster in clusters:
+            cluster.shutdown()
 
 @ray.remote
 def head_script(enable_distributed_scheduling: bool = False) -> None:

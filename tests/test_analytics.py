@@ -5,6 +5,7 @@ from ray.cluster_utils import Cluster
 import dask
 from ray.util.dask.scheduler import ray_dask_get
 import numpy as np
+from tests.utils import pick_free_port
 
 
 @pytest.fixture
@@ -20,6 +21,8 @@ def ray_multinode_cluster():
         connect=False,
         head_node_args={
             "num_cpus": 1,
+            "gcs_server_port": pick_free_port(),
+            "dashboard_port": pick_free_port(),
             "env_vars": {"RAY_OVERRIDE_NODE_ID_FOR_TESTING": cluster_node_ids["head"]},
         },
     )

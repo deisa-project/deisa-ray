@@ -9,6 +9,7 @@ from deisa.ray.head_node import HeadNodeActor
 from deisa.ray.scheduling_actor import SchedulingActor
 from deisa.ray.types import ScheduledByOtherActor
 from deisa.ray.utils import get_head_actor_options
+from tests.utils import pick_free_port
 
 
 @pytest.fixture
@@ -32,6 +33,8 @@ def ray_three_node_cluster() -> dict[str, Any]:
         connect=False,
         head_node_args={
             "num_cpus": 1,
+            "gcs_server_port": pick_free_port(),
+            "dashboard_port": pick_free_port(),
             "env_vars": {"RAY_OVERRIDE_NODE_ID_FOR_TESTING": cluster_node_ids["head"]},
         },
     )

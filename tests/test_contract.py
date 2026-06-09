@@ -23,7 +23,11 @@ def ray_multinode_cluster():
     cluster = Cluster(
         initialize_head=True,
         connect=False,
-        head_node_args={"num_cpus": 1},
+        head_node_args={
+            "num_cpus": 1,
+            "gcs_server_port": pick_free_port(),
+            "dashboard_port": pick_free_port(),
+        },
     )
     cluster.add_node(num_cpus=1)
     cluster.add_node(num_cpus=1)
