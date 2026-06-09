@@ -1,3 +1,4 @@
+import os
 import random
 import time
 from typing import Dict, Any
@@ -6,6 +7,22 @@ from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 
 DEISA_HEAD_ACTOR_NAME = "simulation_head"
 DEISA_NAMESPACE = "deisa_ray"
+
+
+def get_ray_address() -> str | None:
+    """
+    Return the explicit Ray address for the current process when available.
+
+    Ray's local autodiscovery is process-global and can see clusters started by
+    other pytest-xdist workers. Prefer explicit addresses so state API calls and
+    lazy ray.init() connect to the cluster this process is already using.
+    """
+    address = os.environ.get("DEISA_RAY_ADDRESS") or os.environ.get("RAY_ADDRESS")
+    if address:
+        return address
+    if ray.is_initialized():
+        return ray.get_runtime_context().gcs_address
+    return None
 
 def get_node_actor_options(name: str, namespace: str) -> Dict[str, Any]:
     """Return Ray options used to create (or get) a node scheduling actor.
@@ -119,7 +136,10 @@ def get_head_node_id() -> str:
     """
     from ray.util import state
 
-    nodes = state.list_nodes(filters=[("is_head_node", "=", True)])
+    nodes = state.list_nodes(
+        address=get_ray_address(),
+        filters=[("is_head_node", "=", True)],
+    )
 
     assert len(nodes) == 1, "There should be exactly one head node"
 

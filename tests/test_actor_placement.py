@@ -33,14 +33,22 @@ def head_node_gcs_server_port() -> int:
 
 
 @pytest.fixture
-def ray_multinode_cluster(head_node_gcs_server_port: int):
+def ray_multinode_cluster(head_node_gcs_server_port: int, monkeypatch):
     cluster = _start_ray_multinode_cluster(head_node_gcs_server_port)
+    monkeypatch.setenv("DEISA_RAY_ADDRESS", cluster.address)
+    monkeypatch.setenv("RAY_ADDRESS", cluster.address)
 
     ray.init(
         address=cluster.address,
         include_dashboard=False,
         log_to_driver=True,
         ignore_reinit_error=True,
+        runtime_env={
+            "env_vars": {
+                "DEISA_RAY_ADDRESS": cluster.address,
+                "RAY_ADDRESS": cluster.address,
+            }
+        },
     )
 
     yield {
@@ -97,7 +105,10 @@ def make_client_and_return_ids(rank):
 
 
 def node_id_of_actor(name: str) -> str:
-    for a in list_actors(filters=[("state", "=", "ALIVE")]):
+    for a in list_actors(
+        address=ray.get_runtime_context().gcs_address,
+        filters=[("state", "=", "ALIVE")],
+    ):
         if a.get("name") == name and a.get("ray_namespace") == DEISA_NAMESPACE:
             # Newer Ray: address.node_id; older: may differ slightly
             nid = a.get("node_id")

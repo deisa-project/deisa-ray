@@ -13,7 +13,7 @@ from tests.utils import pick_free_port
 
 
 @pytest.fixture
-def ray_three_node_cluster() -> dict[str, Any]:
+def ray_three_node_cluster(monkeypatch) -> dict[str, Any]:
     """
     Start a three-node Ray cluster for scheduling-actor tests.
 
@@ -42,11 +42,20 @@ def ray_three_node_cluster() -> dict[str, Any]:
     cluster.add_node(num_cpus=1, env_vars={"RAY_OVERRIDE_NODE_ID_FOR_TESTING": cluster_node_ids["node1"]})
     cluster.add_node(num_cpus=1, env_vars={"RAY_OVERRIDE_NODE_ID_FOR_TESTING": cluster_node_ids["node2"]})
 
+    monkeypatch.setenv("DEISA_RAY_ADDRESS", cluster.address)
+    monkeypatch.setenv("RAY_ADDRESS", cluster.address)
+
     ray.init(
         address=cluster.address,
         include_dashboard=False,
         log_to_driver=True,
         ignore_reinit_error=True,
+        runtime_env={
+            "env_vars": {
+                "DEISA_RAY_ADDRESS": cluster.address,
+                "RAY_ADDRESS": cluster.address,
+            }
+        },
     )
 
     yield {"cluster": cluster, "ids": cluster_node_ids}

@@ -19,7 +19,7 @@ DIST_TIMEOUT_ERRORS = tuple(
 
 
 @pytest.fixture
-def ray_multinode_cluster():
+def ray_multinode_cluster(monkeypatch):
     cluster = Cluster(
         initialize_head=True,
         connect=False,
@@ -34,12 +34,21 @@ def ray_multinode_cluster():
     cluster.add_node(num_cpus=1)
     cluster.add_node(num_cpus=1)
 
+    monkeypatch.setenv("DEISA_RAY_ADDRESS", cluster.address)
+    monkeypatch.setenv("RAY_ADDRESS", cluster.address)
+
     # Connect driver to this cluster (IMPORTANT)
     ray.init(
         address=cluster.address,
         include_dashboard=False,
         log_to_driver=True,
         ignore_reinit_error=True,
+        runtime_env={
+            "env_vars": {
+                "DEISA_RAY_ADDRESS": cluster.address,
+                "RAY_ADDRESS": cluster.address,
+            }
+        },
     )
 
     yield {
@@ -319,20 +328,3 @@ def test_sim_raise_if_not_enough_bridges_connect(ray_multinode_cluster):
         for i, (n_id, _) in enumerate(sim_res):
             assert n_id == worker_nodes[i]
         assert ray.get(ref_analytics)
-
-
-# # TODO use more specific timeoutError
-# def test_sim_exits_if_analytics_dont_start(ray_multinode_cluster):
-#     ids = ray_multinode_cluster["ids"]
-#     worker_node_id = ids["node1"]
-#
-#     # test that client creation resilient to head actor taking a long time to start
-#     @ray.remote(
-#         scheduling_strategy=NodeAffinitySchedulingStrategy(node_id=worker_node_id, soft=False),
-#     )
-#     def make_client_and_return_ids():
-#         c = Bridge(_node_id=None, _init_retries=1)  # type:ignore
-#         return (c.node_id, f"sched-{c.node_id}")
-#
-#     with pytest.raises(Exception):
-#         ray.get(make_client_and_return_ids.remote())

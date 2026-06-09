@@ -9,7 +9,7 @@ from tests.utils import pick_free_port
 
 
 @pytest.fixture
-def ray_multinode_cluster():
+def ray_multinode_cluster(monkeypatch):
     cluster_node_ids = {
         "head": "f64704987dec54e6c20445dc6a063ad34de1cd777d5c7e0779d1100a",
         "node1": "f64704987dec54e6c20445dc6a063ad34de1cd777d5c7e0779d1100b",
@@ -30,12 +30,21 @@ def ray_multinode_cluster():
     cluster.add_node(num_cpus=1, env_vars={"RAY_OVERRIDE_NODE_ID_FOR_TESTING": cluster_node_ids["node1"]})
     cluster.add_node(num_cpus=1, env_vars={"RAY_OVERRIDE_NODE_ID_FOR_TESTING": cluster_node_ids["node2"]})
 
+    monkeypatch.setenv("DEISA_RAY_ADDRESS", cluster.address)
+    monkeypatch.setenv("RAY_ADDRESS", cluster.address)
+
     # Connect driver to this cluster (IMPORTANT)
     ray.init(
         address=cluster.address,
         include_dashboard=False,
         log_to_driver=True,
         ignore_reinit_error=True,
+        runtime_env={
+            "env_vars": {
+                "DEISA_RAY_ADDRESS": cluster.address,
+                "RAY_ADDRESS": cluster.address,
+            }
+        },
     )
 
     dask.config.set(scheduler=ray_dask_get)

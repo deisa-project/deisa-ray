@@ -18,7 +18,7 @@ from deisa.ray.comm import normalize_comm
 from deisa.ray.errors import ContractError, _default_exception_handler
 from deisa.ray.scheduling_actor import SchedulingActor as _RealSchedulingActor
 from deisa.ray.types import RayActorHandle
-from deisa.ray.utils import get_node_actor_options
+from deisa.ray.utils import get_node_actor_options, get_ray_address
 import sys
 
 logger = logging.getLogger(__name__)
@@ -161,7 +161,11 @@ class Bridge(IBridge):
             }
 
         if not ray.is_initialized():
-            ray.init(address="auto", log_to_driver=False, logging_level=logging.ERROR)
+            ray.init(
+                address=get_ray_address() or "auto",
+                log_to_driver=False,
+                logging_level=logging.ERROR,
+            )
 
         self.node_id = _node_id or ray.get_runtime_context().get_node_id()
         name = f"sched-{self.node_id}"
