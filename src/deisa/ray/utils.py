@@ -4,6 +4,8 @@ from typing import Dict, Any
 import ray
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 
+DEISA_HEAD_ACTOR_NAME = "simulation_head"
+DEISA_NAMESPACE = "deisa_ray"
 
 def get_node_actor_options(name: str, namespace: str) -> Dict[str, Any]:
     """Return Ray options used to create (or get) a node scheduling actor.
@@ -147,8 +149,8 @@ def get_head_actor_options() -> dict:
     """
     return dict(
         # The workers will be able to access to this actor using its name
-        name="simulation_head",
-        namespace="deisa_ray",
+        name=DEISA_HEAD_ACTOR_NAME,
+        namespace=DEISA_NAMESPACE,
         # Schedule the actor on this node
         scheduling_strategy=NodeAffinitySchedulingStrategy(
             node_id=get_head_node_id(),

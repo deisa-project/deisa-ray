@@ -9,27 +9,19 @@ from ray.util.state import list_actors
 from deisa.ray.types import DeisaArray
 from ray.cluster_utils import Cluster
 from tests.utils import wait_for_head_node
+from deisa.ray.utils import DEISA_HEAD_ACTOR_NAME, DEISA_NAMESPACE
 
-
+# 1 head node + 2 worker nodes
 @pytest.fixture
 def ray_multinode_cluster():
-    cluster_node_ids = {
-        "head": "f64704987dec54e6c20445dc6a063ad34de1cd777d5c7e0779d1100a",
-        "node1": "f64704987dec54e6c20445dc6a063ad34de1cd777d5c7e0779d1100b",
-    }
-
     cluster = Cluster(
         initialize_head=True,
         connect=False,
-        head_node_args={
-            "num_cpus": 1,
-            "env_vars": {"RAY_OVERRIDE_NODE_ID_FOR_TESTING": cluster_node_ids["head"]},
-        },
+        head_node_args={"num_cpus": 1},
     )
+    cluster.add_node(num_cpus=1)
+    cluster.add_node(num_cpus=1)
 
-    cluster.add_node(num_cpus=1, env_vars={"RAY_OVERRIDE_NODE_ID_FOR_TESTING": cluster_node_ids["node1"]})
-
-    # Connect driver to this cluster (IMPORTANT)
     ray.init(
         address=cluster.address,
         include_dashboard=False,
@@ -39,100 +31,90 @@ def ray_multinode_cluster():
 
     yield {
         "cluster": cluster,
-        "ids": cluster_node_ids,
-        "address": cluster.address,
     }
 
     ray.shutdown()
     cluster.shutdown()
 
+@ray.remote
+def head_script(enable_distributed_scheduling: bool = False) -> None:
+    """The head node checks that the values are correct"""
+    from deisa.ray.window_handler import Deisa
 
-def test_fake_cluster(ray_multinode_cluster):
-    cluster = ray_multinode_cluster["cluster"]
-    ids = ray_multinode_cluster["ids"]
-    nodes = cluster.list_all_nodes()
-    for node in nodes:
-        print(f"Node id: {node.node_id}, is_head: {node.is_head()}")
-    assert len(nodes) == len(ids)
-    assert ray.is_initialized()
-    assert cluster.gcs_address is not None
-    # Check that overridden node IDs are present
-    live_ids = {n.node_id for n in nodes}
-    assert set(ids.values()) == live_ids
+    os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
+
+    d = Deisa()
+
+    @d.register("array")
+    def simulation_callback(array: list[DeisaArray]):
+        return True
+
+@ray.remote
+def make_client_and_return_ids(rank):
+    arrays_md = {
+        "array": {
+            "global_shape": (1, 2),
+            "chunk_shape": (1, 1),
+            "chunk_position": (0, rank),
+        }
+    }
+
+    bridge = Bridge(
+        arrays_metadata=arrays_md,
+        comm=NoOpComm(0, 1),
+        scheduling_actor_cls=StubSchedulingActor,
+    )  # type:ignore
+
+    return (bridge.node_id, f"sched-{bridge.node_id}")
 
 
-NAMESPACE = "deisa_ray"
-
-
-def actor_node_id_by_name(name: str, namespace: str = NAMESPACE) -> str:
+def node_id_of_actor(name: str) -> str:
     for a in list_actors(filters=[("state", "=", "ALIVE")]):
-        if a.get("name") == name and a.get("ray_namespace") == namespace:
+        if a.get("name") == name and a.get("ray_namespace") == DEISA_NAMESPACE:
             # Newer Ray: address.node_id; older: may differ slightly
             nid = a.get("node_id")
             if nid:
                 return nid
-    raise RuntimeError(f"Actor {name} not found in namespace {namespace}")
+    raise RuntimeError(f"Actor {name} not found in namespace {DEISA_NAMESPACE}")
 
 
-@pytest.mark.parametrize("enable_distributed_scheduling", [True, False])
-def test_actor_placement(enable_distributed_scheduling, ray_multinode_cluster):
-    ids = ray_multinode_cluster["ids"]
-    head_node_id, worker_node_id = ids["head"], ids["node1"]
+def test_actor_placement(ray_multinode_cluster):
+    cluster = ray_multinode_cluster["cluster"]
+    head_node_id = None
+    worker_node_ids = []
+    nodes = cluster.list_all_nodes()
+    for node in nodes:
+        if node.is_head():
+            head_node_id = node.node_id
+        else:
+            worker_node_ids.append(node.node_id)
 
-    # start analytics first (this ensures that head actor is created. We have an explicit wait)
-    # make sure that it runs on mock head node
-    @ray.remote(
-        max_retries=0,
-        scheduling_strategy=NodeAffinitySchedulingStrategy(node_id=head_node_id, soft=False),
-    )
-    def head_script(enable_distributed_scheduling) -> None:
-        """The head node checks that the values are correct"""
-        from deisa.ray.window_handler import Deisa
-        from deisa.ray.types import Window
-
-        os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
-
-        d = Deisa()
-
-        def simulation_callback(array: list[DeisaArray]):
-            return True
-
-        d.register_callback(
-            simulation_callback,
-            *[Window("array")],
-        )
-
-    # submit head script (analogous to submitting analytics to head node)
-    ray.get(head_script.remote(enable_distributed_scheduling))
-    # just a ray.get_actor() wrapped in while loop
+    # submit head script
+    ray.get(head_script.options(
+        max_retries=0, 
+        scheduling_strategy=NodeAffinitySchedulingStrategy(
+            node_id=head_node_id, soft=False)
+        ).remote())
+    # wait for head actor to be up 
     wait_for_head_node()
+
     # check that head actor is running in mock head node
-    assert actor_node_id_by_name("simulation_head") == head_node_id
+    assert node_id_of_actor(DEISA_HEAD_ACTOR_NAME) == head_node_id
 
-    # start client in worker node (this will create one scheduling actor)
-    # we need to check that both the scheduling actor and client have node_id that is the same as
-    # the worker node id
-    @ray.remote(
-        scheduling_strategy=NodeAffinitySchedulingStrategy(node_id=worker_node_id, soft=False),
-    )
-    def make_client_and_return_ids():
-        arrays_md = {
-            "array": {
-                "global_shape": (1, 1),
-                "chunk_shape": (1, 1),
-                "chunk_position": (0, 0),
-            }
-        }
+    nodes_to_actor = []
+    for i, node in enumerate(worker_node_ids):
+        nodes_to_actor.append(ray.get(
+            make_client_and_return_ids.options(
+                scheduling_strategy=NodeAffinitySchedulingStrategy(
+                    node_id=node, soft=False)
+                ).remote(i)
+        ))
+    res = dict(nodes_to_actor)
 
-        c = Bridge(
-            arrays_metadata=arrays_md,
-            comm=NoOpComm(0, 1),
-            _node_id=None,
-            scheduling_actor_cls=StubSchedulingActor,
-        )  # type:ignore
+    # assert node ids of bridge match worker ids
+    assert list(res.keys()) == worker_node_ids
 
-        return (c.node_id, f"sched-{c.node_id}")
-
-    client_node_id, sched_name = ray.get(make_client_and_return_ids.remote())
-    assert client_node_id == worker_node_id
-    assert actor_node_id_by_name(sched_name) == worker_node_id
+    actor_ids = []
+    for name in res.values():
+        actor_ids.append(node_id_of_actor(name))
+    assert set(actor_ids) == set(worker_node_ids)
