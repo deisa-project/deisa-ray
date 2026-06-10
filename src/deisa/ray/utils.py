@@ -96,19 +96,16 @@ async def get_ready_actor_with_retry(name, namespace, deadline_s=180):
     The function uses exponential backoff with jitter for retries. The delay
     starts at 0.2 seconds and increases by a factor of 1.5 up to a maximum
     of 5.0 seconds. A small random jitter (0-0.1 seconds) is added to avoid
-    thundering herd problems.
+    thundering herd problems. The function more or less corresponds to 3 retries 
+    since each try times out after 60 seconds by default.
     """
     start, delay = time.time(), 0.2
     while True:
         try:
             actor = ray.get_actor(name=name, namespace=namespace)
-            # ready gate
-            # TODO for even more reliability, in the future we should handle
-            # actor exists, but unavailable
-            # actor exists, crashed, need to recreate
-            await actor.ready.remote()
+            await actor.ready.remote() # readyness gate
             return actor
-        except ValueError:
+        except Exception:
             if time.time() - start > deadline_s:
                 raise TimeoutError(f"{namespace}/{name} not found in {deadline_s}s")
             time.sleep(delay + random.random() * 0.1)

@@ -20,6 +20,7 @@ from deisa.ray.scheduling_actor import SchedulingActor as _RealSchedulingActor
 from deisa.ray.types import RayActorHandle
 from deisa.ray.utils import get_node_actor_options, get_ray_address
 import sys
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -146,13 +147,11 @@ class Bridge(IBridge):
         self.comm = comm
         self.bridge_id = self.comm.Get_rank()
 
-        # NOTE : Possible error : if two bridges have different first array it will have different
-        # shape and will be declared twice.
-        # Possible fix : do it somewhere else (Head or SchedulingActor)
-        # we add a special array with a name that will signal the end of the simulation
-        # note we only need the metadata so that it can pass through the entire pipeline correctly and
-        # in sequential order, so we just replicate the first metadata we have.
-
+        # TODO detect that rank0 exists aka that the special array "__deisa_last_iteration_array" 
+        # has been described. If this is not the case, raise an error. Otherwise analytics will never stop. 
+        # Since the logic is that after the barrier, we expect all bridges to have sent their metatadata
+        # and in finalize registration all scheduling actors send their described arrays to the head actor, 
+        # the check should happen there. 
         if self.bridge_id == 0:
             self.arrays_metadata["__deisa_last_iteration_array"] = {
                 "global_shape": (1, 1),
@@ -361,6 +360,8 @@ class Bridge(IBridge):
         for _ in range(max(1, self._init_retries)):
             try:
                 # first rank to arrive creates, others get same handle (get_if_exists)
+                # node actor waits up to 180 seconds for head actor to be created otherwise it raises a TimeoutError
+                # this means that 3 retries here corresponds to waiting up to 9 minutes for the head actor to be created 
                 self.node_actor: RayActorHandle = node_actor_cls.options(**node_actor_options).remote(
                     actor_id=self.node_id
                 )  # type: ignore

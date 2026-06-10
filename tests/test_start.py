@@ -6,6 +6,13 @@ from deisa.ray.types import DeisaArray
 import torch.distributed as dist
 from tests.utils import pick_free_port, ray_multinode_cluster
 
+# TODO check that all errors types that can be raised when the bridge is not properly initialized are correctly caught raised
+# for now we catch DistStoreError and DistNetworkError but should check that the other errors also happen correctly. 
+# needed tests: 
+# 1) RuntimeError if node actor cannot be created after N retries. 
+# 2) Value Error if comm is None
+# 3) Type Error if comm is not of type ICommunicator
+# 4) No rank0 raises an error
 
 DIST_TIMEOUT_ERRORS = tuple(
     err
