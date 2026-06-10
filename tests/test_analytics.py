@@ -26,12 +26,16 @@ def head_script(enable_distributed_scheduling: bool) -> None:
     def analytics_callback(array: list[DeisaArray]):
         d_arr = array[0]
 
+        # check persist works
+        d_arr_p = d_arr.persist()
+
         computed = d_arr.compute()
         print(f"analytics array = {computed}", flush=True)
         np.testing.assert_array_equal(computed, np.array([[1, 2]], dtype=np.int64))
 
         assert isinstance(d_arr.mean().compute(), float)
-        assert d_arr.mean().compute() == 1.5
+        # uses persisted array
+        assert d_arr_p.mean().compute() == 1.5
         assert d_arr.sum().compute() == 3
         assert d_arr.min().compute() == 1
         assert d_arr.max().compute() == 2
