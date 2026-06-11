@@ -43,15 +43,17 @@ def _get_ray_object_store_memory() -> tuple[int, int]:
     store_stats = internal_api.get_memory_info_reply(state).store_stats
     used_bytes = int(store_stats.object_store_bytes_used)
     total_bytes = int(store_stats.object_store_bytes_avail)
-
-    print(f"{used_bytes=}, {total_bytes=}")
     return used_bytes, total_bytes
 
 
 def _wait_for_object_store_memory(
     required_bytes: int,
-    poll_interval: float = 3.0,
+    poll_interval: float = 0.5,
     threshold: float = 0.6,
+    timeout_s: float | None = 100.0,
+    bridge_rank: int | None = None,
+    array_name: str | None = None,
+    timestep: int | None = None,
 ) -> None:
     """
     Block until Ray's object store has enough room for a new object.
@@ -60,6 +62,7 @@ def _wait_for_object_store_memory(
     usage after inserting the object is below ``threshold`` and currently free
     object store memory can hold ``required_bytes``.
     """
+    start_time = time.monotonic()
     while True:
         used_bytes, total_bytes = _get_ray_object_store_memory()
         free_bytes = max(total_bytes - used_bytes, 0)
@@ -71,9 +74,47 @@ def _wait_for_object_store_memory(
         if usage_ok and space_ok:
             return
 
+        elapsed_s = time.monotonic() - start_time
+        if timeout_s is not None and elapsed_s >= timeout_s:
+            message = (
+                "Insufficient Ray object store memory while bridge rank %s was sending chunk "
+                "array=%r timestep=%r after %.1fs: available=%.2f GB, used=%.1f%%, "
+                "projected_used=%.1f%%, needed=%.2f GB, threshold=%.1f%%"
+            )
+            logger.error(
+                message,
+                bridge_rank,
+                array_name,
+                timestep,
+                elapsed_s,
+                free_bytes / 1e9,
+                (100 * used_bytes / total_bytes) if total_bytes > 0 else 100,
+                100 * projected_usage,
+                required_bytes / 1e9,
+                100 * threshold,
+            )
+            raise MemoryError(
+                message
+                % (
+                    bridge_rank,
+                    array_name,
+                    timestep,
+                    elapsed_s,
+                    free_bytes / 1e9,
+                    (100 * used_bytes / total_bytes) if total_bytes > 0 else 100,
+                    100 * projected_usage,
+                    required_bytes / 1e9,
+                    100 * threshold,
+                )
+            )
+
         logger.info(
-            "Waiting for Ray object store memory before ray.put: available=%.2f GB, "
+            "Waiting for Ray object store memory before ray.put from bridge rank %s: "
+            "array=%r, timestep=%r, available=%.2f GB, "
             "used=%.1f%%, projected_used=%.1f%%, needed=%.2f GB",
+            bridge_rank,
+            array_name,
+            timestep,
             free_bytes / 1e9,
             (100 * used_bytes / total_bytes) if total_bytes > 0 else 100,
             100 * projected_usage,
@@ -104,6 +145,9 @@ class Bridge(IBridge):
         :class:`deisa.ray.scheduling_actor.SchedulingActor`.
     _init_retries : int, optional
         Number of attempts to create and ready the node actor. Defaults to 3.
+    object_store_memory_timeout_s : float or None, optional
+        Maximum time to wait for Ray object store memory before raising
+        ``MemoryError``. Defaults to 100 seconds. Set to ``None`` to wait forever.
 
     Attributes
     ----------
@@ -162,6 +206,9 @@ class Bridge(IBridge):
             Keys represent the name of the array while the values are
             dictionaries that must at least declare the metadata expected by
             :meth:`validate_arrays_meta`.
+        object_store_memory_timeout_s : float or None, optional
+            Maximum time to wait for Ray object store memory before raising
+            ``MemoryError``. Defaults to 100 seconds. Set to ``None`` to wait forever.
 
         Raises
         ------
@@ -186,12 +233,14 @@ class Bridge(IBridge):
         _node_id: str | None = kwargs.pop("_node_id", None)
         scheduling_actor_cls: ActorClass = kwargs.pop("scheduling_actor_cls", _RealSchedulingActor)
         _init_retries: int = kwargs.pop("_init_retries", 3)
+        object_store_memory_timeout_s: float | None = kwargs.pop("object_store_memory_timeout_s", 100.0)
         if kwargs:
             unexpected = next(iter(kwargs))
             raise TypeError(f"Bridge.__init__() got an unexpected keyword argument '{unexpected}'")
 
         self._init_retries = _init_retries
         self._closed = False
+        self.object_store_memory_timeout_s = object_store_memory_timeout_s
 
         self.arrays_metadata = copy.deepcopy(validate_arrays_metadata(arrays_metadata))
         if comm is None:
@@ -321,7 +370,13 @@ class Bridge(IBridge):
         try:
             chunk_dtype = chunk.dtype
             # Setting the owner allows keeping the reference when the simulation script terminates.
-            _wait_for_object_store_memory(_estimate_object_size_bytes(chunk))
+            _wait_for_object_store_memory(
+                _estimate_object_size_bytes(chunk),
+                bridge_rank=self.bridge_id,
+                array_name=array_name,
+                timestep=timestep,
+                timeout_s=self.object_store_memory_timeout_s,
+            )
             ref = ray.put(chunk, _owner=self.node_actor)
             future: ray.ObjectRef = self.node_actor.add_chunk.remote(
                 bridge_id=self.bridge_id,
@@ -334,6 +389,8 @@ class Bridge(IBridge):
             ray.get(future)
         except ContractError as e:
             raise e
+        except MemoryError:
+            raise
         except Exception as e:
             _default_exception_handler(e)
 
