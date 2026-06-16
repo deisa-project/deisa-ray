@@ -28,7 +28,10 @@ def head_script(enable_distributed_scheduling) -> None:
 
 
 @ray.remote(num_cpus=0, max_retries=0)
-def bridge_script(*, rank: int, port: int) -> None:
+def bridge_script(*, rank: int, port: int) -> str:
+    import io
+    import logging
+
     from deisa.ray.bridge import Bridge
     from tests.comm_utils import init_gloo_comm
 
@@ -52,7 +55,17 @@ def bridge_script(*, rank: int, port: int) -> None:
     for i in range(NB_ITERATIONS):
         bridge.send(array_name="array", chunk=i * array, timestep=i)
 
+    log_stream = io.StringIO()
+    handler = logging.StreamHandler(log_stream)
+    logger = logging.getLogger("deisa.ray.bridge")
+    previous_level = logger.level
+    logger.setLevel(logging.INFO)
+    logger.addHandler(handler)
     bridge.close(timestep=NB_ITERATIONS)
+    logger.removeHandler(handler)
+    logger.setLevel(previous_level)
+
+    return log_stream.getvalue()
 
 
 @pytest.mark.parametrize("enable_distributed_scheduling", (True, False))
@@ -85,7 +98,8 @@ def test_deisa_ray(enable_distributed_scheduling: bool, ray_multinode_cluster) -
         for rank in range(2)
     ]
 
-    ray.get([head_ref] + worker_refs)
+    results = ray.get([head_ref] + worker_refs)
+    assert any(f"Bridge 0 closed at timestep {NB_ITERATIONS}" in result for result in results[1:])
 
     # Check that the right number of scheduling actors were created
     simulation_head = ray.get_actor("simulation_head", namespace="deisa_ray")
