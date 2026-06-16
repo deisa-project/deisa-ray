@@ -1,79 +1,31 @@
-from typing import Any
-
-import pytest
 import ray
-from ray.cluster_utils import Cluster
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 
 from deisa.ray.head_node import HeadNodeActor
 from deisa.ray.scheduling_actor import SchedulingActor
 from deisa.ray.types import ScheduledByOtherActor
 from deisa.ray.utils import get_head_actor_options
-from tests.utils import pick_free_port
+from tests.utils import ray_multinode_cluster  # noqa: F401
 
 
-@pytest.fixture
-def ray_three_node_cluster(monkeypatch) -> dict[str, Any]:
-    """
-    Start a three-node Ray cluster for scheduling-actor tests.
-
-    Returns
-    -------
-    dict[str, Any]
-        Mapping containing the cluster handle and stable node IDs.
-    """
-    cluster_node_ids = {
-        "head": "f64704987dec54e6c20445dc6a063ad34de1cd777d5c7e0779d1100a",
-        "node1": "f64704987dec54e6c20445dc6a063ad34de1cd777d5c7e0779d1100b",
-        "node2": "f64704987dec54e6c20445dc6a063ad34de1cd777d5c7e0779d1100c",
-    }
-
-    cluster = Cluster(
-        initialize_head=True,
-        connect=False,
-        head_node_args={
-            "num_cpus": 1,
-            "gcs_server_port": pick_free_port(),
-            "dashboard_port": pick_free_port(),
-            "env_vars": {"RAY_OVERRIDE_NODE_ID_FOR_TESTING": cluster_node_ids["head"]},
-        },
-    )
-
-    cluster.add_node(num_cpus=1, env_vars={"RAY_OVERRIDE_NODE_ID_FOR_TESTING": cluster_node_ids["node1"]})
-    cluster.add_node(num_cpus=1, env_vars={"RAY_OVERRIDE_NODE_ID_FOR_TESTING": cluster_node_ids["node2"]})
-
-    monkeypatch.setenv("DEISA_RAY_ADDRESS", cluster.address)
-    monkeypatch.setenv("RAY_ADDRESS", cluster.address)
-
-    ray.init(
-        address=cluster.address,
-        include_dashboard=False,
-        log_to_driver=True,
-        ignore_reinit_error=True,
-        runtime_env={
-            "env_vars": {
-                "DEISA_RAY_ADDRESS": cluster.address,
-                "RAY_ADDRESS": cluster.address,
-            }
-        },
-    )
-
-    yield {"cluster": cluster, "ids": cluster_node_ids}
-
-    ray.shutdown()
-    cluster.shutdown()
-
-
-def test_cross_actor_graph_no_deadlock(ray_three_node_cluster: dict[str, Any]) -> None:
+def test_cross_actor_graph_no_deadlock(ray_multinode_cluster) -> None:
     """
     Validate that cyclic cross-actor scheduling resolves without deadlock.
 
     Parameters
     ----------
-    ray_three_node_cluster : dict[str, Any]
+    ray_multinode_cluster : dict[str, Any]
         Cluster fixture with node IDs and a connected driver.
     """
-    node_ids = ray_three_node_cluster["ids"]
+    worker_node_ids = []
+    for node in ray_multinode_cluster["cluster"].list_all_nodes():
+        if not node.is_head():
+            worker_node_ids.append(node.node_id)
+
+    node_ids = {
+        "node1": worker_node_ids[0],
+        "node2": worker_node_ids[1],
+    }
 
     head = HeadNodeActor.options(**get_head_actor_options()).remote()
     ray.get(head.ready.remote())
