@@ -9,7 +9,7 @@ import sys
 
 import pytest
 
-from tests.utils import ray_cluster  # noqa: F401
+from tests.utils import ray_multinode_cluster  # noqa: F401
 
 
 def _build_mpi_command(launcher: str, runner: pathlib.Path) -> list[str]:
@@ -37,16 +37,65 @@ def _build_mpi_command(launcher: str, runner: pathlib.Path) -> list[str]:
 
     if pathlib.Path(launcher).name in {"mpirun", "mpiexec"}:
         command.append("--oversubscribe")
+        command.extend(
+            [
+                "-x",
+                "LD_LIBRARY_PATH",
+                "-x",
+                "MPI4PY_LIBMPI",
+                "-x",
+                "DEISA_RAY_ADDRESS",
+                "-x",
+                "PYTHONUNBUFFERED",
+                "-x",
+                "PYTHONFAULTHANDLER",
+            ]
+        )
 
     command.extend(["-n", "4", sys.executable, str(runner)])
     return command
+
+
+def _launcher_lib_env(launcher: str, env: dict[str, str]) -> dict[str, str]:
+    lib_dir = pathlib.Path(launcher).resolve().parents[1] / "lib"
+    if not lib_dir.exists():
+        return {}
+
+    updates = {}
+
+    libmpi = lib_dir / "libmpi.so"
+    if libmpi.exists():
+        updates["MPI4PY_LIBMPI"] = str(libmpi)
+
+    current = env.get("LD_LIBRARY_PATH")
+    updates["LD_LIBRARY_PATH"] = str(lib_dir) if not current else f"{lib_dir}{os.pathsep}{current}"
+    return updates
+
+
+def _prepend_launcher_lib_path(env: dict[str, str], launcher: str) -> None:
+    env.update(_launcher_lib_env(launcher, env))
+
+
+@pytest.fixture
+def mpi_launcher_env(monkeypatch):
+    launcher = shutil.which("mpirun") or shutil.which("mpiexec")
+    if launcher is None:
+        return
+
+    for name, value in _launcher_lib_env(launcher, os.environ).items():
+        monkeypatch.setenv(name, value)
+
+
+@pytest.fixture
+def mpi_ray_multinode_cluster(mpi_launcher_env, ray_multinode_cluster):
+    return ray_multinode_cluster
 
 
 @pytest.mark.skipif(
     shutil.which("mpirun") is None and shutil.which("mpiexec") is None,
     reason="MPI launcher is not installed",
 )
-def test_deisa_ray_with_mpi_comm(ray_cluster) -> None:  # noqa: F811
+def test_deisa_ray_with_mpi_comm(mpi_ray_multinode_cluster) -> None:  # noqa: F811
     pytest.importorskip("mpi4py")
 
     launcher = shutil.which("mpirun") or shutil.which("mpiexec")
@@ -56,7 +105,8 @@ def test_deisa_ray_with_mpi_comm(ray_cluster) -> None:  # noqa: F811
     command = _build_mpi_command(launcher, runner)
     cwd = pathlib.Path(__file__).resolve().parents[1]
     env = os.environ.copy()
-    env["DEISA_RAY_ADDRESS"] = str(ray_cluster)
+    _prepend_launcher_lib_path(env, launcher)
+    env["DEISA_RAY_ADDRESS"] = mpi_ray_multinode_cluster["cluster"].address
     env["PYTHONUNBUFFERED"] = "1"
     env["PYTHONFAULTHANDLER"] = "1"
     result = subprocess.run(
@@ -77,6 +127,8 @@ def test_deisa_ray_with_mpi_comm(ray_cluster) -> None:  # noqa: F811
             f"cwd: {cwd}",
             f"returncode: {result.returncode}",
             f"DEISA_RAY_ADDRESS: {env['DEISA_RAY_ADDRESS']}",
+            f"LD_LIBRARY_PATH: {env.get('LD_LIBRARY_PATH', '<unset>')}",
+            f"MPI4PY_LIBMPI: {env.get('MPI4PY_LIBMPI', '<unset>')}",
             f"stdout:\n{stdout}",
             f"stderr:\n{stderr}",
         ]
