@@ -4,7 +4,7 @@ import ray
 import numpy as np
 
 from deisa.ray.bridge import Bridge
-from deisa.ray.comm import NoOpComm
+from tests.comm_utils import NoOpComm
 from tests.utils import ray_multinode_cluster, wait_for_head_node  # noqa: F401
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 

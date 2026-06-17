@@ -61,7 +61,7 @@ def test_bridge_zero_queries_head_actor_directly(monkeypatch) -> None:
     Test that the Bridge.get method queries the head actor directly for feedback, and not the node actors.
     """
     from deisa.ray.bridge import Bridge
-    from deisa.ray.comm import NoOpComm
+    from tests.comm_utils import NoOpComm
 
     bridge = Bridge.__new__(Bridge)
     bridge.bridge_id = 0
@@ -82,7 +82,7 @@ def test_bridge_zero_queries_head_actor_directly(monkeypatch) -> None:
 
 def test_bridge_get_returns_default_when_feedback_missing(monkeypatch) -> None:
     from deisa.ray.bridge import Bridge
-    from deisa.ray.comm import NoOpComm
+    from tests.comm_utils import NoOpComm
 
     bridge = Bridge.__new__(Bridge)
     bridge.bridge_id = 0

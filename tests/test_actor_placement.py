@@ -3,7 +3,7 @@ import ray
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 from tests.stubs import StubSchedulingActor
 from deisa.ray.bridge import Bridge
-from deisa.ray.comm import NoOpComm
+from tests.comm_utils import NoOpComm
 from ray.util.state import list_actors
 from deisa.ray.types import DeisaArray
 from tests.utils import (

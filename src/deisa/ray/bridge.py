@@ -14,16 +14,18 @@ import ray
 from ray.actor import ActorClass
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 from deisa.core import ICommunicator, IBridge, validate_arrays_metadata
-from deisa.ray.comm import normalize_comm
 from deisa.ray.errors import ContractError, _default_exception_handler
 from deisa.ray.scheduling_actor import SchedulingActor as _RealSchedulingActor
 from deisa.ray.types import RayActorHandle
 from deisa.ray.utils import get_node_actor_options, get_ray_address
 import sys
-import time
 
 logger = logging.getLogger(__name__)
 
+def _validate_comm(comm: Any) -> None:
+    required_methods = ("Get_rank", "Get_size", "gather", "bcast", "barrier")
+    if not all(callable(getattr(comm, method, None)) for method in required_methods):
+        raise TypeError("comm must implement deisa.core.ICommunicator")
 
 class Bridge(IBridge):
     """
@@ -37,8 +39,7 @@ class Bridge(IBridge):
     ----------
     comm : deisa.core.ICommunicator
         Communication backend for the simulation ranks. The bridge ID is
-        derived from ``comm.Get_rank()``. Raw ``mpi4py`` communicators are
-        wrapped in :class:`deisa.ray.comm.MPICommAdapter`.
+        derived from ``comm.Get_rank()``.
     arrays_metadata : Mapping[str, Mapping[str, Any]]
         Metadata describing the array layout managed by this bridge.
     _node_id : str or None, optional
@@ -100,8 +101,7 @@ class Bridge(IBridge):
         ----------
         comm : deisa.core.ICommunicator
             Communication backend to use. The unique bridge identifier is
-            derived from ``comm.Get_rank()``. Raw ``mpi4py`` communicators are
-            wrapped in :class:`deisa.ray.comm.MPICommAdapter`.
+            derived from ``comm.Get_rank()``.
         arrays_metadata : Dict[str, Dict]
             Dictionary that describes the arrays being shared by the simulation.
             Keys represent the name of the array while the values are
@@ -139,11 +139,9 @@ class Bridge(IBridge):
         self._closed = False
 
         self.arrays_metadata = copy.deepcopy(validate_arrays_metadata(arrays_metadata))
-        comm = normalize_comm(comm)
         if comm is None:
             raise ValueError("comm is required")
-        if not isinstance(comm, ICommunicator):
-            raise TypeError("comm must implement deisa.core.ICommunicator")
+        _validate_comm(comm)
         self.comm = comm
         self.bridge_id = self.comm.Get_rank()
 
