@@ -27,20 +27,16 @@ def test_dask_save_hdf5(fname, enable_distributed_scheduling, ray_cluster) -> No
     def head_script(fname, enable_distributed_scheduling) -> None:
         """The head node checks that the values are correct"""
         from deisa.ray.window_handler import Deisa
-        from deisa.ray.types import Window
 
         os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
 
         d = Deisa()
 
+        @d.register("array")
         def simulation_callback(array: list[DeisaArray]):
             if array[0].t == 5:
                 array[0].to_hdf5(fname, "data")
 
-        d.register_callback(
-            simulation_callback,
-            *[Window("array")],
-        )
         d.execute_callbacks()
 
     import h5py
@@ -101,19 +97,15 @@ def test_dask_save_several_timesteps_hdf5(fname, enable_distributed_scheduling, 
     def head_script(fname, enable_distributed_scheduling) -> None:
         """The head node checks that the values are correct"""
         from deisa.ray.window_handler import Deisa
-        from deisa.ray.types import Window
 
         os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
 
         d = Deisa()
 
+        @d.register("array")
         def simulation_callback(array: list[DeisaArray]):
             array[0].to_hdf5(fname, str(array[0].t))
 
-        d.register_callback(
-            simulation_callback,
-            *[Window("array")],
-        )
         d.execute_callbacks()
 
     import h5py
@@ -172,20 +164,17 @@ def test_dask_save_several_arrays_hdf5(fname, enable_distributed_scheduling, ray
     def head_script(fname, enable_distributed_scheduling) -> None:
         """The head node checks that the values are correct"""
         from deisa.ray.window_handler import Deisa
-        from deisa.ray.types import Window, to_hdf5
+        from deisa.ray.types import to_hdf5
 
         os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
 
         d = Deisa()
 
+        @d.register("a", "b")
         def simulation_callback(a: list[DeisaArray], b: list[DeisaArray]):
             if a[0].t == 5:
                 to_hdf5(fname, {"a": a[0], "b": b[0]})
 
-        d.register_callback(
-            simulation_callback,
-            *[Window("a"), Window("b")],
-        )
         d.execute_callbacks()
 
     import h5py
@@ -254,21 +243,17 @@ def test_dask_save_zarr(fname, enable_distributed_scheduling, ray_cluster) -> No
     def head_script(fname, enable_distributed_scheduling) -> None:
         """The head node checks that the values are correct"""
         from deisa.ray.window_handler import Deisa
-        from deisa.ray.types import Window
 
         os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
 
         d = Deisa()
 
+        @d.register("array")
         def simulation_callback(array: list[DeisaArray]):
             # If something that we are looking foward happens:
             if array[0].t == 5:
                 array[0].to_zarr(fname, component="data")
 
-        d.register_callback(
-            simulation_callback,
-            *[Window("array")],
-        )
         d.execute_callbacks()
 
     # Check in the correct place.
@@ -324,7 +309,6 @@ def test_dask_save_netcdf_xarray(fname, enable_distributed_scheduling, ray_clust
     def head_script(fname, enable_distributed_scheduling) -> None:
         """The head node checks that the values are correct"""
         from deisa.ray.window_handler import Deisa
-        from deisa.ray.types import Window
 
         import xarray as xr
 
@@ -332,16 +316,13 @@ def test_dask_save_netcdf_xarray(fname, enable_distributed_scheduling, ray_clust
 
         d = Deisa()
 
+        @d.register("array")
         def simulation_callback(array: list[DeisaArray]):
             if array[0].t == 5:
                 xarray_da = xr.DataArray(array[0], dims=["x", "y"], name="data").compute()
 
                 xarray_da.to_netcdf(fname)
 
-        d.register_callback(
-            simulation_callback,
-            *[Window("array")],
-        )
         d.execute_callbacks()
 
     import xarray as xr
