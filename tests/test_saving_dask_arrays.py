@@ -1,6 +1,7 @@
 # TODO use deisa.core DeisaArray and these tests should be moved to deisa.core/tests/test_saving_dask_arrays.py
 import os
 import pathlib
+from typing import TypedDict
 
 import dask.array as da
 import numpy as np
@@ -15,8 +16,16 @@ NB_ITERATIONS = 6
 EXPECTED_AT_T5 = 5 * np.array([[1, 2]])
 
 
+class PersistencePaths(TypedDict):
+    hdf5: list[str]
+    hdf5_timesteps: list[str]
+    hdf5_arrays: str
+    zarr: list[str]
+    netcdf: str
+
+
 @ray.remote(max_retries=0)
-def head_script(fname: str, enable_distributed_scheduling: bool, save_mode: str) -> None:
+def head_script(paths: PersistencePaths, enable_distributed_scheduling: bool) -> None:
     """The head node saves data through Dask-backed DEISA arrays."""
     from deisa.ray.window_handler import Deisa
 
@@ -24,45 +33,31 @@ def head_script(fname: str, enable_distributed_scheduling: bool, save_mode: str)
 
     d = Deisa()
 
-    if save_mode == "hdf5":
+    import xarray as xr
 
-        @d.register("array")
-        def simulation_callback(array: list[DeisaArray]):
-            if array[0].t == 5:
-                array[0].to_hdf5(fname, "data")
+    from deisa.ray.types import to_hdf5
 
-    elif save_mode == "hdf5_timesteps":
-
-        @d.register("array")
-        def simulation_callback(array: list[DeisaArray]):
+    @d.register("array")
+    def save_single_array_outputs(array: list[DeisaArray]):
+        for fname in paths["hdf5_timesteps"]:
             array[0].to_hdf5(fname, str(array[0].t))
 
-    elif save_mode == "hdf5_arrays":
-        from deisa.ray.types import to_hdf5
+        if array[0].t != 5:
+            return
 
-        @d.register("a", "b")
-        def simulation_callback(a: list[DeisaArray], b: list[DeisaArray]):
-            if a[0].t == 5:
-                to_hdf5(fname, {"a": a[0], "b": b[0]})
+        for fname in paths["hdf5"]:
+            array[0].to_hdf5(fname, "data")
 
-    elif save_mode == "zarr":
+        for fname in paths["zarr"]:
+            array[0].to_zarr(fname, component="data")
 
-        @d.register("array")
-        def simulation_callback(array: list[DeisaArray]):
-            if array[0].t == 5:
-                array[0].to_zarr(fname, component="data")
+        xarray_da = xr.DataArray(array[0], dims=["x", "y"], name="data").compute()
+        xarray_da.to_netcdf(paths["netcdf"])
 
-    elif save_mode == "netcdf":
-        import xarray as xr
-
-        @d.register("array")
-        def simulation_callback(array: list[DeisaArray]):
-            if array[0].t == 5:
-                xarray_da = xr.DataArray(array[0], dims=["x", "y"], name="data").compute()
-                xarray_da.to_netcdf(fname)
-
-    else:
-        raise ValueError(f"Unknown save mode: {save_mode}")
+    @d.register("a", "b")
+    def save_multiple_array_hdf5(a: list[DeisaArray], b: list[DeisaArray]):
+        if a[0].t == 5:
+            to_hdf5(paths["hdf5_arrays"], {"a": a[0], "b": b[0]})
 
     d.execute_callbacks()
 
@@ -115,9 +110,8 @@ def _node_ids(ray_multinode_cluster) -> tuple[str, list[str]]:
 def _run_save_workflow(
     *,
     ray_multinode_cluster,
-    fname: str,
+    paths: PersistencePaths,
     enable_distributed_scheduling: bool,
-    save_mode: str,
 ) -> None:
     head_node_id, worker_node_ids = _node_ids(ray_multinode_cluster)
     head_ref = head_script.options(
@@ -125,11 +119,11 @@ def _run_save_workflow(
             node_id=head_node_id,
             soft=False,
         ),
-    ).remote(fname, enable_distributed_scheduling, save_mode)
+    ).remote(paths, enable_distributed_scheduling)
     wait_for_head_node()
     port = pick_free_port()
 
-    array_names = ["a", "b"] if save_mode == "hdf5_arrays" else ["array"]
+    array_names = ["array", "a", "b"]
 
     worker_refs = [
         bridge_script.options(
@@ -151,136 +145,69 @@ def _output_path(tmp_path: pathlib.Path, fname: str) -> pathlib.Path:
     return tmp_path / fname
 
 
-@pytest.mark.parametrize(
-    "fname, enable_distributed_scheduling",
-    [
-        ("interesting-event.h5", False),
-        ("interesting-event.h5", True),
-        ("~/interesting-event.h5", True),
-        ("~/interesting-event.h5", False),
-    ],
-)
-def test_dask_save_hdf5(fname, enable_distributed_scheduling, ray_multinode_cluster, tmp_path) -> None:  # noqa: F811
+def _persistence_paths(tmp_path: pathlib.Path) -> PersistencePaths:
+    hdf5_paths = [
+        _output_path(tmp_path, "interesting-event.h5"),
+        _output_path(tmp_path, "~/interesting-event.h5"),
+    ]
+    hdf5_timesteps_paths = [_output_path(tmp_path, "timesteps.h5")]
+    hdf5_arrays_path = _output_path(tmp_path, "several-arrays.h5")
+    zarr_paths = [
+        _output_path(tmp_path, "interesting-event.zarr"),
+        _output_path(tmp_path, "~/interesting-event.zarr"),
+    ]
+    netcdf_path = _output_path(tmp_path, "interesting-event.nc")
+
+    for output_path in [*hdf5_paths, *hdf5_timesteps_paths, hdf5_arrays_path, *zarr_paths, netcdf_path]:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    return {
+        "hdf5": [str(path) for path in hdf5_paths],
+        "hdf5_timesteps": [str(path) for path in hdf5_timesteps_paths],
+        "hdf5_arrays": str(hdf5_arrays_path),
+        "zarr": [str(path) for path in zarr_paths],
+        "netcdf": str(netcdf_path),
+    }
+
+
+def _assert_hdf5_dataset(path: pathlib.Path, dataset: str, expected: np.ndarray) -> None:
     import h5py
 
-    full_name = _output_path(tmp_path, fname)
-    full_name.parent.mkdir(parents=True, exist_ok=True)
+    with h5py.File(path) as h5file:
+        data = da.from_array(h5file[dataset], chunks=2)
+        assert (data.compute() == expected).all()
+
+
+@pytest.mark.parametrize("enable_distributed_scheduling", [False, True])
+def test_dask_array_persistence_formats(enable_distributed_scheduling, ray_multinode_cluster, tmp_path) -> None:  # noqa: F811
+    import h5py
+    import xarray as xr
+
+    paths = _persistence_paths(tmp_path)
 
     _run_save_workflow(
         ray_multinode_cluster=ray_multinode_cluster,
-        fname=str(full_name),
+        paths=paths,
         enable_distributed_scheduling=enable_distributed_scheduling,
-        save_mode="hdf5",
     )
 
-    with h5py.File(full_name) as h5file:
-        data = da.from_array(h5file["data"], chunks=2)
-        assert (data.compute() == EXPECTED_AT_T5).all()
+    for hdf5_path in paths["hdf5"]:
+        _assert_hdf5_dataset(pathlib.Path(hdf5_path), "data", EXPECTED_AT_T5)
 
-
-@pytest.mark.parametrize(
-    "fname, enable_distributed_scheduling",
-    [
-        ("interesting-event.h5", False),
-        ("interesting-event.h5", True),
-    ],
-)
-def test_dask_save_several_timesteps_hdf5(
-    fname, enable_distributed_scheduling, ray_multinode_cluster, tmp_path
-) -> None:  # noqa: F811
-    import h5py
-
-    full_name = _output_path(tmp_path, fname)
-    full_name.parent.mkdir(parents=True, exist_ok=True)
-
-    _run_save_workflow(
-        ray_multinode_cluster=ray_multinode_cluster,
-        fname=str(full_name),
-        enable_distributed_scheduling=enable_distributed_scheduling,
-        save_mode="hdf5_timesteps",
-    )
-
-    with h5py.File(full_name) as h5file:
+    with h5py.File(paths["hdf5_timesteps"][0]) as h5file:
         for i in range(NB_ITERATIONS):
             data = da.from_array(h5file[str(i)], chunks=2)
-
             arr = i * np.array([[1, 2]])
             assert (data.compute() == arr).all()
 
+    _assert_hdf5_dataset(pathlib.Path(paths["hdf5_arrays"]), "a", EXPECTED_AT_T5)
+    _assert_hdf5_dataset(pathlib.Path(paths["hdf5_arrays"]), "b", EXPECTED_AT_T5)
 
-@pytest.mark.parametrize(
-    "fname, enable_distributed_scheduling",
-    [
-        ("interesting-event.h5", False),
-        ("interesting-event.h5", True),
-    ],
-)
-def test_dask_save_several_arrays_hdf5(fname, enable_distributed_scheduling, ray_multinode_cluster, tmp_path) -> None:  # noqa: F811
-    import h5py
+    for zarr_path in paths["zarr"]:
+        data = da.from_zarr(zarr_path, component="data")
+        assert (data.compute() == EXPECTED_AT_T5).all()
 
-    full_name = _output_path(tmp_path, fname)
-    full_name.parent.mkdir(parents=True, exist_ok=True)
-
-    _run_save_workflow(
-        ray_multinode_cluster=ray_multinode_cluster,
-        fname=str(full_name),
-        enable_distributed_scheduling=enable_distributed_scheduling,
-        save_mode="hdf5_arrays",
-    )
-
-    with h5py.File(full_name) as h5file:
-        data_a = da.from_array(h5file["a"], chunks=2)
-        assert (data_a.compute() == EXPECTED_AT_T5).all()
-
-        data_b = da.from_array(h5file["b"], chunks=2)
-        assert (data_b.compute() == EXPECTED_AT_T5).all()
-
-
-@pytest.mark.parametrize(
-    "fname, enable_distributed_scheduling",
-    [
-        ("interesting-event.zarr", False),
-        ("~/interesting-event.zarr", False),
-        ("interesting-event.zarr", True),
-        ("~/interesting-event.zarr", True),
-    ],
-)
-def test_dask_save_zarr(fname, enable_distributed_scheduling, ray_multinode_cluster, tmp_path) -> None:  # noqa: F811
-    full_path = _output_path(tmp_path, fname)
-    full_path.parent.mkdir(parents=True, exist_ok=True)
-
-    _run_save_workflow(
-        ray_multinode_cluster=ray_multinode_cluster,
-        fname=str(full_path),
-        enable_distributed_scheduling=enable_distributed_scheduling,
-        save_mode="zarr",
-    )
-
-    data = da.from_zarr(full_path, component="data")
-    assert (data.compute() == EXPECTED_AT_T5).all()
-
-
-@pytest.mark.parametrize(
-    "fname, enable_distributed_scheduling",
-    [
-        ("interesting-event.nc", False),
-        ("interesting-event.nc", True),
-    ],
-)
-def test_dask_save_netcdf_xarray(fname, enable_distributed_scheduling, ray_multinode_cluster, tmp_path) -> None:  # noqa: F811
-    import xarray as xr
-
-    full_name = _output_path(tmp_path, fname)
-    full_name.parent.mkdir(parents=True, exist_ok=True)
-
-    _run_save_workflow(
-        ray_multinode_cluster=ray_multinode_cluster,
-        fname=str(full_name),
-        enable_distributed_scheduling=enable_distributed_scheduling,
-        save_mode="netcdf",
-    )
-
-    with xr.open_dataarray(full_name) as data:
+    with xr.open_dataarray(paths["netcdf"]) as data:
         assert (data.compute() == EXPECTED_AT_T5).all()
         assert data.dims == ("x", "y")
 
