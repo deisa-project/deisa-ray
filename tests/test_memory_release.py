@@ -2,11 +2,12 @@
 import os
 import random
 
+import numpy as np
 import pytest
 import ray
 
 from deisa.ray.types import DeisaArray
-from tests.utils import simple_worker, wait_for_head_node, pick_free_port  # noqa: F401
+from tests.utils import wait_for_head_node, pick_free_port  # noqa: F401
 
 NB_ITERATIONS = 100  # Should be enough to saturate the memory in case the chunks are not released
 
@@ -31,6 +32,27 @@ def head_script(enable_distributed_scheduling) -> None:
     d.execute_callbacks()
 
 
+@ray.remote(num_cpus=0, max_retries=0)
+def bridge_script(*, rank: int, port: int) -> None:
+    from deisa.ray.bridge import Bridge
+    from tests.comm_utils import NoOpComm
+    arrays_md = {
+        "array": {
+            "global_shape": (1024, 1024),
+            "chunk_shape": (1024, 1024),
+            "chunk_position": (0, 0),
+        }
+    }
+
+    bridge = Bridge(arrays_metadata=arrays_md, comm=NoOpComm())
+
+    array = (rank + 1) * np.ones((1024, 1024), dtype=np.int32)
+    for timestep in range(NB_ITERATIONS):
+        bridge.send(array_name="array", chunk=timestep * array, timestep=timestep)
+
+    bridge.close(timestep=NB_ITERATIONS)
+
+
 @pytest.fixture
 def ray_spilling_cluster():
     spilling_path = f"/tmp/deisa_ray_spilling_test_{random.randint(0, 2**128 - 1)}"
@@ -51,13 +73,8 @@ def test_memory_release(enable_distributed_scheduling, ray_spilling_cluster: str
     wait_for_head_node()
     port = pick_free_port()
 
-    worker = simple_worker.remote(
+    worker = bridge_script.remote(
         rank=0,
-        position=(0, 0),
-        chunks_per_dim=(1, 1),
-        chunk_size=(1024, 1024),
-        nb_iterations=NB_ITERATIONS,
-        nb_nodes=1,
         port=port,
     )
 
