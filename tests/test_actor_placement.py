@@ -9,6 +9,7 @@ from deisa.ray.types import DeisaArray
 from tests.utils import wait_for_head_node
 from deisa.ray.utils import DEISA_HEAD_ACTOR_NAME, DEISA_NAMESPACE
 
+
 @ray.remote
 def head_script(enable_distributed_scheduling: bool = False) -> None:
     """The head node checks that the values are correct"""
