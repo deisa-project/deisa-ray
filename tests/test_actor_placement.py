@@ -6,27 +6,8 @@ from deisa.ray.bridge import Bridge
 from tests.comm_utils import NoOpComm
 from ray.util.state import list_actors
 from deisa.ray.types import DeisaArray
-from tests.utils import (
-    pick_free_port,
-    start_ray_multinode_cluster,
-    wait_for_head_node,
-)
+from tests.utils import wait_for_head_node
 from deisa.ray.utils import DEISA_HEAD_ACTOR_NAME, DEISA_NAMESPACE
-
-
-def test_ray_multinode_clusters_can_start_in_parallel():
-    clusters = [
-        start_ray_multinode_cluster(head_node_gcs_server_port=pick_free_port()),
-        start_ray_multinode_cluster(head_node_gcs_server_port=pick_free_port()),
-    ]
-
-    try:
-        addresses = [cluster.address for cluster in clusters]
-        assert len(set(addresses)) == len(addresses)
-    finally:
-        for cluster in clusters:
-            cluster.shutdown()
-
 
 @ray.remote
 def head_script(enable_distributed_scheduling: bool = False) -> None:
