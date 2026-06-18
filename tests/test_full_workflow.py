@@ -24,6 +24,7 @@ def head_script(enable_distributed_scheduling) -> None:
     def simulation_callback(array: list[DeisaArray]):
         x = array[0].mean().compute()
         assert x == (3 * array[0].t) / 2
+
     d.execute_callbacks()
 
 

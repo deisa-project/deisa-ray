@@ -28,6 +28,7 @@ def test_ray_multinode_clusters_can_start_in_parallel():
         for cluster in clusters:
             cluster.shutdown()
 
+
 @ray.remote
 def head_script(enable_distributed_scheduling: bool = False) -> None:
     """The head node checks that the values are correct"""
@@ -40,6 +41,7 @@ def head_script(enable_distributed_scheduling: bool = False) -> None:
     @d.register("array")
     def simulation_callback(array: list[DeisaArray]):
         return True
+
 
 @ray.remote
 def bridge_script(rank):
@@ -85,12 +87,12 @@ def test_actor_placement(ray_multinode_cluster):
             worker_node_ids.append(node.node_id)
 
     # submit head script
-    ray.get(head_script.options(
-        max_retries=0, 
-        scheduling_strategy=NodeAffinitySchedulingStrategy(
-            node_id=head_node_id, soft=False)
-        ).remote())
-    # wait for head actor to be up 
+    ray.get(
+        head_script.options(
+            max_retries=0, scheduling_strategy=NodeAffinitySchedulingStrategy(node_id=head_node_id, soft=False)
+        ).remote()
+    )
+    # wait for head actor to be up
     wait_for_head_node()
 
     # check that head actor is running in mock head node
@@ -98,12 +100,13 @@ def test_actor_placement(ray_multinode_cluster):
 
     nodes_to_actor = []
     for i, node in enumerate(worker_node_ids):
-        nodes_to_actor.append(ray.get(
-            bridge_script.options(
-                scheduling_strategy=NodeAffinitySchedulingStrategy(
-                    node_id=node, soft=False)
+        nodes_to_actor.append(
+            ray.get(
+                bridge_script.options(
+                    scheduling_strategy=NodeAffinitySchedulingStrategy(node_id=node, soft=False)
                 ).remote(i)
-        ))
+            )
+        )
     res = dict(nodes_to_actor)
 
     # assert node ids of bridge match worker ids

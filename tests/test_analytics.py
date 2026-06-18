@@ -77,9 +77,7 @@ def head_script(enable_distributed_scheduling: bool) -> None:
         square_root = da.sqrt(d_arr.astype(float)).compute()
         np.testing.assert_allclose(square_root, np.array([[1.0, np.sqrt(2.0)]]))
 
-        stacked = da.concatenate([d_arr, d_arr * 2, d_arr * 3], axis=0).rechunk(
-            (3, 2)
-        )
+        stacked = da.concatenate([d_arr, d_arr * 2, d_arr * 3], axis=0).rechunk((3, 2))
         np.testing.assert_array_equal(
             stacked.compute(),
             np.array([[1, 2], [2, 4], [3, 6]], dtype=np.int64),

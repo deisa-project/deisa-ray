@@ -25,7 +25,6 @@ def test_init_accepts_variadic_args_signature():
 
 
 def test_init_raises_when_comm_is_none():
-
     with pytest.raises(ValueError, match="comm is required"):
         Bridge(
             arrays_metadata=arrays_md,

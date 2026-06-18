@@ -24,6 +24,7 @@ def get_ray_address() -> str | None:
         return ray.get_runtime_context().gcs_address
     return None
 
+
 def get_node_actor_options(name: str, namespace: str) -> Dict[str, Any]:
     """Return Ray options used to create (or get) a node scheduling actor.
 
@@ -96,14 +97,14 @@ async def get_ready_actor_with_retry(name, namespace, deadline_s=180):
     The function uses exponential backoff with jitter for retries. The delay
     starts at 0.2 seconds and increases by a factor of 1.5 up to a maximum
     of 5.0 seconds. A small random jitter (0-0.1 seconds) is added to avoid
-    thundering herd problems. The function more or less corresponds to 3 retries 
+    thundering herd problems. The function more or less corresponds to 3 retries
     since each try times out after 60 seconds by default.
     """
     start, delay = time.time(), 0.2
     while True:
         try:
             actor = ray.get_actor(name=name, namespace=namespace)
-            await actor.ready.remote() # readyness gate
+            await actor.ready.remote()  # readyness gate
             return actor
         except Exception:
             if time.time() - start > deadline_s:

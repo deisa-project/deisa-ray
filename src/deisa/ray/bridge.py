@@ -22,10 +22,12 @@ import sys
 
 logger = logging.getLogger(__name__)
 
+
 def _validate_comm(comm: Any) -> None:
     required_methods = ("Get_rank", "Get_size", "gather", "bcast", "barrier")
     if not all(callable(getattr(comm, method, None)) for method in required_methods):
         raise TypeError("comm must implement deisa.core.ICommunicator")
+
 
 class Bridge(IBridge):
     """
@@ -145,11 +147,11 @@ class Bridge(IBridge):
         self.comm = comm
         self.bridge_id = self.comm.Get_rank()
 
-        # TODO detect that rank0 exists aka that the special array "__deisa_last_iteration_array" 
-        # has been described. If this is not the case, raise an error. Otherwise analytics will never stop. 
+        # TODO detect that rank0 exists aka that the special array "__deisa_last_iteration_array"
+        # has been described. If this is not the case, raise an error. Otherwise analytics will never stop.
         # Since the logic is that after the barrier, we expect all bridges to have sent their metatadata
-        # and in finalize registration all scheduling actors send their described arrays to the head actor, 
-        # the check should happen there. 
+        # and in finalize registration all scheduling actors send their described arrays to the head actor,
+        # the check should happen there.
         if self.bridge_id == 0:
             self.arrays_metadata["__deisa_last_iteration_array"] = {
                 "global_shape": (1, 1),
@@ -359,7 +361,7 @@ class Bridge(IBridge):
             try:
                 # first rank to arrive creates, others get same handle (get_if_exists)
                 # node actor waits up to 180 seconds for head actor to be created otherwise it raises a TimeoutError
-                # this means that 3 retries here corresponds to waiting up to 9 minutes for the head actor to be created 
+                # this means that 3 retries here corresponds to waiting up to 9 minutes for the head actor to be created
                 self.node_actor: RayActorHandle = node_actor_cls.options(**node_actor_options).remote(
                     actor_id=self.node_id
                 )  # type: ignore

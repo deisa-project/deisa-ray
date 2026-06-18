@@ -160,9 +160,7 @@ def _output_path(tmp_path: pathlib.Path, fname: str) -> pathlib.Path:
         ("~/interesting-event.h5", False),
     ],
 )
-def test_dask_save_hdf5(
-    fname, enable_distributed_scheduling, ray_multinode_cluster, tmp_path
-) -> None:  # noqa: F811
+def test_dask_save_hdf5(fname, enable_distributed_scheduling, ray_multinode_cluster, tmp_path) -> None:  # noqa: F811
     import h5py
 
     full_name = _output_path(tmp_path, fname)
@@ -217,9 +215,7 @@ def test_dask_save_several_timesteps_hdf5(
         ("interesting-event.h5", True),
     ],
 )
-def test_dask_save_several_arrays_hdf5(
-    fname, enable_distributed_scheduling, ray_multinode_cluster, tmp_path
-) -> None:  # noqa: F811
+def test_dask_save_several_arrays_hdf5(fname, enable_distributed_scheduling, ray_multinode_cluster, tmp_path) -> None:  # noqa: F811
     import h5py
 
     full_name = _output_path(tmp_path, fname)
@@ -249,9 +245,7 @@ def test_dask_save_several_arrays_hdf5(
         ("~/interesting-event.zarr", True),
     ],
 )
-def test_dask_save_zarr(
-    fname, enable_distributed_scheduling, ray_multinode_cluster, tmp_path
-) -> None:  # noqa: F811
+def test_dask_save_zarr(fname, enable_distributed_scheduling, ray_multinode_cluster, tmp_path) -> None:  # noqa: F811
     full_path = _output_path(tmp_path, fname)
     full_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -273,9 +267,7 @@ def test_dask_save_zarr(
         ("interesting-event.nc", True),
     ],
 )
-def test_dask_save_netcdf_xarray(
-    fname, enable_distributed_scheduling, ray_multinode_cluster, tmp_path
-) -> None:  # noqa: F811
+def test_dask_save_netcdf_xarray(fname, enable_distributed_scheduling, ray_multinode_cluster, tmp_path) -> None:  # noqa: F811
     import xarray as xr
 
     full_name = _output_path(tmp_path, fname)

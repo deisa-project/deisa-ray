@@ -4,12 +4,12 @@ import ray
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 from deisa.ray.types import DeisaArray
 import torch.distributed as dist
-from tests.utils import pick_free_port, ray_multinode_cluster
+from tests.utils import pick_free_port
 
 # TODO check that all errors types that can be raised when the bridge is not properly initialized are correctly caught raised
-# for now we catch DistStoreError and DistNetworkError but should check that the other errors also happen correctly. 
-# needed tests: 
-# 1) RuntimeError if node actor cannot be created after N retries. 
+# for now we catch DistStoreError and DistNetworkError but should check that the other errors also happen correctly.
+# needed tests:
+# 1) RuntimeError if node actor cannot be created after N retries.
 # 2) Value Error if comm is None
 # 3) Type Error if comm is not of type ICommunicator
 # 4) No rank0 raises an error
@@ -22,6 +22,7 @@ DIST_TIMEOUT_ERRORS = tuple(
     )
     if err is not None
 )
+
 
 @ray.remote(max_retries=0)
 def head_script() -> bool:
@@ -36,6 +37,7 @@ def head_script() -> bool:
 
     d.execute_callbacks()
     return True
+
 
 @ray.remote(num_cpus=0, max_retries=0)
 def bridge_script(*, rank: int, port: int):
@@ -60,6 +62,7 @@ def bridge_script(*, rank: int, port: int):
         arrays_metadata=arrays_md,
         comm=comm,
     )  # type:ignore
+
 
 @pytest.mark.parametrize("sleep_t", [5])
 def test_sim_start_first_and_analytics_can_start_after_x_secs(ray_multinode_cluster, sleep_t):
@@ -96,7 +99,6 @@ def test_sim_start_first_and_analytics_can_start_after_x_secs(ray_multinode_clus
     ray.get([head_ref] + worker_refs)
 
 
-
 @pytest.mark.parametrize("sleep_t", [5])
 def test_analytics_start_first_and_sim_can_start_after_x_secs(ray_multinode_cluster, sleep_t):
     gloo_port = pick_free_port()
@@ -130,7 +132,6 @@ def test_analytics_start_first_and_sim_can_start_after_x_secs(ray_multinode_clus
     ]
 
     ray.get([head_ref] + worker_refs)
-
 
 
 def test_sim_raise_if_not_enough_bridges_connect(ray_multinode_cluster):

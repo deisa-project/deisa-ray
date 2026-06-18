@@ -19,7 +19,9 @@ def head_script() -> None:
     @d.register("array")
     def simulation_callback(array):
         assert False
+
     d.execute_callbacks()
+
 
 @ray.remote(max_retries=0)
 def bridge_script(rank: int) -> str:
@@ -82,8 +84,8 @@ def contract_error_bridge_script(rank: int) -> str:
     return bridge.node_id
 
 
-# CRITICAL WARNING : This test checks that an assertion error in the callback is detected. If this test fails, 
-# it means that all callbacks could secretely fail and the test harness is not detecting it. 
+# CRITICAL WARNING : This test checks that an assertion error in the callback is detected. If this test fails,
+# it means that all callbacks could secretely fail and the test harness is not detecting it.
 def test_exception_handler_not_bypass_computation(ray_multinode_cluster) -> None:  # noqa: F811
     with pytest.raises(AssertionError):
         cluster = ray_multinode_cluster["cluster"]
@@ -120,6 +122,7 @@ def test_exception_handler_not_bypass_computation(ray_multinode_cluster) -> None
             ).remote(0)
         )
         ray.get(head_ref)
+
 
 def test_contract_error(ray_multinode_cluster) -> None:  # noqa: F811
     cluster = ray_multinode_cluster["cluster"]

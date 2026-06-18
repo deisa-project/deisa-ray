@@ -350,9 +350,9 @@ class Deisa(IDeisa):
                         )
                         try:
                             simulation_callback(**callback_args)
-                        # TODO need to discuss whats the best way to handle this. 
-                        # this is simulation_callback strictly, so maybe ALL errors 
-                        # should be caught. 
+                        # TODO need to discuss whats the best way to handle this.
+                        # this is simulation_callback strictly, so maybe ALL errors
+                        # should be caught.
                         except TimeoutError as e:
                             raise e
                         except AssertionError as e:

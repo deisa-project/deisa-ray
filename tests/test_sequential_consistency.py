@@ -53,9 +53,7 @@ def bridge_script(*, rank: int, port: int) -> None:
 
 
 @pytest.mark.parametrize("enable_distributed_scheduling", [True, False])
-def test_arrays_sent_out_of_order_fails_analytics(
-    enable_distributed_scheduling: bool, ray_multinode_cluster
-) -> None:  # noqa: F811
+def test_arrays_sent_out_of_order_fails_analytics(enable_distributed_scheduling: bool, ray_multinode_cluster) -> None:  # noqa: F811
     cluster = ray_multinode_cluster["cluster"]
     head_node_id = None
     worker_node_ids = []

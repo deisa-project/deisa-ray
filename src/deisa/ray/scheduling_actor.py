@@ -78,7 +78,7 @@ class NodeActorBase:
         self.head = await get_ready_actor_with_retry(name="simulation_head", namespace="deisa_ray")
         # TODO this function adds to self.scheduling_actors of the head node. But that attribute
         # is only used in the method `list_scheduling_actors` of the head node. That method
-        # is only called by _scheduler.py and in `schedule_graph` of the scheduling actor. 
+        # is only called by _scheduler.py and in `schedule_graph` of the scheduling actor.
         # therefore it could be moved to the case of the distributed scheduler.
         await self.head.register_scheduling_actor.remote(actor_id, self.actor_handle)
 
