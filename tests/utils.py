@@ -66,20 +66,6 @@ def ray_multinode_cluster(monkeypatch):
     cluster.shutdown()
 
 
-# @pytest.fixture(scope = "session")
-@pytest.fixture()
-def ray_cluster():
-    if ray.is_initialized():
-        ray.shutdown()
-    os.environ.setdefault("RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO", "0")
-    ray.init()
-    try:
-        yield ray.get_runtime_context().gcs_address
-    finally:
-        if ray.is_initialized():
-            ray.shutdown()
-
-
 def wait_for_head_node() -> None:
     """Wait until the head node is ready"""
     while True:

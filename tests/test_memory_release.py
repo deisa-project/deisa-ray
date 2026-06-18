@@ -6,7 +6,7 @@ import pytest
 import ray
 
 from deisa.ray.types import DeisaArray
-from tests.utils import ray_cluster, simple_worker, wait_for_head_node, pick_free_port  # noqa: F401
+from tests.utils import simple_worker, wait_for_head_node, pick_free_port  # noqa: F401
 
 NB_ITERATIONS = 100  # Should be enough to saturate the memory in case the chunks are not released
 
