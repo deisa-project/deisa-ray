@@ -101,35 +101,10 @@ def test_bridge_get_returns_default_when_feedback_missing(monkeypatch) -> None:
     assert bridge.head_actor.get_feedback.calls == [("foo", 7)]
 
 
-def test_feedback_queue_is_fixed_size(ray_multinode_cluster) -> None:  # noqa: F811
-    """Test that the feedback queue in the head actor is fixed size."""
+def test_feedback_queue_rejects_non_increasing_timesteps_and_evicts_old_values(ray_multinode_cluster) -> None:  # noqa: F811
     from deisa.ray.window_handler import Deisa
 
     deisa = Deisa(feedback_queue_size=2)
-
-    deisa.set("foo", value="old", timestep=0)
-    deisa.set("foo", value="middle", timestep=1)
-    deisa.set("foo", value="new", timestep=2)
-
-    # querying "foo" at timestep 0 should miss since it doesnt exist in queue (queue removed bc too old)
-    assert ray.get(deisa.head.get_feedback.remote("foo", 0)) == (False, None)
-    # querying "foo" at timestep 1 should hit
-    assert ray.get(deisa.head.get_feedback.remote("foo", 1)) == (True, "middle")
-    # querying "foo" at timestep 2 should hit
-    assert ray.get(deisa.head.get_feedback.remote("foo", 2)) == (True, "new")
-    # querying "foo" at timestep 3 should miss since its too new (not yet added)
-    assert ray.get(deisa.head.get_feedback.remote("foo", 3)) == (False, None)
-    # querying "foo" without a timestep should return all feedback in the queue, which should only contain the 2 most recent entries
-    assert ray.get(deisa.head.get_feedback.remote("foo")) == (True, [(1, "middle"), (2, "new")])
-
-
-def test_feedback_queue_behavior(ray_multinode_cluster) -> None:  # noqa: F811
-    """
-    Test that the feedback queue in the head actor rejects non-increasing timesteps.
-    """
-    from deisa.ray.window_handler import Deisa
-
-    deisa = Deisa(feedback_queue_size=3)
 
     deisa.set("foo", value="one", timestep=1)
 
@@ -142,17 +117,14 @@ def test_feedback_queue_behavior(ray_multinode_cluster) -> None:  # noqa: F811
     deisa.set("foo", value="two", timestep=2)
     deisa.set("bar", value="independent", timestep=0)
 
-    # querying "foo" at timestep 0 should miss since it doesnt exist in queue (rejected for being too old)
     assert ray.get(deisa.head.get_feedback.remote("foo", 0)) == (False, None)
-    # querying "foo" at timestep 1 should hit
     assert ray.get(deisa.head.get_feedback.remote("foo", 1)) == (True, "one")
-    # querying "foo" at timestep 2 should hit
     assert ray.get(deisa.head.get_feedback.remote("foo", 2)) == (True, "two")
-    # querying "bar" at timestep 0 should hit since it's independent of "foo" and has its own entry in the queue
+    assert ray.get(deisa.head.get_feedback.remote("foo", 3)) == (False, None)
+    assert ray.get(deisa.head.get_feedback.remote("foo")) == (True, [(1, "one"), (2, "two")])
+
     assert ray.get(deisa.head.get_feedback.remote("bar", 0)) == (True, "independent")
-    # querying "bar" at timestep 1 should miss since it doesnt exist in queue
     assert ray.get(deisa.head.get_feedback.remote("bar", 1)) == (False, None)
-    # querying "joe" at any timestep should miss since it doesnt exist in queue
     assert ray.get(deisa.head.get_feedback.remote("joe", 0)) == (False, None)
     assert ray.get(deisa.head.get_feedback.remote("joe", 1)) == (False, None)
     assert ray.get(deisa.head.get_feedback.remote("joe")) == (False, None)
