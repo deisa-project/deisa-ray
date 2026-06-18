@@ -1,119 +1,155 @@
-import os
 import pytest
 import ray
-
+import numpy as np
 from deisa.ray.errors import ContractError
-from deisa.ray.types import DeisaArray
-from tests.utils import simple_worker, simple_worker_error_test, wait_for_head_node, pick_free_port  # noqa: F401
-
-
-NB_ITERATIONS = 5
+from deisa.ray.bridge import Bridge
+from tests.comm_utils import NoOpComm
+from tests.utils import wait_for_head_node
+from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 
 
 @ray.remote(max_retries=0)
-def head_script(enable_distributed_scheduling, assert_error: bool = False) -> None:
+def head_script() -> None:
     """The head node checks that the values are correct"""
     from deisa.ray.window_handler import Deisa
-    from deisa.ray.types import Window
-
-    os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
 
     d = Deisa()
 
     # TODO : modify assert to test the actual error handler
-    def simulation_callback(array: list[DeisaArray]):
-        array[0].compute()
-        if assert_error:
-            assert False
+    @d.register("array")
+    def simulation_callback(array):
+        assert False
 
-    d.register_callback(
-        simulation_callback,
-        *[Window("array")],
-    )
     d.execute_callbacks()
 
 
-# WARNING : CRITICAL : Be careful if this test is failing, every other tests
-#           can secretly be wrong without failing
-@pytest.mark.parametrize(
-    "enable_distributed_scheduling",
-    [False],
-)
-def test_exception_handler_not_bypass_computation(enable_distributed_scheduling: bool, ray_cluster) -> None:  # noqa: F811
+@ray.remote(max_retries=0)
+def bridge_script(rank: int) -> str:
+    arrays_md = {
+        "array": {
+            "global_shape": (1, 2),
+            "chunk_shape": (1, 1),
+            "chunk_position": (0, rank),
+        }
+    }
+
+    bridge = Bridge(
+        arrays_metadata=arrays_md,
+        comm=NoOpComm(rank, 2),
+    )  # type:ignore
+
+    bridge.send(
+        array_name="array",
+        chunk=np.array([[rank + 1]], dtype=np.int64),
+        timestep=0,
+    )
+
+    return bridge.node_id
+
+
+@ray.remote(max_retries=0)
+def contract_head_script() -> None:
+    from deisa.ray.window_handler import Deisa
+
+    d = Deisa()
+
+    @d.register("array")
+    def simulation_callback(array):
+        pass
+
+    d.execute_callbacks()
+
+
+@ray.remote(max_retries=0)
+def contract_error_bridge_script(rank: int) -> str:
+    arrays_md = {
+        "array": {
+            "global_shape": (1, 2),
+            "chunk_shape": (1, 1),
+            "chunk_position": (0, rank),
+        }
+    }
+
+    bridge = Bridge(
+        arrays_metadata=arrays_md,
+        comm=NoOpComm(rank, 2),
+    )  # type:ignore
+
+    bridge.send(
+        array_name="not_described",
+        chunk=np.array([[rank + 1]], dtype=np.int64),
+        timestep=0,
+    )
+
+    return bridge.node_id
+
+
+# CRITICAL WARNING : This test checks that an assertion error in the callback is detected. If this test fails,
+# it means that all callbacks could secretely fail and the test harness is not detecting it.
+def test_exception_handler_not_bypass_computation(ray_multinode_cluster) -> None:  # noqa: F811
     with pytest.raises(AssertionError):
-        head_ref = head_script.remote(enable_distributed_scheduling, True)
+        cluster = ray_multinode_cluster["cluster"]
+        head_node_id = None
+        worker_node_ids = []
+        for node in cluster.list_all_nodes():
+            if node.is_head():
+                head_node_id = node.node_id
+            else:
+                worker_node_ids.append(node.node_id)
+
+        head_ref = head_script.options(
+            scheduling_strategy=NodeAffinitySchedulingStrategy(
+                node_id=head_node_id,
+                soft=False,
+            ),
+        ).remote()
         wait_for_head_node()
-        port = pick_free_port()
 
-        worker_refs = []
-        for rank in range(4):
-            worker_refs.append(
-                simple_worker.remote(
-                    rank=rank,
-                    position=(rank // 2, rank % 2),
-                    chunks_per_dim=(2, 2),
-                    chunk_size=(1, 1),
-                    nb_iterations=NB_ITERATIONS,
-                    node_id=f"node_{rank}",
-                    nb_nodes=4,
-                    port=port,
-                )
-            )
+        ray.get(
+            bridge_script.options(
+                scheduling_strategy=NodeAffinitySchedulingStrategy(
+                    node_id=worker_node_ids[1],
+                    soft=False,
+                ),
+            ).remote(1)
+        )
+        ray.get(
+            bridge_script.options(
+                scheduling_strategy=NodeAffinitySchedulingStrategy(
+                    node_id=worker_node_ids[0],
+                    soft=False,
+                ),
+            ).remote(0)
+        )
+        ray.get(head_ref)
 
-        ray.get([head_ref] + worker_refs)
 
+def test_contract_error(ray_multinode_cluster) -> None:  # noqa: F811
+    cluster = ray_multinode_cluster["cluster"]
+    head_node_id = None
+    worker_node_ids = []
+    for node in cluster.list_all_nodes():
+        if node.is_head():
+            head_node_id = node.node_id
+        else:
+            worker_node_ids.append(node.node_id)
 
-# TODO : To check Contract Error we need to re raise the exception in the _default_exception_handler but if we do that, Bridge crash.
-@pytest.mark.parametrize(
-    "enable_distributed_scheduling",
-    [False],
-)
-def test_contract_error(enable_distributed_scheduling: bool, ray_cluster) -> None:  # noqa: F811
+    head_ref = contract_head_script.options(
+        scheduling_strategy=NodeAffinitySchedulingStrategy(
+            node_id=head_node_id,
+            soft=False,
+        ),
+    ).remote()
+    wait_for_head_node()
+
     with pytest.raises(ContractError):
-        head_ref = head_script.remote(enable_distributed_scheduling)
-        wait_for_head_node()
-        port = pick_free_port()
+        ray.get(
+            contract_error_bridge_script.options(
+                scheduling_strategy=NodeAffinitySchedulingStrategy(
+                    node_id=worker_node_ids[0],
+                    soft=False,
+                ),
+            ).remote(0)
+        )
 
-        worker_refs = []
-        for rank in range(4):
-            worker_refs.append(
-                simple_worker_error_test.remote(
-                    rank=rank,
-                    position=(rank // 2, rank % 2),
-                    chunks_per_dim=(2, 2),
-                    chunk_size=(1, 1),
-                    nb_iterations=NB_ITERATIONS,
-                    node_id=f"node_{rank}",
-                    nb_nodes=4,
-                    port=port,
-                )
-            )
-
-        ray.get([head_ref] + worker_refs)
-
-
-# @pytest.mark.parametrize(
-#    "nb_nodes, enable_distributed_scheduling",
-#    [
-#        (1, True),
-#    ],
-# )
-# def test_timeout_error(nb_nodes: int, enable_distributed_scheduling: bool, ray_cluster) -> None:  # noqa: F811
-#    with pytest.raises(TimeoutError):
-#        head_ref = head_script.remote(enable_distributed_scheduling)
-#        wait_for_head_node()
-#
-#        worker_refs = []
-#        for rank in range(4):
-#            worker_refs.append(
-#                simple_worker_error_test.remote(
-#                    rank=rank,
-#                    position=(rank // 2, rank % 2),
-#                    chunks_per_dim=(2, 2),
-#                    chunk_size=(1, 1),
-#                    nb_iterations=NB_ITERATIONS,
-#                    node_id=f"node_{rank % nb_nodes}",
-#                )
-#            )
-#
-#        ray.get([head_ref] + worker_refs)
+    ray.cancel(head_ref, force=True)

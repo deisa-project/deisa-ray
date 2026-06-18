@@ -1,10 +1,13 @@
 import os
+
 import dask.array as da
+import numpy as np
 import pytest
 import ray
+from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 
 from deisa.ray.types import DeisaArray
-from tests.utils import ray_cluster, simple_worker, wait_for_head_node, pick_free_port  # noqa: F401
+from tests.utils import pick_free_port, wait_for_head_node
 
 
 NB_ITERATIONS = 5
@@ -22,7 +25,7 @@ def head_script(partitioning_strategy: str) -> None:
 
     def simulation_callback(array: list[DeisaArray]):
         x = array[0].sum().compute(deisa_ray_partitioning_strategy=partitioning_strategy)
-        assert x == 10 * array[0].t
+        assert x == 3 * array[0].t
 
         # Test with a full Dask computation
         assert da.ones((2, 2), chunks=(1, 1)).sum().compute(deisa_ray_partitioning_strategy=partitioning_strategy) == 4
@@ -34,25 +37,62 @@ def head_script(partitioning_strategy: str) -> None:
     d.execute_callbacks()
 
 
+@ray.remote(num_cpus=0, max_retries=0)
+def bridge_script(*, rank: int, port: int) -> None:
+    from deisa.ray.bridge import Bridge
+    from tests.comm_utils import init_gloo_comm
+
+    arrays_md = {
+        "array": {
+            "global_shape": (1, 2),
+            "chunk_shape": (1, 1),
+            "chunk_position": (0, rank),
+        }
+    }
+
+    comm = init_gloo_comm(
+        2,
+        rank,
+        "127.0.0.1",
+        port,
+    )
+    bridge = Bridge(arrays_metadata=arrays_md, comm=comm, _node_id=f"node_{rank}")
+
+    array = (rank + 1) * np.ones((1, 1), dtype=np.int32)
+    for timestep in range(NB_ITERATIONS):
+        bridge.send(array_name="array", chunk=timestep * array, timestep=timestep)
+
+    bridge.close(timestep=NB_ITERATIONS)
+
+
 @pytest.mark.parametrize("partitioning_strategy", ["random", "greedy"])
-def test_partitioning(partitioning_strategy: str, ray_cluster) -> None:  # noqa: F811
-    head_ref = head_script.remote(partitioning_strategy)
+def test_partitioning(partitioning_strategy: str, ray_multinode_cluster) -> None:  # noqa: F811
+    cluster = ray_multinode_cluster["cluster"]
+    head_node_id = None
+    worker_node_ids = []
+    for node in cluster.list_all_nodes():
+        if node.is_head():
+            head_node_id = node.node_id
+        else:
+            worker_node_ids.append(node.node_id)
+
+    head_ref = head_script.options(
+        scheduling_strategy=NodeAffinitySchedulingStrategy(
+            node_id=head_node_id,
+            soft=False,
+        ),
+    ).remote(partitioning_strategy)
     wait_for_head_node()
     port = pick_free_port()
 
-    worker_refs = []
-    for rank in range(4):
-        worker_refs.append(
-            simple_worker.remote(
-                rank=rank,
-                position=(rank // 2, rank % 2),
-                chunks_per_dim=(2, 2),
-                chunk_size=(1, 1),
-                nb_iterations=NB_ITERATIONS,
-                node_id=f"node_{rank % 4}",
-                nb_nodes=4,
-                port=port,
-            )
-        )
+    worker_refs = [
+        bridge_script.options(
+            scheduling_strategy=NodeAffinitySchedulingStrategy(
+                node_id=worker_node_ids[rank],
+                soft=False,
+            ),
+        ).remote(rank=rank, port=port)
+        for rank in range(2)
+    ]
 
     ray.get([head_ref] + worker_refs)

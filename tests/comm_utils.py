@@ -4,6 +4,44 @@ import torch.distributed as dist
 from deisa.core import ICommunicator
 
 
+class NoOpComm(ICommunicator):
+    """Fallback communicator that no-ops synchronization calls."""
+
+    def __init__(self, rank: int = 0, world_size: int = 1):
+        """
+        Create a dummy communicator for single-process environments.
+
+        Parameters
+        ----------
+        rank : int, optional
+            Rank to report. Defaults to 0.
+        world_size : int, optional
+            World size to report. Defaults to 1.
+        """
+        self.rank = rank
+        self.world_size = world_size
+
+    def Get_rank(self) -> int:
+        """Return this communicator rank."""
+        return self.rank
+
+    def Get_size(self) -> int:
+        """Return this communicator world size."""
+        return self.world_size
+
+    def gather(self, data, root: int = 0):
+        """Gather Python objects to ``root``."""
+        return [data] if self.rank == root else None
+
+    def barrier(self) -> None:
+        """No-op barrier for single-process setups."""
+        return
+
+    def bcast(self, obj, root: int = 0):
+        """Return ``obj`` unchanged in single-process setups."""
+        return obj
+
+
 # TODO: Add test about comm size > declared world size.
 def init_gloo_comm(
     world_size: int, rank: int, master_addr: str = "127.0.0.1", master_port: int = 29500, timeout_s: int = 120

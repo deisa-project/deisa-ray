@@ -1,86 +1,99 @@
-import os
-import pytest
+# TODO is this really something we want to test? At the end of the day its a python feature... so maybe it should just be
+# shown as an example in the docs.
 import ray
+import numpy as np
 
-from deisa.ray.types import DeisaArray
-from tests.utils import ray_cluster, simple_worker, wait_for_head_node, pick_free_port  # noqa: F401
+from deisa.ray.bridge import Bridge
+from tests.comm_utils import NoOpComm
+from tests.utils import wait_for_head_node
+from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 
-NB_ITERATIONS = 5
+SHARED_SUM = 0
 
 
 @ray.remote(max_retries=0)
-def head_script(enable_distributed_scheduling) -> None:
+def head_script() -> None:
     """The head node checks that the values are correct"""
     from deisa.ray.window_handler import Deisa
-    from deisa.ray.types import Window
 
-    os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
+    global SHARED_SUM
+    SHARED_SUM = 0
 
     d = Deisa()
 
-    class Shared_variables:
-        def __init__(self) -> None:
-            self.sum = 0
-
-    vars = Shared_variables()
-
-    def simulation_callback1(array: list[DeisaArray]):
+    @d.register("array")
+    def simulation_callback1(array):
+        global SHARED_SUM
         x = array[0].sum().compute()
-        assert x == 10 * array[0].t
-        if array[0].t == 5:
-            vars.sum = x
+        assert x == 3
+        SHARED_SUM = x
 
-    def simulation_callback2(array1: list[DeisaArray]):
-        x = array1[0].sum().compute()
-        assert x == 10 * array1[0].t
-        if array1[0].t == 8:
-            vars.sum = vars.sum + x
-
-    def simulation_callback3(array: list[DeisaArray], array1: list[DeisaArray]):
+    @d.register("array")
+    def simulation_callback2(array):
         x = array[0].sum().compute()
-        y = array1[0].sum().compute()
-        assert x == 10 * array[0].t and y == 10 * array1[0].t
-        if array1[0].t > 8:
-            assert vars.sum == 130
+        assert x == SHARED_SUM
 
-    d.register_callback(
-        simulation_callback1,
-        *[Window("array")],
-    )
-    d.register_callback(
-        simulation_callback2,
-        *[Window("array1")],
-    )
-    d.register_callback(
-        simulation_callback3,
-        *[Window("array"), Window("array1")],
-    )
     d.execute_callbacks()
 
 
-@pytest.mark.parametrize(
-    "enable_distributed_scheduling",
-    [True, False],
-)
-def test_multiple_callbacks(enable_distributed_scheduling: bool, ray_cluster) -> None:  # noqa: F811
-    head_ref = head_script.remote(enable_distributed_scheduling)
+@ray.remote(max_retries=0)
+def bridge_script(rank: int) -> str:
+    arrays_md = {
+        "array": {
+            "global_shape": (1, 2),
+            "chunk_shape": (1, 1),
+            "chunk_position": (0, rank),
+        }
+    }
+
+    bridge = Bridge(
+        arrays_metadata=arrays_md,
+        comm=NoOpComm(rank, 2),
+    )  # type:ignore
+
+    bridge.send(
+        array_name="array",
+        chunk=np.array([[rank + 1]], dtype=np.int64),
+        timestep=0,
+    )
+    bridge.close(timestep=1)
+
+    return bridge.node_id
+
+
+def test_multiple_callbacks(ray_multinode_cluster) -> None:  # noqa: F811
+    cluster = ray_multinode_cluster["cluster"]
+    head_node_id = None
+    worker_node_ids = []
+    for node in cluster.list_all_nodes():
+        if node.is_head():
+            head_node_id = node.node_id
+        else:
+            worker_node_ids.append(node.node_id)
+
+    head_ref = head_script.options(
+        scheduling_strategy=NodeAffinitySchedulingStrategy(
+            node_id=head_node_id,
+            soft=False,
+        ),
+    ).remote()
     wait_for_head_node()
-    port = pick_free_port()
 
-    worker_refs = []
-    for rank in range(4):
-        worker_refs.append(
-            simple_worker.remote(
-                rank=rank,
-                position=(rank // 2, rank % 2),
-                chunks_per_dim=(2, 2),
-                chunk_size=(1, 1),
-                nb_iterations=NB_ITERATIONS,
-                node_id=f"node_{rank}",
-                array_name=["array", "array1"],
-                nb_nodes=4,
-                port=port,
-            )
-        )
+    ray.get(
+        bridge_script.options(
+            scheduling_strategy=NodeAffinitySchedulingStrategy(
+                node_id=worker_node_ids[1],
+                soft=False,
+            ),
+        ).remote(1)
+    )
+    ray.get(
+        bridge_script.options(
+            scheduling_strategy=NodeAffinitySchedulingStrategy(
+                node_id=worker_node_ids[0],
+                soft=False,
+            ),
+        ).remote(0)
+    )
 
-    ray.get([head_ref] + worker_refs)
+    ray.get(head_ref)

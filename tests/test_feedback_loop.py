@@ -6,7 +6,8 @@ import pytest
 import ray
 
 from deisa.ray.config import DEISA_DISTRIBUTED_SCHEDULING_ENV
-from tests.utils import pick_free_port, ray_cluster, wait_for_head_node  # noqa: F401
+from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
+from tests.utils import pick_free_port, wait_for_head_node
 
 # I need to test:
 # - [x] that the head actor is queried directly for feedback (not the node actors)
@@ -60,7 +61,7 @@ def test_bridge_zero_queries_head_actor_directly(monkeypatch) -> None:
     Test that the Bridge.get method queries the head actor directly for feedback, and not the node actors.
     """
     from deisa.ray.bridge import Bridge
-    from deisa.ray.comm import NoOpComm
+    from tests.comm_utils import NoOpComm
 
     bridge = Bridge.__new__(Bridge)
     bridge.bridge_id = 0
@@ -81,7 +82,7 @@ def test_bridge_zero_queries_head_actor_directly(monkeypatch) -> None:
 
 def test_bridge_get_returns_default_when_feedback_missing(monkeypatch) -> None:
     from deisa.ray.bridge import Bridge
-    from deisa.ray.comm import NoOpComm
+    from tests.comm_utils import NoOpComm
 
     bridge = Bridge.__new__(Bridge)
     bridge.bridge_id = 0
@@ -100,35 +101,10 @@ def test_bridge_get_returns_default_when_feedback_missing(monkeypatch) -> None:
     assert bridge.head_actor.get_feedback.calls == [("foo", 7)]
 
 
-def test_feedback_queue_is_fixed_size(ray_cluster) -> None:  # noqa: F811
-    """Test that the feedback queue in the head actor is fixed size."""
+def test_feedback_queue_rejects_non_increasing_timesteps_and_evicts_old_values(ray_multinode_cluster) -> None:  # noqa: F811
     from deisa.ray.window_handler import Deisa
 
     deisa = Deisa(feedback_queue_size=2)
-
-    deisa.set("foo", value="old", timestep=0)
-    deisa.set("foo", value="middle", timestep=1)
-    deisa.set("foo", value="new", timestep=2)
-
-    # querying "foo" at timestep 0 should miss since it doesnt exist in queue (queue removed bc too old)
-    assert ray.get(deisa.head.get_feedback.remote("foo", 0)) == (False, None)
-    # querying "foo" at timestep 1 should hit
-    assert ray.get(deisa.head.get_feedback.remote("foo", 1)) == (True, "middle")
-    # querying "foo" at timestep 2 should hit
-    assert ray.get(deisa.head.get_feedback.remote("foo", 2)) == (True, "new")
-    # querying "foo" at timestep 3 should miss since its too new (not yet added)
-    assert ray.get(deisa.head.get_feedback.remote("foo", 3)) == (False, None)
-    # querying "foo" without a timestep should return all feedback in the queue, which should only contain the 2 most recent entries
-    assert ray.get(deisa.head.get_feedback.remote("foo")) == (True, [(1, "middle"), (2, "new")])
-
-
-def test_feedback_queue_rejects_non_increasing_timesteps(ray_cluster) -> None:  # noqa: F811
-    """
-    Test that the feedback queue in the head actor rejects non-increasing timesteps.
-    """
-    from deisa.ray.window_handler import Deisa
-
-    deisa = Deisa(feedback_queue_size=3)
 
     deisa.set("foo", value="one", timestep=1)
 
@@ -141,23 +117,20 @@ def test_feedback_queue_rejects_non_increasing_timesteps(ray_cluster) -> None:  
     deisa.set("foo", value="two", timestep=2)
     deisa.set("bar", value="independent", timestep=0)
 
-    # querying "foo" at timestep 0 should miss since it doesnt exist in queue (rejected for being too old)
     assert ray.get(deisa.head.get_feedback.remote("foo", 0)) == (False, None)
-    # querying "foo" at timestep 1 should hit
     assert ray.get(deisa.head.get_feedback.remote("foo", 1)) == (True, "one")
-    # querying "foo" at timestep 2 should hit
     assert ray.get(deisa.head.get_feedback.remote("foo", 2)) == (True, "two")
-    # querying "bar" at timestep 0 should hit since it's independent of "foo" and has its own entry in the queue
+    assert ray.get(deisa.head.get_feedback.remote("foo", 3)) == (False, None)
+    assert ray.get(deisa.head.get_feedback.remote("foo")) == (True, [(1, "one"), (2, "two")])
+
     assert ray.get(deisa.head.get_feedback.remote("bar", 0)) == (True, "independent")
-    # querying "bar" at timestep 1 should miss since it doesnt exist in queue
     assert ray.get(deisa.head.get_feedback.remote("bar", 1)) == (False, None)
-    # querying "joe" at any timestep should miss since it doesnt exist in queue
     assert ray.get(deisa.head.get_feedback.remote("joe", 0)) == (False, None)
     assert ray.get(deisa.head.get_feedback.remote("joe", 1)) == (False, None)
     assert ray.get(deisa.head.get_feedback.remote("joe")) == (False, None)
 
 
-def test_feedback_set_does_not_leak_dask_scheduler(ray_cluster) -> None:  # noqa: F811
+def test_feedback_set_does_not_leak_dask_scheduler(ray_multinode_cluster) -> None:  # noqa: F811
     """Publishing feedback should not change later unrelated Dask computations."""
     from deisa.ray.window_handler import Deisa
 
@@ -196,9 +169,9 @@ def feedback_worker(*, rank: int, port: int) -> tuple[int, str, int]:
 
     arrays_md = {
         "array": {
-            "global_shape": (2,),
-            "chunk_shape": (1,),
-            "chunk_position": (rank,),
+            "global_shape": (1, 2),
+            "chunk_shape": (1, 1),
+            "chunk_position": (0, rank),
         }
     }
 
@@ -208,12 +181,12 @@ def feedback_worker(*, rank: int, port: int) -> tuple[int, str, int]:
         "127.0.0.1",
         port,
     )
-    bridge = Bridge(arrays_metadata=arrays_md, comm=comm, _node_id=f"node_{rank}")
+    bridge = Bridge(arrays_metadata=arrays_md, comm=comm)
 
     for timestep in range(2):
         bridge.send(
             array_name="array",
-            chunk=np.array([(rank + 1) * timestep], dtype=np.int32),
+            chunk=np.array([[(rank + 1) * timestep]], dtype=np.int32),
             timestep=timestep,
         )
 
@@ -245,13 +218,34 @@ def feedback_worker(*, rank: int, port: int) -> tuple[int, str, int]:
     return feedback_0, missing, feedback_1
 
 
-@pytest.mark.parametrize("worker_count", [2])
-def test_bridge_get_broadcasts_timestamped_feedback(worker_count: int, ray_cluster) -> None:  # noqa: F811
-    head_ref = feedback_head.remote()
+def test_bridge_get_broadcasts_timestamped_feedback(ray_multinode_cluster) -> None:  # noqa: F811
+    cluster = ray_multinode_cluster["cluster"]
+    head_node_id = None
+    worker_node_ids = []
+    for node in cluster.list_all_nodes():
+        if node.is_head():
+            head_node_id = node.node_id
+        else:
+            worker_node_ids.append(node.node_id)
+
+    head_ref = feedback_head.options(
+        scheduling_strategy=NodeAffinitySchedulingStrategy(
+            node_id=head_node_id,
+            soft=False,
+        ),
+    ).remote()
     wait_for_head_node()
     port = pick_free_port()
 
-    worker_refs = [feedback_worker.remote(rank=rank, port=port) for rank in range(worker_count)]
+    worker_refs = [
+        feedback_worker.options(
+            scheduling_strategy=NodeAffinitySchedulingStrategy(
+                node_id=worker_node_ids[rank],
+                soft=False,
+            ),
+        ).remote(rank=rank, port=port)
+        for rank in range(2)
+    ]
 
     results = ray.get(worker_refs)
     assert ray.get(head_ref)

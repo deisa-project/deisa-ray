@@ -20,7 +20,7 @@ from deisa.ray.types import (
     CallbackArgs,
     _CallbackConfig,
 )
-from deisa.ray.utils import get_head_actor_options
+from deisa.ray.utils import get_head_actor_options, get_ray_address
 
 Callback = IDeisa.Callback
 ExceptionHandler = IDeisa.ExceptionHandler
@@ -37,7 +37,11 @@ def _ray_start_impl() -> None:
     does not provide a custom ``ray_start`` hook.
     """
     if not ray.is_initialized():
-        ray.init(address="auto", log_to_driver=False, logging_level=logging.ERROR)
+        ray.init(
+            address=get_ray_address() or "auto",
+            log_to_driver=False,
+            logging_level=logging.ERROR,
+        )
 
 
 def _with_timestep(array: da.Array, timestep: int) -> DeisaArray:
@@ -346,6 +350,9 @@ class Deisa(IDeisa):
                         )
                         try:
                             simulation_callback(**callback_args)
+                        # TODO need to discuss whats the best way to handle this.
+                        # this is simulation_callback strictly, so maybe ALL errors
+                        # should be caught.
                         except TimeoutError as e:
                             raise e
                         except AssertionError as e:

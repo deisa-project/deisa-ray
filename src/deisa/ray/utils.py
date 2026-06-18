@@ -1,8 +1,28 @@
+import os
 import random
 import time
 from typing import Dict, Any
 import ray
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
+
+DEISA_HEAD_ACTOR_NAME = "simulation_head"
+DEISA_NAMESPACE = "deisa_ray"
+
+
+def get_ray_address() -> str | None:
+    """
+    Return the explicit Ray address for the current process when available.
+
+    Ray's local autodiscovery is process-global and can see clusters started by
+    other pytest-xdist workers. Prefer explicit addresses so state API calls and
+    lazy ray.init() connect to the cluster this process is already using.
+    """
+    address = os.environ.get("DEISA_RAY_ADDRESS") or os.environ.get("RAY_ADDRESS")
+    if address:
+        return address
+    if ray.is_initialized():
+        return ray.get_runtime_context().gcs_address
+    return None
 
 
 def get_node_actor_options(name: str, namespace: str) -> Dict[str, Any]:
@@ -77,19 +97,16 @@ async def get_ready_actor_with_retry(name, namespace, deadline_s=180):
     The function uses exponential backoff with jitter for retries. The delay
     starts at 0.2 seconds and increases by a factor of 1.5 up to a maximum
     of 5.0 seconds. A small random jitter (0-0.1 seconds) is added to avoid
-    thundering herd problems.
+    thundering herd problems. The function more or less corresponds to 3 retries
+    since each try times out after 60 seconds by default.
     """
     start, delay = time.time(), 0.2
     while True:
         try:
             actor = ray.get_actor(name=name, namespace=namespace)
-            # ready gate
-            # TODO for even more reliability, in the future we should handle
-            # actor exists, but unavailable
-            # actor exists, crashed, need to recreate
-            await actor.ready.remote()
+            await actor.ready.remote()  # readyness gate
             return actor
-        except ValueError:
+        except Exception:
             if time.time() - start > deadline_s:
                 raise TimeoutError(f"{namespace}/{name} not found in {deadline_s}s")
             time.sleep(delay + random.random() * 0.1)
@@ -117,7 +134,10 @@ def get_head_node_id() -> str:
     """
     from ray.util import state
 
-    nodes = state.list_nodes(filters=[("is_head_node", "=", True)])
+    nodes = state.list_nodes(
+        address=get_ray_address(),
+        filters=[("is_head_node", "=", True)],
+    )
 
     assert len(nodes) == 1, "There should be exactly one head node"
 
@@ -147,8 +167,8 @@ def get_head_actor_options() -> dict:
     """
     return dict(
         # The workers will be able to access to this actor using its name
-        name="simulation_head",
-        namespace="deisa_ray",
+        name=DEISA_HEAD_ACTOR_NAME,
+        namespace=DEISA_NAMESPACE,
         # Schedule the actor on this node
         scheduling_strategy=NodeAffinitySchedulingStrategy(
             node_id=get_head_node_id(),

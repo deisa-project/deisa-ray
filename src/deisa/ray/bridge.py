@@ -14,14 +14,19 @@ import ray
 from ray.actor import ActorClass
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 from deisa.core import ICommunicator, IBridge, validate_arrays_metadata
-from deisa.ray.comm import normalize_comm
 from deisa.ray.errors import ContractError, _default_exception_handler
 from deisa.ray.scheduling_actor import SchedulingActor as _RealSchedulingActor
 from deisa.ray.types import RayActorHandle
-from deisa.ray.utils import get_node_actor_options
+from deisa.ray.utils import get_node_actor_options, get_ray_address
 import sys
 
 logger = logging.getLogger(__name__)
+
+
+def _validate_comm(comm: Any) -> None:
+    required_methods = ("Get_rank", "Get_size", "gather", "bcast", "barrier")
+    if not all(callable(getattr(comm, method, None)) for method in required_methods):
+        raise TypeError("comm must implement deisa.core.ICommunicator")
 
 
 class Bridge(IBridge):
@@ -36,8 +41,7 @@ class Bridge(IBridge):
     ----------
     comm : deisa.core.ICommunicator
         Communication backend for the simulation ranks. The bridge ID is
-        derived from ``comm.Get_rank()``. Raw ``mpi4py`` communicators are
-        wrapped in :class:`deisa.ray.comm.MPICommAdapter`.
+        derived from ``comm.Get_rank()``.
     arrays_metadata : Mapping[str, Mapping[str, Any]]
         Metadata describing the array layout managed by this bridge.
     _node_id : str or None, optional
@@ -99,8 +103,7 @@ class Bridge(IBridge):
         ----------
         comm : deisa.core.ICommunicator
             Communication backend to use. The unique bridge identifier is
-            derived from ``comm.Get_rank()``. Raw ``mpi4py`` communicators are
-            wrapped in :class:`deisa.ray.comm.MPICommAdapter`.
+            derived from ``comm.Get_rank()``.
         arrays_metadata : Dict[str, Dict]
             Dictionary that describes the arrays being shared by the simulation.
             Keys represent the name of the array while the values are
@@ -138,21 +141,17 @@ class Bridge(IBridge):
         self._closed = False
 
         self.arrays_metadata = copy.deepcopy(validate_arrays_metadata(arrays_metadata))
-        comm = normalize_comm(comm)
         if comm is None:
             raise ValueError("comm is required")
-        if not isinstance(comm, ICommunicator):
-            raise TypeError("comm must implement deisa.core.ICommunicator")
+        _validate_comm(comm)
         self.comm = comm
         self.bridge_id = self.comm.Get_rank()
 
-        # NOTE : Possible error : if two bridges have different first array it will have different
-        # shape and will be declared twice.
-        # Possible fix : do it somewhere else (Head or SchedulingActor)
-        # we add a special array with a name that will signal the end of the simulation
-        # note we only need the metadata so that it can pass through the entire pipeline correctly and
-        # in sequential order, so we just replicate the first metadata we have.
-
+        # TODO detect that rank0 exists aka that the special array "__deisa_last_iteration_array"
+        # has been described. If this is not the case, raise an error. Otherwise analytics will never stop.
+        # Since the logic is that after the barrier, we expect all bridges to have sent their metatadata
+        # and in finalize registration all scheduling actors send their described arrays to the head actor,
+        # the check should happen there.
         if self.bridge_id == 0:
             self.arrays_metadata["__deisa_last_iteration_array"] = {
                 "global_shape": (1, 1),
@@ -161,7 +160,11 @@ class Bridge(IBridge):
             }
 
         if not ray.is_initialized():
-            ray.init(address="auto", log_to_driver=False, logging_level=logging.ERROR)
+            ray.init(
+                address=get_ray_address() or "auto",
+                log_to_driver=False,
+                logging_level=logging.ERROR,
+            )
 
         self.node_id = _node_id or ray.get_runtime_context().get_node_id()
         name = f"sched-{self.node_id}"
@@ -357,6 +360,8 @@ class Bridge(IBridge):
         for _ in range(max(1, self._init_retries)):
             try:
                 # first rank to arrive creates, others get same handle (get_if_exists)
+                # node actor waits up to 180 seconds for head actor to be created otherwise it raises a TimeoutError
+                # this means that 3 retries here corresponds to waiting up to 9 minutes for the head actor to be created
                 self.node_actor: RayActorHandle = node_actor_cls.options(**node_actor_options).remote(
                     actor_id=self.node_id
                 )  # type: ignore

@@ -1,10 +1,9 @@
-import os
 import socket
 import time
 
-import numpy as np
 import pytest
 import ray
+from ray.cluster_utils import Cluster
 
 
 def pick_free_port():
@@ -15,18 +14,54 @@ def pick_free_port():
     return port
 
 
-# @pytest.fixture(scope = "session")
-@pytest.fixture()
-def ray_cluster():
-    if ray.is_initialized():
-        ray.shutdown()
-    os.environ.setdefault("RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO", "0")
-    ray.init()
-    try:
-        yield ray.get_runtime_context().gcs_address
-    finally:
-        if ray.is_initialized():
-            ray.shutdown()
+def start_ray_multinode_cluster(
+    *,
+    head_node_gcs_server_port: int,
+) -> Cluster:
+    """Start a local multinode Ray test cluster with isolated head ports."""
+    cluster = Cluster(
+        initialize_head=True,
+        connect=False,
+        head_node_args={
+            "num_cpus": 1,
+            "gcs_server_port": head_node_gcs_server_port,
+            "dashboard_port": pick_free_port(),
+        },
+    )
+    cluster.add_node(num_cpus=1)
+    cluster.add_node(num_cpus=1)
+
+    return cluster
+
+
+@pytest.fixture
+def ray_multinode_cluster(monkeypatch):
+    cluster = start_ray_multinode_cluster(
+        head_node_gcs_server_port=pick_free_port(),
+    )
+
+    monkeypatch.setenv("DEISA_RAY_ADDRESS", cluster.address)
+    monkeypatch.setenv("RAY_ADDRESS", cluster.address)
+
+    ray.init(
+        address=cluster.address,
+        include_dashboard=False,
+        log_to_driver=True,
+        ignore_reinit_error=True,
+        runtime_env={
+            "env_vars": {
+                "DEISA_RAY_ADDRESS": cluster.address,
+                "RAY_ADDRESS": cluster.address,
+            }
+        },
+    )
+
+    yield {
+        "cluster": cluster,
+    }
+
+    ray.shutdown()
+    cluster.shutdown()
 
 
 def wait_for_head_node() -> None:
@@ -38,103 +73,3 @@ def wait_for_head_node() -> None:
             return
         except ValueError:
             time.sleep(0.1)
-
-
-@ray.remote(num_cpus=0, max_retries=0)
-def simple_worker(
-    *,
-    rank: int,
-    position: tuple[int, ...],
-    chunks_per_dim: tuple[int, ...],
-    chunk_size: tuple[int, ...],
-    nb_iterations: int,
-    nb_nodes: int,
-    port: int,
-    node_id: str | None = None,
-    array_name: str | list[str] = "array",
-    dtype: np.dtype = np.int32,  # type: ignore
-    _sleep_b4_send=0,
-    _sleep_intra_send=0,
-    **kwargs,
-) -> None:
-    """Worker node sending chunks of data"""
-    from deisa.ray.bridge import Bridge
-    from tests.comm_utils import init_gloo_comm
-
-    if isinstance(array_name, str):
-        array_name = [array_name]
-
-    start_iteration = kwargs.get("start_iteration", 0)
-
-    arrays_md = {
-        name: {
-            "global_shape": tuple(n * c for n, c in zip(chunks_per_dim, chunk_size)),
-            "chunk_shape": chunk_size,
-            "chunk_position": position,
-        }
-        for name in array_name
-    }
-
-    comm = init_gloo_comm(
-        nb_nodes,
-        rank,
-        "127.0.0.1",
-        port,
-    )
-    client = Bridge(arrays_metadata=arrays_md, comm=comm, _node_id=node_id)
-
-    array = (rank + 1) * np.ones(chunk_size, dtype=dtype)
-
-    time.sleep(_sleep_b4_send)
-    for i in range(start_iteration, nb_iterations):
-        time.sleep(_sleep_intra_send)
-        for array_described in list(arrays_md.keys()):
-            chunk = i * array
-            client.send(array_name=array_described, chunk=chunk, timestep=i)
-
-    client.close(timestep=nb_iterations)
-
-
-@ray.remote(num_cpus=0, max_retries=0)
-def simple_worker_error_test(
-    *,
-    rank: int,
-    position: tuple[int, ...],
-    chunks_per_dim: tuple[int, ...],
-    chunk_size: tuple[int, ...],
-    nb_iterations: int,
-    nb_nodes: int,
-    port: int,
-    node_id: str | None = None,
-    array_name: str = "array",
-    dtype: np.dtype = np.int32,  # type: ignore
-) -> None:
-    """Worker node sending chunks of data"""
-    from deisa.ray.bridge import Bridge
-    from tests.comm_utils import init_gloo_comm
-
-    arrays_md = {
-        array_name: {
-            "global_shape": tuple(n * c for n, c in zip(chunks_per_dim, chunk_size)),
-            "chunk_shape": chunk_size,
-            "chunk_position": position,
-        }
-    }
-
-    comm = init_gloo_comm(
-        nb_nodes,
-        rank,
-        "127.0.0.1",
-        port,
-    )
-    client = Bridge(arrays_metadata=arrays_md, comm=comm, _node_id=node_id)
-
-    array = (rank + 1) * np.ones(chunk_size, dtype=dtype)
-
-    for i in range(nb_iterations):
-        chunk = i * array
-        if i == nb_iterations // 2:
-            client.send(array_name="error", chunk=chunk, timestep=i)
-        else:
-            client.send(array_name=array_name, chunk=chunk, timestep=i)
-    client.close(timestep=nb_iterations)

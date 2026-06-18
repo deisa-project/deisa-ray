@@ -1,388 +1,215 @@
-import dask.array as da
-import ray
-from deisa.ray.types import DeisaArray
-from tests.utils import ray_cluster, simple_worker, wait_for_head_node, pick_free_port  # noqa: F401
-import pytest
-
-import numpy as np
-import shutil
-import pathlib
+# TODO use deisa.core DeisaArray and these tests should be moved to deisa.core/tests/test_saving_dask_arrays.py
 import os
+import pathlib
+from typing import TypedDict
 
-NB_ITERATIONS = 10
+import dask.array as da
+import numpy as np
+import pytest
+import ray
+from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 
+from deisa.ray.types import DeisaArray
+from tests.utils import pick_free_port, wait_for_head_node
 
-@pytest.mark.parametrize(
-    "fname, enable_distributed_scheduling",
-    [
-        ("interesting-event.h5", False),
-        ("interesting-event.h5", True),
-        ("~/interesting-event.h5", True),
-        ("~/interesting-event.h5", False),
-    ],
-)
-def test_dask_save_hdf5(fname, enable_distributed_scheduling, ray_cluster) -> None:  # noqa: F811
-    @ray.remote(max_retries=0)
-    def head_script(fname, enable_distributed_scheduling) -> None:
-        """The head node checks that the values are correct"""
-        from deisa.ray.window_handler import Deisa
-        from deisa.ray.types import Window
+NB_ITERATIONS = 6
+EXPECTED_AT_T5 = 5 * np.array([[1, 2]])
 
-        os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
 
-        d = Deisa()
+class PersistencePaths(TypedDict):
+    hdf5: list[str]
+    hdf5_timesteps: list[str]
+    hdf5_arrays: str
+    zarr: list[str]
+    netcdf: str
 
-        def simulation_callback(array: list[DeisaArray]):
-            if array[0].t == 5:
-                array[0].to_hdf5(fname, "data")
 
-        d.register_callback(
-            simulation_callback,
-            *[Window("array")],
-        )
-        d.execute_callbacks()
+@ray.remote(max_retries=0)
+def head_script(paths: PersistencePaths, enable_distributed_scheduling: bool) -> None:
+    """The head node saves data through Dask-backed DEISA arrays."""
+    from deisa.ray.window_handler import Deisa
 
-    import h5py
+    os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
 
-    # Check in the correct place.
-    full_name = pathlib.Path(fname).expanduser().resolve()
-
-    if os.path.exists(full_name):
-        save_dir = full_name.parent
-        os.system(f"rm -f {save_dir}/*.h5 {save_dir}/.*h5")
-
-    # Resolve on the driver so the Ray task writes to the same absolute path
-    # that this test later reads, regardless of task working directory.
-    head_ref = head_script.remote(str(full_name), enable_distributed_scheduling)
-    wait_for_head_node()
-    port = pick_free_port()
-
-    worker_refs = []
-    for rank in range(4):
-        worker_refs.append(
-            simple_worker.remote(
-                rank=rank,
-                position=(rank // 2, rank % 2),
-                chunks_per_dim=(2, 2),
-                chunk_size=(1, 1),
-                nb_iterations=NB_ITERATIONS,
-                node_id=f"node_{rank}",
-                nb_nodes=4,
-                port=port,
-            )
-        )
-
-    ray.get([head_ref] + worker_refs)
-
-    x = h5py.File(full_name)["data"]
-    data = da.from_array(x, chunks=2)
-
-    data_sum = data.sum().compute()
-    assert 49 < data_sum < 51
-
-    arr = 5 * np.array([[1, 2], [3, 4]])
-    assert (data.compute() == arr).all()
-
-    if os.path.exists(full_name):
-        save_dir = full_name.parent
-        os.system(f"rm -f {save_dir}/*.h5 {save_dir}/.*h5")
-
-
-@pytest.mark.parametrize(
-    "fname, enable_distributed_scheduling",
-    [
-        ("interesting-event.h5", False),
-        ("interesting-event.h5", True),
-    ],
-)
-def test_dask_save_several_timesteps_hdf5(fname, enable_distributed_scheduling, ray_cluster) -> None:  # noqa: F811
-    @ray.remote(max_retries=0)
-    def head_script(fname, enable_distributed_scheduling) -> None:
-        """The head node checks that the values are correct"""
-        from deisa.ray.window_handler import Deisa
-        from deisa.ray.types import Window
-
-        os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
-
-        d = Deisa()
-
-        def simulation_callback(array: list[DeisaArray]):
-            array[0].to_hdf5(fname, str(array[0].t))
-
-        d.register_callback(
-            simulation_callback,
-            *[Window("array")],
-        )
-        d.execute_callbacks()
-
-    import h5py
-
-    # Check in the correct place.
-    full_name = pathlib.Path(fname).expanduser().resolve()
-
-    if os.path.exists(full_name):
-        save_dir = full_name.parent
-        os.system(f"rm -f {save_dir}/*.h5 {save_dir}/.*h5")
-
-    # Resolve on the driver so the Ray task writes to the same absolute path
-    # that this test later reads, regardless of task working directory.
-    head_ref = head_script.remote(str(full_name), enable_distributed_scheduling)
-    wait_for_head_node()
-    port = pick_free_port()
-
-    worker_refs = []
-    for rank in range(4):
-        worker_refs.append(
-            simple_worker.remote(
-                rank=rank,
-                position=(rank // 2, rank % 2),
-                chunks_per_dim=(2, 2),
-                chunk_size=(1, 1),
-                nb_iterations=NB_ITERATIONS,
-                node_id=f"node_{rank}",
-                nb_nodes=4,
-                port=port,
-            )
-        )
-
-    ray.get([head_ref] + worker_refs)
-
-    for i in range(NB_ITERATIONS):
-        x = h5py.File(full_name)[str(i)]
-        data = da.from_array(x, chunks=2)
-
-        arr = i * np.array([[1, 2], [3, 4]])
-        assert (data.compute() == arr).all()
-
-    if os.path.exists(full_name):
-        save_dir = full_name.parent
-        os.system(f"rm -f {save_dir}/*.h5 {save_dir}/.*h5")
-
-
-@pytest.mark.parametrize(
-    "fname, enable_distributed_scheduling",
-    [
-        ("interesting-event.h5", False),
-        ("interesting-event.h5", True),
-    ],
-)
-def test_dask_save_several_arrays_hdf5(fname, enable_distributed_scheduling, ray_cluster) -> None:  # noqa: F811
-    @ray.remote(max_retries=0)
-    def head_script(fname, enable_distributed_scheduling) -> None:
-        """The head node checks that the values are correct"""
-        from deisa.ray.window_handler import Deisa
-        from deisa.ray.types import Window, to_hdf5
-
-        os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
-
-        d = Deisa()
-
-        def simulation_callback(a: list[DeisaArray], b: list[DeisaArray]):
-            if a[0].t == 5:
-                to_hdf5(fname, {"a": a[0], "b": b[0]})
-
-        d.register_callback(
-            simulation_callback,
-            *[Window("a"), Window("b")],
-        )
-        d.execute_callbacks()
-
-    import h5py
-
-    # Check in the correct place.
-    full_name = pathlib.Path(fname).expanduser().resolve()
-
-    if os.path.exists(full_name):
-        save_dir = full_name.parent
-        os.system(f"rm -f {save_dir}/*.h5 {save_dir}/.*h5")
-
-    # Resolve on the driver so the Ray task writes to the same absolute path
-    # that this test later reads, regardless of task working directory.
-    head_ref = head_script.remote(str(full_name), enable_distributed_scheduling)
-    wait_for_head_node()
-    port = pick_free_port()
-
-    worker_refs = []
-    for rank in range(4):
-        worker_refs.append(
-            simple_worker.remote(
-                rank=rank,
-                position=(rank // 2, rank % 2),
-                chunks_per_dim=(2, 2),
-                chunk_size=(1, 1),
-                nb_iterations=NB_ITERATIONS,
-                array_name=["a", "b"],
-                node_id=f"node_{rank}",
-                nb_nodes=4,
-                port=port,
-            )
-        )
-
-    ray.get([head_ref] + worker_refs)
-
-    a = h5py.File(full_name)["a"]
-    data_a = da.from_array(a, chunks=2)
-
-    b = h5py.File(full_name)["b"]
-    data_b = da.from_array(b, chunks=2)
-
-    sum_a = data_a.sum().compute()
-    assert 49 < sum_a < 51
-
-    sum_b = data_b.sum().compute()
-    assert 49 < sum_b < 51
-
-    assert sum_a - sum_b == 0
-
-    if os.path.exists(full_name):
-        save_dir = full_name.parent
-        os.system(f"rm -f {save_dir}/*.h5 {save_dir}/.*h5")
-
-
-@pytest.mark.parametrize(
-    "fname, enable_distributed_scheduling",
-    [
-        ("interesting-event.zarr", False),
-        ("~/interesting-event.zarr", False),
-        ("interesting-event.zarr", True),
-        ("~/interesting-event.zarr", True),
-    ],
-)
-def test_dask_save_zarr(fname, enable_distributed_scheduling, ray_cluster) -> None:  # noqa: F811
-    @ray.remote(max_retries=0)
-    def head_script(fname, enable_distributed_scheduling) -> None:
-        """The head node checks that the values are correct"""
-        from deisa.ray.window_handler import Deisa
-        from deisa.ray.types import Window
-
-        os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
-
-        d = Deisa()
-
-        def simulation_callback(array: list[DeisaArray]):
-            # If something that we are looking foward happens:
-            if array[0].t == 5:
-                array[0].to_zarr(fname, component="data")
-
-        d.register_callback(
-            simulation_callback,
-            *[Window("array")],
-        )
-        d.execute_callbacks()
-
-    # Check in the correct place.
-    full_path = pathlib.Path(fname).expanduser().resolve()
-
-    if os.path.exists(full_path):
-        shutil.rmtree(full_path)
-
-    # Resolve on the driver so the Ray task writes to the same absolute path
-    # that this test later reads, regardless of task working directory.
-    head_ref = head_script.remote(str(full_path), enable_distributed_scheduling)
-    wait_for_head_node()
-    port = pick_free_port()
-
-    worker_refs = []
-    for rank in range(4):
-        worker_refs.append(
-            simple_worker.remote(
-                rank=rank,
-                position=(rank // 2, rank % 2),
-                chunks_per_dim=(2, 2),
-                chunk_size=(1, 1),
-                nb_iterations=NB_ITERATIONS,
-                node_id=f"node_{rank}",
-                nb_nodes=4,
-                port=port,
-            )
-        )
-
-    ray.get([head_ref] + worker_refs)
-
-    data = da.from_zarr(full_path, component="data")
-
-    data_sum = data.sum().compute()
-    assert 49 < data_sum < 51
-
-    arr = 5 * np.array([[1, 2], [3, 4]])
-    assert (data.compute() == arr).all()
-
-    if os.path.exists(full_path):
-        shutil.rmtree(full_path)
-
-
-@pytest.mark.parametrize(
-    "fname, enable_distributed_scheduling",
-    [
-        ("interesting-event.nc", False),
-        ("interesting-event.nc", True),
-    ],
-)
-def test_dask_save_netcdf_xarray(fname, enable_distributed_scheduling, ray_cluster) -> None:  # noqa: F811
-    @ray.remote(max_retries=0)
-    def head_script(fname, enable_distributed_scheduling) -> None:
-        """The head node checks that the values are correct"""
-        from deisa.ray.window_handler import Deisa
-        from deisa.ray.types import Window
-
-        import xarray as xr
-
-        os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
-
-        d = Deisa()
-
-        def simulation_callback(array: list[DeisaArray]):
-            if array[0].t == 5:
-                xarray_da = xr.DataArray(array[0], dims=["x", "y"], name="data").compute()
-
-                xarray_da.to_netcdf(fname)
-
-        d.register_callback(
-            simulation_callback,
-            *[Window("array")],
-        )
-        d.execute_callbacks()
+    d = Deisa()
 
     import xarray as xr
 
-    # Check in the correct place.
-    full_name = pathlib.Path(fname).expanduser().resolve()
+    from deisa.ray.types import to_hdf5
 
-    if os.path.exists(full_name):
-        os.system(f"rm -f {full_name}")
+    @d.register("array")
+    def save_single_array_outputs(array: list[DeisaArray]):
+        for fname in paths["hdf5_timesteps"]:
+            array[0].to_hdf5(fname, str(array[0].t))
 
-    # Resolve on the driver so the Ray task writes to the same absolute path
-    # that this test later reads, regardless of task working directory.
-    head_ref = head_script.remote(str(full_name), enable_distributed_scheduling)
+        if array[0].t != 5:
+            return
+
+        for fname in paths["hdf5"]:
+            array[0].to_hdf5(fname, "data")
+
+        for fname in paths["zarr"]:
+            array[0].to_zarr(fname, component="data")
+
+        xarray_da = xr.DataArray(array[0], dims=["x", "y"], name="data").compute()
+        xarray_da.to_netcdf(paths["netcdf"])
+
+    @d.register("a", "b")
+    def save_multiple_array_hdf5(a: list[DeisaArray], b: list[DeisaArray]):
+        if a[0].t == 5:
+            to_hdf5(paths["hdf5_arrays"], {"a": a[0], "b": b[0]})
+
+    d.execute_callbacks()
+
+
+@ray.remote(num_cpus=0, max_retries=0)
+def bridge_script(*, rank: int, port: int, array_names: list[str]) -> None:
+    from deisa.ray.bridge import Bridge
+    from tests.comm_utils import init_gloo_comm
+
+    arrays_md = {
+        name: {
+            "global_shape": (1, 2),
+            "chunk_shape": (1, 1),
+            "chunk_position": (0, rank),
+        }
+        for name in array_names
+    }
+
+    comm = init_gloo_comm(
+        2,
+        rank,
+        "127.0.0.1",
+        port,
+    )
+    bridge = Bridge(arrays_metadata=arrays_md, comm=comm, _node_id=f"node_{rank}")
+
+    array = (rank + 1) * np.ones((1, 1), dtype=np.int32)
+    for i in range(NB_ITERATIONS):
+        for array_name in array_names:
+            bridge.send(array_name=array_name, chunk=i * array, timestep=i)
+
+    bridge.close(timestep=NB_ITERATIONS)
+
+
+def _node_ids(ray_multinode_cluster) -> tuple[str, list[str]]:
+    cluster = ray_multinode_cluster["cluster"]
+    head_node_id = None
+    worker_node_ids = []
+    for node in cluster.list_all_nodes():
+        if node.is_head():
+            head_node_id = node.node_id
+        else:
+            worker_node_ids.append(node.node_id)
+
+    assert head_node_id is not None
+    assert len(worker_node_ids) == 2
+    return head_node_id, worker_node_ids
+
+
+def _run_save_workflow(
+    *,
+    ray_multinode_cluster,
+    paths: PersistencePaths,
+    enable_distributed_scheduling: bool,
+) -> None:
+    head_node_id, worker_node_ids = _node_ids(ray_multinode_cluster)
+    head_ref = head_script.options(
+        scheduling_strategy=NodeAffinitySchedulingStrategy(
+            node_id=head_node_id,
+            soft=False,
+        ),
+    ).remote(paths, enable_distributed_scheduling)
     wait_for_head_node()
     port = pick_free_port()
 
-    worker_refs = []
-    for rank in range(4):
-        worker_refs.append(
-            simple_worker.remote(
-                rank=rank,
-                position=(rank // 2, rank % 2),
-                chunks_per_dim=(2, 2),
-                chunk_size=(1, 1),
-                nb_iterations=NB_ITERATIONS,
-                node_id=f"node_{rank}",
-                nb_nodes=4,
-                port=port,
-            )
-        )
+    array_names = ["array", "a", "b"]
+
+    worker_refs = [
+        bridge_script.options(
+            scheduling_strategy=NodeAffinitySchedulingStrategy(
+                node_id=worker_node_ids[rank],
+                soft=False,
+            ),
+        ).remote(rank=rank, port=port, array_names=array_names)
+        for rank in range(2)
+    ]
 
     ray.get([head_ref] + worker_refs)
 
-    data = xr.open_dataarray(full_name)
 
-    arr = 5 * np.array([[1, 2], [3, 4]])
-    assert (data.compute() == arr).all()
+def _output_path(tmp_path: pathlib.Path, fname: str) -> pathlib.Path:
+    """Return an isolated path while preserving relative and tilde-shaped cases."""
+    if fname.startswith("~/"):
+        return tmp_path / "home" / fname.removeprefix("~/")
+    return tmp_path / fname
 
-    assert data.dims == ("x", "y")
 
-    if os.path.exists(full_name):
-        os.system(f"rm -f {full_name}")
+def _persistence_paths(tmp_path: pathlib.Path) -> PersistencePaths:
+    hdf5_paths = [
+        _output_path(tmp_path, "interesting-event.h5"),
+        _output_path(tmp_path, "~/interesting-event.h5"),
+    ]
+    hdf5_timesteps_paths = [_output_path(tmp_path, "timesteps.h5")]
+    hdf5_arrays_path = _output_path(tmp_path, "several-arrays.h5")
+    zarr_paths = [
+        _output_path(tmp_path, "interesting-event.zarr"),
+        _output_path(tmp_path, "~/interesting-event.zarr"),
+    ]
+    netcdf_path = _output_path(tmp_path, "interesting-event.nc")
+
+    for output_path in [*hdf5_paths, *hdf5_timesteps_paths, hdf5_arrays_path, *zarr_paths, netcdf_path]:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    return {
+        "hdf5": [str(path) for path in hdf5_paths],
+        "hdf5_timesteps": [str(path) for path in hdf5_timesteps_paths],
+        "hdf5_arrays": str(hdf5_arrays_path),
+        "zarr": [str(path) for path in zarr_paths],
+        "netcdf": str(netcdf_path),
+    }
+
+
+def _assert_hdf5_dataset(path: pathlib.Path, dataset: str, expected: np.ndarray) -> None:
+    import h5py
+
+    with h5py.File(path) as h5file:
+        data = da.from_array(h5file[dataset], chunks=2)
+        assert (data.compute() == expected).all()
+
+
+@pytest.mark.parametrize("enable_distributed_scheduling", [False, True])
+def test_dask_array_persistence_formats(enable_distributed_scheduling, ray_multinode_cluster, tmp_path) -> None:  # noqa: F811
+    import h5py
+    import xarray as xr
+
+    paths = _persistence_paths(tmp_path)
+
+    _run_save_workflow(
+        ray_multinode_cluster=ray_multinode_cluster,
+        paths=paths,
+        enable_distributed_scheduling=enable_distributed_scheduling,
+    )
+
+    for hdf5_path in paths["hdf5"]:
+        _assert_hdf5_dataset(pathlib.Path(hdf5_path), "data", EXPECTED_AT_T5)
+
+    with h5py.File(paths["hdf5_timesteps"][0]) as h5file:
+        for i in range(NB_ITERATIONS):
+            data = da.from_array(h5file[str(i)], chunks=2)
+            arr = i * np.array([[1, 2]])
+            assert (data.compute() == arr).all()
+
+    _assert_hdf5_dataset(pathlib.Path(paths["hdf5_arrays"]), "a", EXPECTED_AT_T5)
+    _assert_hdf5_dataset(pathlib.Path(paths["hdf5_arrays"]), "b", EXPECTED_AT_T5)
+
+    for zarr_path in paths["zarr"]:
+        data = da.from_zarr(zarr_path, component="data")
+        assert (data.compute() == EXPECTED_AT_T5).all()
+
+    with xr.open_dataarray(paths["netcdf"]) as data:
+        assert (data.compute() == EXPECTED_AT_T5).all()
+        assert data.dims == ("x", "y")
 
 
 # Regression note:

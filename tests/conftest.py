@@ -1,1 +1,1 @@
-from .utils import ray_cluster  # noqa: F401
+from tests.utils import ray_multinode_cluster  # noqa: F401
