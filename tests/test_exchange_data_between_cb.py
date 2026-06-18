@@ -5,7 +5,7 @@ import numpy as np
 
 from deisa.ray.bridge import Bridge
 from tests.comm_utils import NoOpComm
-from tests.utils import ray_multinode_cluster, wait_for_head_node  # noqa: F401
+from tests.utils import wait_for_head_node
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 
 SHARED_SUM = 0

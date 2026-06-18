@@ -8,7 +8,7 @@ from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 from deisa.ray.bridge import Bridge
 from tests.comm_utils import NoOpComm
 from deisa.ray.types import DeisaArray
-from tests.utils import ray_multinode_cluster, wait_for_head_node  # noqa: F401
+from tests.utils import wait_for_head_node
 
 
 @ray.remote(max_retries=0)

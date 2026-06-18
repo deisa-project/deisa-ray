@@ -9,8 +9,6 @@ import sys
 
 import pytest
 
-from tests.utils import ray_multinode_cluster  # noqa: F401
-
 
 def _build_mpi_command(launcher: str, runner: pathlib.Path) -> list[str]:
     """

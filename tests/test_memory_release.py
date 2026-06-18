@@ -67,6 +67,7 @@ def head_script(enable_distributed_scheduling) -> None:
     @d.register("array")
     def simulation_callback(array: list[DeisaArray]):
         pass
+
     d.execute_callbacks()
 
 
@@ -74,6 +75,7 @@ def head_script(enable_distributed_scheduling) -> None:
 def bridge_script(*, rank: int, port: int) -> None:
     from deisa.ray.bridge import Bridge
     from tests.comm_utils import NoOpComm
+
     arrays_md = {
         "array": {
             "global_shape": (1024, 1024),

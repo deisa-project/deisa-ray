@@ -9,7 +9,7 @@ import ray
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 
 from deisa.ray.types import DeisaArray
-from tests.utils import pick_free_port, ray_multinode_cluster, wait_for_head_node  # noqa: F401
+from tests.utils import pick_free_port, wait_for_head_node
 
 NB_ITERATIONS = 6
 EXPECTED_AT_T5 = 5 * np.array([[1, 2]])

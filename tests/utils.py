@@ -1,7 +1,6 @@
 import socket
 import time
 
-import numpy as np
 import pytest
 import ray
 from ray.cluster_utils import Cluster

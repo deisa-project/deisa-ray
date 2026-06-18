@@ -58,7 +58,7 @@ def bridge_script(*, rank: int, port: int):
         port,
         timeout_s=1,
     )
-    b = Bridge(
+    Bridge(
         arrays_metadata=arrays_md,
         comm=comm,
     )  # type:ignore

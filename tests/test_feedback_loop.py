@@ -7,7 +7,7 @@ import ray
 
 from deisa.ray.config import DEISA_DISTRIBUTED_SCHEDULING_ENV
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
-from tests.utils import pick_free_port, ray_multinode_cluster, wait_for_head_node  # noqa: F401
+from tests.utils import pick_free_port, wait_for_head_node
 
 # I need to test:
 # - [x] that the head actor is queried directly for feedback (not the node actors)

@@ -8,7 +8,6 @@ from ray.util.state import list_actors
 from deisa.ray.types import DeisaArray
 from tests.utils import (
     pick_free_port,
-    ray_multinode_cluster,  # noqa: F401
     start_ray_multinode_cluster,
     wait_for_head_node,
 )

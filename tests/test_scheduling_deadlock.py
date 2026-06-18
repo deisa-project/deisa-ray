@@ -5,7 +5,6 @@ from deisa.ray.head_node import HeadNodeActor
 from deisa.ray.scheduling_actor import SchedulingActor
 from deisa.ray.types import ScheduledByOtherActor
 from deisa.ray.utils import get_head_actor_options
-from tests.utils import ray_multinode_cluster  # noqa: F401
 
 
 def test_cross_actor_graph_no_deadlock(ray_multinode_cluster) -> None:
