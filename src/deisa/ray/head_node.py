@@ -62,6 +62,14 @@ class HeadNodeActor:
         max_simulation_ahead : int, optional
             How many timesteps may be created ahead of the analytics.
             Defaults to 1.
+        feedback_queue_size : int, optional
+            Maximum number of timestamped feedback values retained per
+            feedback key. Defaults to 1024.
+
+        Raises
+        ------
+        ValueError
+            If ``feedback_queue_size`` is less than or equal to zero.
 
         Notes
         -----
@@ -208,6 +216,25 @@ class HeadNodeActor:
         """
         Store a timestamped feedback value for simulation bridges.
 
+        Parameters
+        ----------
+        key : Hashable
+            Identifier for the feedback stream.
+        timestep : Timestep
+            Timestep associated with ``value``. Timesteps for the same key
+            must be strictly increasing.
+        value : Any
+            Feedback payload to store.
+
+        Raises
+        ------
+        TypeError
+            If ``timestep`` cannot be compared with previous timesteps for
+            the same key.
+        ValueError
+            If ``timestep`` duplicates or is older than the newest stored
+            timestep for ``key``.
+
         Notes
         -----
         Values are kept in a fixed-size per-key queue. Timesteps for each key
@@ -302,6 +329,10 @@ class HeadNodeActor:
         pos_to_ref : dict[tuple, ray.ObjectRef]
             Mapping from chunk position to Ray ObjectRef (double refs) for
             the chunk payloads owned by the calling actor.
+        actor_id : str
+            Identifier of the scheduling actor reporting ready chunks.
+        dtype : numpy.dtype
+            NumPy dtype shared by the chunks for this array timestep.
 
         Notes
         -----

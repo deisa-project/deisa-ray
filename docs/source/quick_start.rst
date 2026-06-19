@@ -110,7 +110,7 @@ standard Dask array methods directly, and ``DeisaArray.t`` is the timestep.
 
     deisa.register_callback(
         summary_callback,
-        [Window("temperature", window_size=3)],
+        [Window("temperature", size=3)],
     )
 
     deisa.execute_callbacks()
@@ -146,13 +146,13 @@ Using ``Window`` with a sliding window
 ------------------------------------------
 
 To keep the last three timesteps of an array available inside a callback, use a
-``Window`` with ``window_size=3``:
+``Window`` with ``size=3``:
 
 .. code-block:: python
 
     from deisa.ray.types import Window
 
-    temperature_spec = Window("temperature", window_size=3)
+    temperature_spec = Window("temperature", size=3)
 
 The callback argument for that window spec will contain up to the three most
 recent arrays sent by the simulation. During the first two iterations, the list
@@ -163,7 +163,7 @@ The window size should be chosen based on both memory capacity and the needs of
 the analysis. A window of length 3 means the system must be able to keep three
 copies of that array in memory at the same time. It should also match the
 algorithm you want to implement. For example, a midpoint Euler-style formula
-that needs three timesteps requires ``window_size=3``.
+that needs three timesteps requires ``size=3``.
 
 The list is ordered from oldest to newest: the oldest array is at the
 beginning, and the most recent array is at the end. Each entry is a
