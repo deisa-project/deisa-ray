@@ -21,7 +21,7 @@ from deisa.ray.types import (
     CallbackArgs,
     _CallbackConfig,
 )
-from deisa.ray.utils import get_head_actor_options, get_ray_address
+from deisa.ray.utils import get_head_actor_options
 
 Callback = IDeisa.Callback
 ExceptionHandler = IDeisa.ExceptionHandler
