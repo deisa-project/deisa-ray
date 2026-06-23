@@ -69,9 +69,8 @@ def _wait_for_object_store_memory(
         projected_used_bytes = used_bytes + required_bytes
         projected_usage = projected_used_bytes / total_bytes if total_bytes > 0 else 1
         usage_ok = projected_usage < threshold
-        space_ok = free_bytes >= required_bytes
 
-        if usage_ok and space_ok:
+        if usage_ok:
             return
 
         elapsed_s = time.monotonic() - start_time

@@ -1,7 +1,6 @@
 from collections import deque, defaultdict
 import gc
 import logging
-import time
 from typing import Any, Callable, List, Optional, Literal
 
 import dask
@@ -21,7 +20,7 @@ from deisa.ray.types import (
     CallbackArgs,
     _CallbackConfig,
 )
-from deisa.ray.utils import get_head_actor_options
+from deisa.ray.utils import get_head_actor_options, get_ray_address
 
 Callback = IDeisa.Callback
 ExceptionHandler = IDeisa.ExceptionHandler
@@ -34,21 +33,15 @@ def _ray_start_impl() -> None:
 
     Notes
     -----
-    Initializes Ray only once with minimal logging. If the Ray runtime is not
-    ready yet, retries for a short window before surfacing the startup error.
+    Initializes Ray only once with minimal logging. Used when the caller
+    does not provide a custom ``ray_start`` hook.
     """
-    timeout_secconds = 10.0
-    interval_retry = 1.0
-    deadline = time.monotonic() + timeout_secconds
-    while not ray.is_initialized():
-        try:
-            ray.init(address="auto", log_to_driver=False, logging_level=logging.ERROR)
-            return
-        except Exception:
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                raise
-            time.sleep(min(interval_retry, remaining))
+    if not ray.is_initialized():
+        ray.init(
+            address=get_ray_address() or "auto",
+            log_to_driver=False,
+            logging_level=logging.ERROR,
+        )
 
 
 def _with_timestep(array: da.Array, timestep: int) -> DeisaArray:
