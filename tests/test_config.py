@@ -59,13 +59,6 @@ def test_ray_start_is_read_from_kwargs():
     assert d._ray_start is ray_start
 
 
-# TODO remove when memory handling is done from bridge size checking that
-# ray.put can happen because enough memory is available.
-def test_max_simulation_ahead_is_read_from_kwargs():
-    d = Deisa(max_simulation_ahead=2)
-    assert d.max_simulation_ahead == 2
-
-
 def test_unexpected_init_kwarg_is_rejected():
     with pytest.raises(TypeError, match="unexpected keyword argument 'unknown'"):
         Deisa(unknown=True)

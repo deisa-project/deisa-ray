@@ -77,7 +77,6 @@ class HeadNodeActor:
         # TODO: document what this event signals and update documentation
         self.new_array_created: dict[str, asyncio.Lock] = {}
         self.max_simulation_ahead = max_simulation_ahead
-        self.semaphore_per_array = {}
 
         if feedback_queue_size <= 0:
             raise ValueError(f"feedback_queue_size must be > 0, got {feedback_queue_size}")
@@ -175,7 +174,6 @@ class HeadNodeActor:
 
         if array_name not in self.registered_arrays:
             self.registered_arrays[array_name] = DaskArrayData(array_name)
-            self.semaphore_per_array[array_name] = asyncio.Semaphore(self.max_simulation_ahead)
             self.new_array_created[array_name] = asyncio.Lock()
 
         array = self.registered_arrays[array_name]
@@ -314,7 +312,6 @@ class HeadNodeActor:
         """
         array = self.registered_arrays[array_name]
         array.update_dtype(timestep, dtype)
-        semaphore = self.semaphore_per_array[array_name]
         lock = self.new_array_created[array_name]
         creator = False
         future = None
@@ -331,7 +328,6 @@ class HeadNodeActor:
                 future = entry
 
         if creator:
-            await semaphore.acquire()
             async with lock:
                 array.chunk_refs[timestep] = []
                 future.set_result(True)
@@ -405,5 +401,4 @@ class HeadNodeActor:
         components to pull work in order.
         """
         array = await self.arrays_ready.get()
-        self.semaphore_per_array[array[0]].release()
         return array
