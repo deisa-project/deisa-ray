@@ -48,8 +48,8 @@ def _get_ray_object_store_memory() -> tuple[int, int]:
 
 def _wait_for_object_store_memory(
     required_bytes: int,
-    poll_interval: float = 0.5,
-    threshold: float = 0.6,
+    poll_interval: float = 0.2,
+    threshold: float = 0.8,
     timeout_s: float | None = 100.0,
     bridge_rank: int | None = None,
     array_name: str | None = None,
