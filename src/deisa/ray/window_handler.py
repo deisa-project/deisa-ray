@@ -45,6 +45,22 @@ def _ray_start_impl() -> None:
 
 
 def _with_timestep(array: da.Array, timestep: int) -> DeisaArray:
+    """
+    Wrap a Dask array as a :class:`DeisaArray` tagged with a timestep.
+
+    Parameters
+    ----------
+    array : dask.array.Array
+        Array produced by the head actor.
+    timestep : int
+        Simulation timestep associated with ``array``.
+
+    Returns
+    -------
+    DeisaArray
+        Array view preserving the original graph metadata and exposing the
+        timestep through :attr:`DeisaArray.timestep`.
+    """
     return DeisaArray(
         array.dask,
         array.name,
@@ -182,6 +198,19 @@ class Deisa(IDeisa):
         """
 
         def deco(fn):
+            """
+            Register ``fn`` as an analytics callback.
+
+            Parameters
+            ----------
+            fn : Callable
+                Callback function to register.
+
+            Returns
+            -------
+            Callable
+                The original callback function.
+            """
             return self.register_callback(
                 fn,
                 *callback_args,

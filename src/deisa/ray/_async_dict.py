@@ -20,7 +20,14 @@ class AsyncDict(Generic[K, V]):
         self._new_key_event = asyncio.Event()
 
     def keys(self) -> list[K]:
-        """Return the view of stored keys."""
+        """
+        Return the stored keys.
+
+        Returns
+        -------
+        dict_keys
+            Dynamic view of the keys currently stored in the dictionary.
+        """
         return self._data.keys()
 
     def __setitem__(self, key: K, value: V) -> None:
@@ -39,7 +46,24 @@ class AsyncDict(Generic[K, V]):
         self._new_key_event.clear()
 
     def __getitem__(self, key: K) -> V:
-        """Return the value stored under ``key`` (raises ``KeyError`` if missing)."""
+        """
+        Return the value stored under ``key``.
+
+        Parameters
+        ----------
+        key : K
+            Key to look up.
+
+        Returns
+        -------
+        V
+            Value associated with ``key``.
+
+        Raises
+        ------
+        KeyError
+            If ``key`` is not present.
+        """
         return self._data[key]
 
     async def wait_for_key(self, key: K) -> V:
@@ -61,9 +85,28 @@ class AsyncDict(Generic[K, V]):
         return self._data[key]
 
     def __contains__(self, key: K) -> bool:
-        """Return True if ``key`` is present."""
+        """
+        Return whether ``key`` is present.
+
+        Parameters
+        ----------
+        key : K
+            Key to test.
+
+        Returns
+        -------
+        bool
+            ``True`` when ``key`` exists in the dictionary.
+        """
         return key in self._data
 
     def __len__(self) -> int:
-        """Return the number of stored keys."""
+        """
+        Return the number of stored items.
+
+        Returns
+        -------
+        int
+            Count of key-value pairs currently stored.
+        """
         return len(self._data)

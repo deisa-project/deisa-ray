@@ -185,20 +185,15 @@ class Window:
     Parameters
     ----------
     name : str
-        The name of the array.
-    window_size : int or None, optional
-        If specified, creates a sliding window of arrays for this array name.
-        The window will contain the last `window_size` timesteps. If None,
-        only the current timestep array is provided. Default is 1.
+        Name of the array passed to a registered analytics callback.
+    size : int, optional
+        Number of latest timesteps to pass for this array. Defaults to 1.
 
     Examples
     --------
-    >>> def normalize(arr):
-    ...     return arr / arr.max()
-    >>> # Array with windowing: last 5 timesteps
-    >>> array_def = ArrayDefinition(name="temperature", window_size=5)
-    >>> # Array without windowing: current timestep only
-    >>> array_def = ArrayDefinition(name="pressure", window_size=None)
+    Request the latest five ``temperature`` arrays in a callback::
+
+        deisa.register_callback(callback, Window("temperature", size=5))
     """
 
     name: str
@@ -210,26 +205,102 @@ type CallbackArgs = Window | str
 
 class DeisaArray(da.Array):
     def __new__(cls, dask, name, chunks, t: int, dtype=None, meta=None, shape=None):
+        """
+        Create a Dask array instance carrying DEISA timestep metadata.
+
+        Parameters
+        ----------
+        dask : Mapping or HighLevelGraph
+            Dask graph backing the array.
+        name : str
+            Dask collection name.
+        chunks : tuple or list
+            Dask chunk structure.
+        t : int
+            Simulation timestep associated with this array.
+        dtype : numpy.dtype or None, optional
+            Array dtype forwarded to :class:`dask.array.Array`.
+        meta : Any, optional
+            Optional Dask meta object.
+        shape : tuple[int, ...] or None, optional
+            Full array shape.
+
+        Returns
+        -------
+        DeisaArray
+            New array object with the same construction semantics as
+            :class:`dask.array.Array`.
+        """
         return super().__new__(cls, dask, name, chunks, dtype=dtype, meta=meta, shape=shape)
 
     def __init__(self, dask, name, chunks, t: int, dtype=None, meta=None, shape=None):
+        """
+        Store timestep metadata on the array.
+
+        Parameters
+        ----------
+        dask : Mapping or HighLevelGraph
+            Dask graph backing the array.
+        name : str
+            Dask collection name.
+        chunks : tuple or list
+            Dask chunk structure.
+        t : int
+            Simulation timestep associated with this array.
+        dtype : numpy.dtype or None, optional
+            Array dtype forwarded during construction.
+        meta : Any, optional
+            Optional Dask meta object.
+        shape : tuple[int, ...] or None, optional
+            Full array shape.
+        """
         self.t = t
 
     @property
     def timestep(self) -> int:
+        """
+        Return the simulation timestep associated with this array.
+
+        Returns
+        -------
+        int
+            Timestep provided when the array was created.
+        """
         return self.t
 
     def to_zarr(
         self, url, component=None, storage_options=None, region=None, compute=True, return_stored=False, mode="a"
     ) -> None:
         """
-        Save data using the zarr storage format
+        Save this array using the Zarr storage format.
+
+        Parameters
+        ----------
+        url : str or pathlib.Path
+            Directory, store, or path-like target passed to
+            :func:`dask.array.to_zarr`.
+        component : str or None, optional
+            Component path inside the Zarr store.
+        storage_options : dict or None, optional
+            Storage options forwarded to Dask for fsspec-backed targets.
+        region : tuple[slice, ...] or None, optional
+            Region to write within an existing array.
+        compute : bool, optional
+            Whether to compute immediately. Defaults to ``True``.
+        return_stored : bool, optional
+            Whether Dask should return stored chunks. Defaults to ``False``.
+        mode : str, optional
+            Zarr write mode. Defaults to ``"a"``.
+
+        Returns
+        -------
+        Any
+            Return value from :func:`dask.array.to_zarr`.
 
         Notes
         -----
-        This method is a simple wrapper to `dask.to_zarr`. To more details about parameters see:
-
-        https://docs.dask.org/en/latest/generated/dask.array.to_zarr.html#dask.array.to_zarr
+        This method persists the array first, resolves local path-like targets
+        to absolute paths, and then delegates to :func:`dask.array.to_zarr`.
         """
 
         full_path = pathlib.Path(url).expanduser().resolve()
@@ -267,21 +338,21 @@ class DeisaArray(da.Array):
 
 def chunk_fname(fname: str, dataset: str, block_id: tuple[int, ...] = ()):
     """
-    Create the filename for a chunk.
+    Create the hidden HDF5 filename for one stored chunk.
 
     Parameters
     ----------
     fname : str
-        The name of the final file where the data will be stored.
+        Final HDF5 VDS file path.
     dataset : str
-        The name of the dataset in the hdf5 where the data will be stored.
-    block_id : tuple[int, ...]
-        Chunk position to create the file.
+        Dataset name inside the final HDF5 file.
+    block_id : tuple[int, ...], optional
+        Chunk grid position. Defaults to ``()``.
 
     Returns
     -------
-    str
-        Filename for the chunk of position block_id.
+    pathlib.Path
+        Hidden chunk file path next to ``fname``.
     """
 
     path = pathlib.Path(fname).expanduser().resolve()
@@ -296,18 +367,23 @@ def chunk_fname(fname: str, dataset: str, block_id: tuple[int, ...] = ()):
 
 def save_chunk(chunk: np.ndarray, fname: str, dataset: str, block_id: tuple[int, ...] | None = None) -> None:
     """
-    Save one chunk to a individual hdf5 file.
+    Save one chunk to an individual HDF5 file.
 
     Parameters
     ----------
-    chunk : np.ndarray
-        Chunk to be stored.
+    chunk : numpy.ndarray
+        Chunk payload to write.
     fname : str
-        The name of the final file where the data will be stored.
+        Final HDF5 VDS file path used to derive the chunk filename.
     dataset : str
-        The name of the dataset in the hdf5 where the data will be stored.
-    block_id : tuple[int, ...]
-        Chunk position, used to merge into a VDS.
+        Dataset name to create in the chunk file.
+    block_id : tuple[int, ...] or None, optional
+        Chunk grid position used in the chunk filename.
+
+    Returns
+    -------
+    None
+        Writes the chunk file for later VDS assembly.
     """
 
     import h5py
@@ -327,22 +403,27 @@ def create_vds(
     data_dtype: np.dtype,
 ) -> None:
     """
-    Creates a VDS aggregating all chunk files.
+    Create an HDF5 virtual dataset aggregating all chunk files.
 
     Parameters
     ----------
     fname : str
-        The name of the final file where the data will be stored.
+        Final HDF5 VDS file path.
     dataset : str
-        The name of the dataset in the hdf5 where the data will be stored.
-    chunk_shape : tuple[int,...]
-        Shape of the chunks, used to map the chunks into the VDS.4
-    data_shape : tuple[int,...]
-        Shape of the data.
-    nb_chunks_per_dim : tuple[int,...]
-        Number of chunks for each dimension
-    data_dtype : np.dtype
-        The numpy dtype of the data.
+        Dataset name to create in ``fname``.
+    chunk_shape : tuple[int, ...]
+        Shape of each chunk.
+    data_shape : tuple[int, ...]
+        Shape of the full logical dataset.
+    nb_chunks_per_dim : tuple[int, ...]
+        Number of chunks along each dimension.
+    data_dtype : numpy.dtype
+        NumPy dtype of the dataset.
+
+    Returns
+    -------
+    None
+        Creates or updates ``fname`` with the virtual dataset.
     """
 
     import h5py
@@ -374,9 +455,14 @@ def to_hdf5(fname: str, sources: dict[str, DeisaArray]) -> None:
     Parameters
     ----------
     fname : str
-        The name of the final file where the data will be stored.
+        Final HDF5 file path.
     sources : dict[str, DeisaArray]
-        Dict mapping the datasets in final file to final files
+        Mapping from dataset names in ``fname`` to arrays to persist.
+
+    Returns
+    -------
+    None
+        Creates chunk files and the virtual datasets in ``fname``.
 
     Notes
     -----
@@ -566,6 +652,21 @@ class DaskArrayData:
                 assert self.chunks_size[i][pos] == size[i]
 
     def update_dtype(self, timestep: Timestep, dtype: np.dtype) -> None:
+        """
+        Record or validate the dtype for an array timestep.
+
+        Parameters
+        ----------
+        timestep : Timestep
+            Timestep whose dtype is being recorded.
+        dtype : numpy.dtype
+            Dtype reported for chunks in this timestep.
+
+        Raises
+        ------
+        AssertionError
+            If a different dtype was already registered for ``timestep``.
+        """
         if timestep not in self.dtype_by_timestep:
             self.dtype_by_timestep[timestep] = dtype
         else:

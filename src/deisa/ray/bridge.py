@@ -25,6 +25,19 @@ logger = logging.getLogger(__name__)
 
 
 def _validate_comm(comm: Any) -> None:
+    """
+    Validate that an object implements the communicator protocol used by bridges.
+
+    Parameters
+    ----------
+    comm : Any
+        Candidate communicator object.
+
+    Raises
+    ------
+    TypeError
+        If ``comm`` does not expose the required collective methods.
+    """
     required_methods = ("Get_rank", "Get_size", "gather", "bcast", "barrier")
     if not all(callable(getattr(comm, method, None)) for method in required_methods):
         raise TypeError("comm must implement deisa.core.ICommunicator")
@@ -394,6 +407,15 @@ class Bridge(IBridge):
             _default_exception_handler(e)
 
     def __del__(self) -> None:
+        """
+        Best-effort finalizer that closes an initialized bridge.
+
+        Notes
+        -----
+        Destructors run during interpreter shutdown and may observe partially
+        torn-down state, so failures are intentionally logged at debug level
+        and ignored.
+        """
         try:
             if hasattr(self, "comm") and hasattr(self, "node_actor"):
                 self.close(sys.maxsize)

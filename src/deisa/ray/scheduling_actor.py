@@ -120,6 +120,28 @@ class NodeActorBase:
         global_shape,
         chunk_position,
     ) -> None:
+        """
+        Register metadata for a chunk owned by this node actor.
+
+        Parameters
+        ----------
+        bridge_id : int
+            Identifier of the bridge that owns the chunk.
+        array_name : str
+            Name of the array the chunk belongs to.
+        chunk_shape : tuple[int, ...]
+            Shape of this bridge's chunk.
+        global_shape : tuple[int, ...]
+            Full shape of the distributed array.
+        chunk_position : tuple[int, ...]
+            Position of the chunk in the global chunk grid.
+
+        Raises
+        ------
+        AssertionError
+            If the derived global chunk grid for ``array_name`` is
+            inconsistent with earlier registrations.
+        """
         partial_array = self._create_or_retrieve_partial_array(array_name)
 
         # add metadata for this array
@@ -139,6 +161,27 @@ class NodeActorBase:
     async def finalize_registration(
         self,
     ) -> None:
+        """
+        Publish this node actor's registered chunk ownership to the head actor.
+
+        Returns
+        -------
+        None
+            The method is idempotent; subsequent calls return immediately
+            after successful finalization.
+
+        Raises
+        ------
+        AssertionError
+            If the number of registered chunk metadata entries does not match
+            the local chunk count collected from bridges.
+
+        Notes
+        -----
+        The method waits until analytics has signaled readiness before
+        registering partial arrays. A lock ensures concurrent calls from
+        multiple bridges sharing the same actor perform registration once.
+        """
         if self.is_finalized:
             return
 
