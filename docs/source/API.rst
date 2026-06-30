@@ -19,7 +19,7 @@ of that array must share their local chunk for the same timestep before DEISA
 can assemble the full Dask array seen by analytics.
 
 Callbacks see those shares through a sliding window. A ``Window`` with
-``window_size=N`` gives the callback up to the most recent ``N`` shared
+``size=N`` gives the callback up to the most recent ``N`` shared
 timesteps for that array, ordered oldest to newest. This is what lets analysis
 code combine data across time, for example comparing the newest field with the
 previous one or computing a derivative over several timesteps.
@@ -78,18 +78,15 @@ Arguments
         Shape of the local chunk as a tuple/list/1D NumPy array of positive
         integers.
 
-    ``nb_chunks_per_dim``
-        Number of chunks in each dimension of the global array. The full array
-        shape is approximately ``chunk_shape * nb_chunks_per_dim`` dimension by
-        dimension.
-
-    ``dtype``
-        NumPy dtype, or a value accepted by ``numpy.dtype``.
+    ``global_shape``
+        Shape of the full distributed array as a tuple/list/1D NumPy array of
+        positive integers. Every dimension must be evenly divisible by the
+        corresponding value in ``chunk_shape``.
 
     ``chunk_position``
         Position of this bridge's chunk in the global chunk grid. It must have
         the same dimensionality as ``chunk_shape`` and each index must be within
-        ``nb_chunks_per_dim``.
+        the grid derived from ``global_shape`` and ``chunk_shape``.
 
 ``comm``
     Required communicator implementing ``deisa.core.ICommunicator``. A raw
@@ -257,7 +254,7 @@ happen lazily when registering callbacks or executing them.
 
     deisa.register_callback(
         summary,
-        [Window("temperature", window_size=3)],
+        [Window("temperature", size=3)],
         when="AND",
     )
 
@@ -326,7 +323,7 @@ callback whose ``when`` condition is satisfied. The loop ends when bridge ``0``
 sends the internal final sentinel through ``Bridge.close``.
 
 Callback arguments are always lists. With no explicit window size, the list has
-one element: the latest ``DeisaArray``. With ``window_size=N``, the list
+one element: the latest ``DeisaArray``. With ``size=N``, the list
 contains up to the last ``N`` arrays for that name, ordered oldest to newest.
 Early timesteps may have shorter lists, so callbacks that require a full
 window should check ``len(window)`` before computing.
@@ -375,14 +372,14 @@ Callback data types
 .. code-block:: python
 
     Window("temperature")
-    Window("temperature", window_size=3)
+    Window("temperature", size=3)
 
 ``Window`` describes one callback input.
 
 ``name``
     Array name. It must match ``Bridge`` metadata and ``Bridge.send``.
 
-``window_size``
+``size``
     Number of recent timesteps to pass to the callback. ``None`` means only the
     latest array is passed. A positive integer creates a sliding window with up
     to that many entries.
@@ -494,9 +491,8 @@ Simulation:
     bridge = Bridge(
         arrays_metadata={
             "temperature": {
+                "global_shape": (256, 256),
                 "chunk_shape": (64, 64),
-                "nb_chunks_per_dim": (4, 4),
-                "dtype": np.float64,
                 "chunk_position": chunk_position,
             },
         },
@@ -518,7 +514,7 @@ Analytics:
 
     deisa = Deisa()
 
-    @deisa.register(Window("temperature", window_size=3))
+    @deisa.register(Window("temperature", size=3))
     def analyze_temperature(temperature: list[DeisaArray]):
         if len(temperature) < 3:
             return

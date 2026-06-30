@@ -133,6 +133,19 @@ def greedy_partitioning(dsk, scheduling_actors: dict) -> dict[str, int]:
     random.shuffle(actors)
 
     def explore(k) -> int:
+        """
+        Assign a graph key to an actor, recursively assigning dependencies first.
+
+        Parameters
+        ----------
+        k : GraphKey
+            Dask graph key to assign.
+
+        Returns
+        -------
+        ActorID
+            Identifier of the actor selected for ``k``.
+        """
         if partition[k] != -1:
             return partition[k]
 

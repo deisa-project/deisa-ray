@@ -4,7 +4,7 @@ Analytics
 In callback examples, the name passed to ``Window`` is also the keyword
 argument name used when DEISA calls the callback. Each argument is a
 ``list[DeisaArray]`` ordered from oldest to newest; with no explicit
-``window_size`` the list contains only the latest shared timestep.
+``size`` the list contains only the latest shared timestep.
 
 Simple example
 --------------
@@ -103,23 +103,23 @@ Sliding window
 --------------
 
 If the analysis requires access to several iterations (for example, to compute
-a time derivative), it is possible to use the ``window_size`` parameter.
+a time derivative), it is possible to use the ``size`` parameter.
 Choose the window size from both the available system memory and the analytics
-algorithm you want to run. A ``window_size`` of 5 means DEISA may need to keep
+algorithm you want to run. A ``size`` of 5 means DEISA may need to keep
 five timesteps of that array available, so it costs more memory than a smaller
 window. It is the right choice for an analysis that needs five temporal points,
 such as a five-point stencil finite-difference approximation.
 
 The window size is an upper bound on what the callback receives, not a
 requirement that every operation in the callback must consume the whole window.
-A callback registered with ``window_size=5`` can still compute single-timestep
+A callback registered with ``size=5`` can still compute single-timestep
 statistics from ``temperature[-1]``, three-timestep estimates from the newest
 three entries, and five-timestep estimates only when all five entries are
 available.
 
 Callbacks are called as soon as their input arrays are available, even before
 the sliding window is full. During the first few calls, the list may contain
-fewer entries than ``window_size``. The callback must check ``len(window)`` for
+fewer entries than ``size``. The callback must check ``len(window)`` for
 any operation that needs a minimum number of timesteps.
 
 .. code-block:: python
@@ -129,7 +129,7 @@ any operation that needs a minimum number of timesteps.
 
     d = Deisa()
 
-    @d.register(Window("temperature", window_size=5))
+    @d.register(Window("temperature", size=5))
     def estimate_temperature_change(temperature: list[DeisaArray]):
         latest_mean = temperature[-1].mean().compute()
         print("mean temperature:", latest_mean)
