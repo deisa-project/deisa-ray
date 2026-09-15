@@ -1,6 +1,7 @@
 from collections import deque, defaultdict
 import gc
 import logging
+import time
 from typing import Any, Callable, List, Optional, Literal
 
 import dask
@@ -27,21 +28,49 @@ ExceptionHandler = IDeisa.ExceptionHandler
 _default_exception_handler = IDeisa._IDeisa__default_exception_handler
 
 
-def _ray_start_impl() -> None:
+def _ray_start_impl(timeout: float = 200.0, retry_interval: float = 1.0) -> None:
     """
     Default Ray startup procedure used by :class:`Deisa`.
 
     Notes
     -----
-    Initializes Ray only once with minimal logging. Used when the caller
-    does not provide a custom ``ray_start`` hook.
+    Initializes Ray only once with minimal logging. If Ray initialization
+    fails, retries until ``timeout`` is reached.
+
+    Parameters
+    ----------
+    timeout:
+        Maximum time in seconds to wait for Ray initialization.
+    retry_interval:
+        Time in seconds to wait between initialization attempts.
     """
-    if not ray.is_initialized():
-        ray.init(
-            address=get_ray_address() or "auto",
-            log_to_driver=False,
-            logging_level=logging.ERROR,
-        )
+    if ray.is_initialized():
+        return
+
+    start_time = time.monotonic()
+    last_exception = None
+
+    while time.monotonic() - start_time < timeout:
+        try:
+            ray.init(
+                address=get_ray_address() or "auto",
+                log_to_driver=False,
+                logging_level=logging.ERROR,
+            )
+            return
+
+        except Exception as exc:
+            last_exception = exc
+
+            elapsed = time.monotonic() - start_time
+            remaining = timeout - elapsed
+
+            if remaining <= 0:
+                break
+
+            time.sleep(min(retry_interval, remaining))
+
+    raise TimeoutError(f"Failed to initialize Ray within {timeout} seconds.") from last_exception
 
 
 def _with_timestep(array: da.Array, timestep: int) -> DeisaArray:
