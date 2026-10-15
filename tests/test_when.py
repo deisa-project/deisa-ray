@@ -188,4 +188,5 @@ def test_and_or_counts_match_when_all_arrays_update_together(
 
     results = ray.get([head_ref] + worker_refs)
     or_count, and_count = results[0]
-    assert or_count == and_count
+    assert or_count == NB_ITERATIONS * 2 - 1
+    assert and_count == NB_ITERATIONS

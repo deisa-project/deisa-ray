@@ -389,7 +389,7 @@ class Bridge(IBridge):
                 timestep=timestep,
                 timeout_s=self.object_store_memory_timeout_s,
             )
-            ref = ray.put(chunk, _owner=self.node_actor)
+            ref = ray.put(chunk)
             future: ray.ObjectRef = self.node_actor.add_chunk.remote(
                 bridge_id=self.bridge_id,
                 array_name=array_name,
@@ -444,7 +444,7 @@ class Bridge(IBridge):
             try:
                 chunk = np.asarray(0)
                 chunk_dtype = chunk.dtype
-                ref = ray.put(chunk, _owner=self.node_actor)
+                ref = ray.put(chunk)
                 future: ray.ObjectRef = self.node_actor.add_chunk.remote(
                     bridge_id=self.bridge_id,
                     array_name="__deisa_last_iteration_array",

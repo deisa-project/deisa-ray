@@ -1,5 +1,4 @@
 from collections import deque, defaultdict
-import gc
 import logging
 import time
 from typing import Any, Callable, List, Optional, Literal
@@ -371,6 +370,7 @@ class Deisa(IDeisa):
                 # guarantee.
                 current_timestep = arr_timestep
                 while True:
+                    self._inspect_callbacks()
                     name, arr_timestep, array = ray.get(self.head.get_next_array.remote())
                     # guarantee sequential flow of data.
                     # TODO add test
@@ -393,34 +393,6 @@ class Deisa(IDeisa):
                         self.has_new_timestep[name] = True
                         self.has_seen_array[name] = True
 
-                # inspect what callbacks can be called
-                for cb_cfg in self.registered_callbacks:
-                    simulation_callback = cb_cfg.simulation_callback
-                    description_arrays_needed = cb_cfg.arrays_description
-                    exception_handler = cb_cfg.exception_handler
-                    when = cb_cfg.when
-
-                    should_call = self._should_call(description_arrays_needed, when)
-                    if should_call:
-                        # Compute the arrays to pass to the callback
-                        callback_args: dict[str, List[DeisaArray]] = self._determine_callback_args(
-                            description_arrays_needed
-                        )
-                        try:
-                            simulation_callback(**callback_args)
-                        # TODO need to discuss whats the best way to handle this.
-                        # this is simulation_callback strictly, so maybe ALL errors
-                        # should be caught.
-                        except TimeoutError as e:
-                            raise e
-                        except AssertionError as e:
-                            raise e
-                        except BaseException as e:
-                            exception_handler(e)
-
-                        del callback_args
-                        gc.collect()
-
                 # set all new timesteps to be false
                 for queue in self.has_new_timestep:
                     self.has_new_timestep[queue] = False
@@ -432,6 +404,30 @@ class Deisa(IDeisa):
                         queue.append(_with_timestep(array, arr_timestep))
                         self.has_new_timestep[name] = True
                         self.has_seen_array[name] = True
+
+    def _inspect_callbacks(self):
+        # inspect what callbacks can be called
+        for cb_cfg in self.registered_callbacks:
+            simulation_callback = cb_cfg.simulation_callback
+            description_arrays_needed = cb_cfg.arrays_description
+            exception_handler = cb_cfg.exception_handler
+            when = cb_cfg.when
+
+            should_call = self._should_call(description_arrays_needed, when)
+            if should_call:
+                # Compute the arrays to pass to the callback
+                callback_args: dict[str, List[DeisaArray]] = self._determine_callback_args(description_arrays_needed)
+                try:
+                    simulation_callback(**callback_args)
+                # TODO need to discuss whats the best way to handle this.
+                # this is simulation_callback strictly, so maybe ALL errors
+                # should be caught.
+                except TimeoutError as e:
+                    raise e
+                except AssertionError as e:
+                    raise e
+                except BaseException as e:
+                    exception_handler(e)
 
     def _determine_callback_args(self, description_of_arrays_needed) -> dict[str, List[DeisaArray]]:
         """
