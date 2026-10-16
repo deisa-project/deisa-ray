@@ -11,8 +11,8 @@ def callback(temperature):
 
     latest_temperature = temperature[-1]
     # compute the sum of the latest temperature
-    sum = latest_temperature.sum().compute()
-    print(f"latest temperature t={latest_temperature.timestep}, sum={sum}", flush=True)
+    sum_value = latest_temperature.sum().compute()
+    print(f"latest temperature t={latest_temperature.timestep}, sum={sum_value}", flush=True)
 
     # plot the latest temperature
     fig = Figure()

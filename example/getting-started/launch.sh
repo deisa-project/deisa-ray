@@ -12,7 +12,7 @@ worker_pid=$!
 
 sleep 2
 
-export DEISA_DISTRIBUTED_SCHEDULING_ENV=1
+export DEISA_DISTRIBUTED_SCHEDULING=1
 mpirun -np 1 python3 analysis.py &
 analysis_pid=$!
 

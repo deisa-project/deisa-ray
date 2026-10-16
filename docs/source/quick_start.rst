@@ -7,6 +7,13 @@ where the data is produced. Dask builds task graphs from your analysis code, and
 Ray runs those tasks across the cluster. The result is fast, asynchronous
 analytics with minimal network transfer.
 
+.. warning::
+
+   Do not install or use the ``distributed`` library (``dask.distributed``)
+   alongside deisa-ray. DEISA installs its own Dask-on-Ray scheduler, and the
+   two are not compatible. Install plain ``dask`` (as pulled in by
+   ``deisa-ray``), not ``distributed``.
+
 Assumptions and model
 ---------------------
 
@@ -141,8 +148,28 @@ standard Dask array methods directly, and ``.t`` is the timestep for which that 
     d.execute_callbacks()
 
 
+Getting started example
+-----------------------
+
+A complete, runnable example lives in ``example/getting-started``. It starts a
+small single-node Ray cluster, runs a 4-rank MPI simulation that streams a
+``64 x 64`` temperature field over 5 timesteps, and registers an analytics
+callback that prints the field sum and writes one PNG per timestep.
+
+.. code-block:: bash
+
+    cd example/getting-started
+    ./launch.sh
+
+The example needs ``mpi4py`` and ``matplotlib`` and must run with exactly 4 MPI
+ranks for the simulation. See ``example/getting-started/README.md`` for what
+each file does, the manual step-by-step commands, and how to change the
+decomposition.
+
 Where to go next
 ----------------
 
+- ``example/getting-started/README.md`` walks through the minimal end-to-end
+  example.
 - :doc:`analytics` shows more callback patterns and window usage.
 - The API reference under ``deisa.ray`` documents the full interface.
