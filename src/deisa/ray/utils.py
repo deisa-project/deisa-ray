@@ -8,6 +8,11 @@ from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 DEISA_HEAD_ACTOR_NAME = "simulation_head"
 DEISA_NAMESPACE = "deisa_ray"
 
+# Implicit resource Ray assigns to the cluster head node. It is part of the
+# node table served by the GCS, so it can be read without the optional
+# ``ray[default]`` dependencies (the dashboard-backed state API).
+HEAD_NODE_RESOURCE_NAME = "node:__internal_head__"
+
 
 def get_ray_address() -> str | None:
     """
@@ -129,19 +134,20 @@ def get_head_node_id() -> str:
 
     Notes
     -----
-    This function queries Ray's state API to find the head node. It assumes
-    there is exactly one head node in the cluster.
+    The head node is the one carrying the ``node:__internal_head__`` resource.
+    This is read from the GCS node table, which is available with a plain
+    ``ray`` install. It deliberately avoids ``ray.util.state`` because that
+    dashboard-backed API requires the optional ``ray[default]`` dependencies.
     """
-    from ray.util import state
+    head_node_ids = [
+        node["NodeID"]
+        for node in ray.nodes()
+        if node.get("Alive", node.get("alive")) and HEAD_NODE_RESOURCE_NAME in node.get("Resources", {})
+    ]
 
-    nodes = state.list_nodes(
-        address=get_ray_address(),
-        filters=[("is_head_node", "=", True)],
-    )
+    assert len(head_node_ids) == 1, "There should be exactly one head node"
 
-    assert len(nodes) == 1, "There should be exactly one head node"
-
-    return nodes[0].node_id
+    return head_node_ids[0]
 
 
 def get_head_actor_options() -> dict:
