@@ -455,7 +455,7 @@ wheels = [
 
 [[package]]
 name = "deisa-ray"
-version = "0.1.7"
+version = "0.1.8"
 source = { editable = "." }
 dependencies = [
     { name = "dask", extra = ["dataframe"] },
