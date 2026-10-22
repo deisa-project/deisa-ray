@@ -1,9 +1,11 @@
 import time
+
 import pytest
 import ray
-from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
-from deisa.ray.types import DeisaArray
 import torch.distributed as dist
+from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
+
+from deisa.ray.types import DeisaArray
 from tests.utils import pick_free_port
 
 # TODO check that all errors types that can be raised when the bridge is not properly initialized are correctly caught raised

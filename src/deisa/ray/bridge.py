@@ -6,19 +6,23 @@ top of Ray.
 """
 
 from __future__ import annotations
+
 import copy
 import logging
 import sys
-from typing import Any, Dict, Mapping, Optional, Union
+from collections.abc import Mapping
+from typing import Any
+
 import numpy as np
+from deisa.core import IBridge, ICommunicator, validate_arrays_metadata
+
 import ray
-from ray.actor import ActorClass
-from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
-from deisa.core import ICommunicator, IBridge, validate_arrays_metadata
 from deisa.ray.errors import ContractError, _default_exception_handler
 from deisa.ray.scheduling_actor import SchedulingActor as _RealSchedulingActor
 from deisa.ray.types import RayActorHandle
 from deisa.ray.utils import get_node_actor_options, get_ray_address
+from ray.actor import ActorClass
+from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +109,7 @@ class Bridge(IBridge):
     def __init__(
         self,
         comm: ICommunicator,
-        arrays_metadata: Dict[str, Dict],
+        arrays_metadata: dict[str, dict],
         *args: Any,
         **kwargs: Any,
     ):
@@ -183,7 +187,7 @@ class Bridge(IBridge):
         name = f"sched-{self.node_id}"
         namespace = "deisa_ray"
 
-        node_actor_options: Dict[str, Any] = get_node_actor_options(name, namespace)
+        node_actor_options: dict[str, Any] = get_node_actor_options(name, namespace)
 
         # place node actor in the same place as detected node_id
         if _node_id is None:
@@ -415,9 +419,9 @@ class Bridge(IBridge):
     def get(
         self,
         key: str,
-        timestep: Optional[int] = None,
+        timestep: int | None = None,
         default: Any = None,
-    ) -> Optional[Union[list, Any]]:
+    ) -> list | Any | None:
         """
         Retrieve feedback from analytics to influence the simulation.
 

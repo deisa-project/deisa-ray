@@ -462,7 +462,6 @@ dependencies = [
     { name = "deisa-core" },
     { name = "h5netcdf" },
     { name = "h5py" },
-    { name = "matplotlib" },
     { name = "mpi4py" },
     { name = "numpy" },
     { name = "ray" },
@@ -471,8 +470,8 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
-mpi = [
-    { name = "mpi4py" },
+example = [
+    { name = "matplotlib" },
 ]
 
 [package.dev-dependencies]
@@ -499,15 +498,14 @@ requires-dist = [
     { name = "deisa-core", specifier = ">=0.5.0" },
     { name = "h5netcdf" },
     { name = "h5py", specifier = ">=3.15.1" },
-    { name = "matplotlib", specifier = ">=3.11.2" },
+    { name = "matplotlib", marker = "extra == 'example'", specifier = ">=3.11.2" },
     { name = "mpi4py", specifier = ">=4.1.2" },
-    { name = "mpi4py", marker = "extra == 'mpi'" },
     { name = "numpy" },
     { name = "ray", specifier = ">=2.48.0" },
     { name = "xarray" },
     { name = "zarr", specifier = ">=3.1.5" },
 ]
-provides-extras = ["mpi"]
+provides-extras = ["example"]
 
 [package.metadata.requires-dev]
 dev = [

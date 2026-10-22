@@ -1,26 +1,27 @@
-from collections import deque, defaultdict
 import logging
 import time
-from typing import Any, Callable, List, Optional, Literal
+from collections import defaultdict, deque
+from collections.abc import Callable
+from typing import Any, Literal
 
 import dask
 import dask.array as da
-import ray
-from ray.util.dask import ray_dask_get
+from deisa.core import IDeisa
 
+import ray
 from deisa.ray._scheduler import deisa_ray_get
 from deisa.ray.config import distributed_scheduling_enabled_from_env
-from deisa.core import IDeisa
 from deisa.ray.head_node import HeadNodeActor
 from deisa.ray.types import (
     ActorID,
+    CallbackArgs,
     DeisaArray,
     RayActorHandle,
     Window,
-    CallbackArgs,
     _CallbackConfig,
 )
 from deisa.ray.utils import get_head_actor_options, get_ray_address
+from ray.util.dask import ray_dask_get
 
 Callback = IDeisa.Callback
 ExceptionHandler = IDeisa.ExceptionHandler
@@ -125,7 +126,7 @@ class Deisa(IDeisa):
             Number of timesteps the analytics may lag behind the simulation.
             Defaults to 1.
         """
-        ray_start: Optional[Callable[[], None]] = kwargs.pop("ray_start", None)
+        ray_start: Callable[[], None] | None = kwargs.pop("ray_start", None)
         max_simulation_ahead: int = kwargs.pop("max_simulation_ahead", 1)
         if kwargs:
             unexpected = next(iter(kwargs))
@@ -416,7 +417,7 @@ class Deisa(IDeisa):
             should_call = self._should_call(description_arrays_needed, when)
             if should_call:
                 # Compute the arrays to pass to the callback
-                callback_args: dict[str, List[DeisaArray]] = self._determine_callback_args(description_arrays_needed)
+                callback_args: dict[str, list[DeisaArray]] = self._determine_callback_args(description_arrays_needed)
                 try:
                     simulation_callback(**callback_args)
                 # TODO need to discuss whats the best way to handle this.
@@ -429,7 +430,7 @@ class Deisa(IDeisa):
                 except BaseException as e:
                     exception_handler(e)
 
-    def _determine_callback_args(self, description_of_arrays_needed) -> dict[str, List[DeisaArray]]:
+    def _determine_callback_args(self, description_of_arrays_needed) -> dict[str, list[DeisaArray]]:
         """
         Build the kwargs passed to a simulation callback.
 

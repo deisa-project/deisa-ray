@@ -1,13 +1,15 @@
 import os
+
 import ray
-from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
-from tests.stubs import StubSchedulingActor
-from deisa.ray.bridge import Bridge
-from tests.comm_utils import NoOpComm
 from ray._private.state import actors as list_actor_info
+from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
+
+from deisa.ray.bridge import Bridge
 from deisa.ray.types import DeisaArray
-from tests.utils import wait_for_head_node
 from deisa.ray.utils import DEISA_HEAD_ACTOR_NAME, DEISA_NAMESPACE
+from tests.comm_utils import NoOpComm
+from tests.stubs import StubSchedulingActor
+from tests.utils import wait_for_head_node
 
 
 @ray.remote

@@ -1,14 +1,13 @@
-from collections import Counter
 import random
-from typing import Callable
+from collections import Counter
+from collections.abc import Callable
 
 from dask._task_spec import DataNode, Task
-from dask.core import get_dependencies
-from dask.core import flatten
-import ray
-from ray.util.dask.scheduler_utils import nested_get
+from dask.core import flatten, get_dependencies
 
-from deisa.ray.types import ActorID, GraphKey, GraphValue, RayActorHandle, ChunkRef, ScheduledByOtherActor
+import ray
+from deisa.ray.types import ActorID, ChunkRef, GraphKey, GraphValue, RayActorHandle, ScheduledByOtherActor
+from ray.util.dask.scheduler_utils import nested_get
 
 
 def random_partitioning(dsk, scheduling_actors: dict) -> dict[str, int]:
@@ -221,7 +220,7 @@ def get_scheduling_actors_mapping():
         Mapping pulled from the head actor registered under the
         ``deisa_ray`` namespace.
     """
-    head_node = ray.get_actor("simulation_head", namespace="deisa_ray")  # noqa: F841
+    head_node = ray.get_actor("simulation_head", namespace="deisa_ray")
 
     # Find the scheduling actors
     scheduling_actor_id_to_handle: dict[ActorID, RayActorHandle] = ray.get(head_node.list_scheduling_actors.remote())

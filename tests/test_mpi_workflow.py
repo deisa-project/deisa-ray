@@ -93,7 +93,7 @@ def mpi_ray_multinode_cluster(mpi_launcher_env, ray_multinode_cluster):
     shutil.which("mpirun") is None and shutil.which("mpiexec") is None,
     reason="MPI launcher is not installed",
 )
-def test_deisa_ray_with_mpi_comm(mpi_ray_multinode_cluster) -> None:  # noqa: F811
+def test_deisa_ray_with_mpi_comm(mpi_ray_multinode_cluster) -> None:
     pytest.importorskip("mpi4py")
 
     launcher = shutil.which("mpirun") or shutil.which("mpiexec")

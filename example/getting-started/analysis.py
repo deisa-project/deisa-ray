@@ -8,7 +8,6 @@ deisa = Deisa()
 
 @deisa.register("temperature")
 def callback(temperature):
-
     latest_temperature = temperature[-1]
     # compute the sum of the latest temperature
     sum_value = latest_temperature.sum().compute()

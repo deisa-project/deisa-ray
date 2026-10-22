@@ -65,7 +65,7 @@ def bridge_script(*, rank: int, port: int) -> None:
     "enable_distributed_scheduling",
     (True, False),
 )
-def test_sim_going_ahead(enable_distributed_scheduling: bool, ray_multinode_cluster) -> None:  # noqa: F811
+def test_sim_going_ahead(enable_distributed_scheduling: bool, ray_multinode_cluster) -> None:
     # This test is only checking that despite simulation continue sending arrays
     # and at some point get stuck until analytics continue, the workflow is still working
     cluster = ray_multinode_cluster["cluster"]

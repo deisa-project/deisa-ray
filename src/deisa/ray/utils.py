@@ -1,7 +1,8 @@
 import os
 import random
 import time
-from typing import Dict, Any
+from typing import Any
+
 import ray
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 
@@ -30,7 +31,7 @@ def get_ray_address() -> str | None:
     return None
 
 
-def get_node_actor_options(name: str, namespace: str) -> Dict[str, Any]:
+def get_node_actor_options(name: str, namespace: str) -> dict[str, Any]:
     """Return Ray options used to create (or get) a node scheduling actor.
 
     Parameters

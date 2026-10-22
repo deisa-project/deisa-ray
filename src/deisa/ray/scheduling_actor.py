@@ -1,10 +1,9 @@
+import asyncio
 import pickle
-from typing import Any, Dict, Hashable
+from collections.abc import Hashable
+from typing import Any
 
 import ray
-from ray.util.dask import ray_dask_get
-
-import asyncio
 from deisa.ray._async_dict import AsyncDict
 from deisa.ray.errors import ContractError
 from deisa.ray.types import (
@@ -18,6 +17,7 @@ from deisa.ray.types import (
     ScheduledByOtherActor,
 )
 from deisa.ray.utils import get_ready_actor_with_retry
+from ray.util.dask import ray_dask_get
 
 
 class NodeActorBase:
@@ -56,7 +56,7 @@ class NodeActorBase:
         simulation.
     """
 
-    async def __init__(self, actor_id: int, arrays_metadata: Dict[str, Dict] = {}) -> None:
+    async def __init__(self, actor_id: int, arrays_metadata: dict[str, dict] = {}) -> None:
         """
         Initialize the base node actor, register with the head, and prime state.
 
@@ -86,7 +86,7 @@ class NodeActorBase:
         # TODO: I think these two responsabilities could be separated.
         self.partial_arrays: AsyncDict[str, PartialArray] = AsyncDict()
 
-        self.should_persist: Dict[Hashable, bool] = {}
+        self.should_persist: dict[Hashable, bool] = {}
         self.is_finalized = False
         self.finalization_lock = asyncio.Lock()
         # the number of chunks per array that a physical node (and therefore this actor) owns.
@@ -224,7 +224,6 @@ class NodeActorBase:
         used by `get_ready_actor_with_retry` to ensure the actor is
         operational before returning its handle.
         """
-        pass
 
     # TODO: refactor from here
     async def add_chunk(
@@ -349,7 +348,7 @@ class SchedulingActor(NodeActorBase):
         which track graph scheduling state and results.
     """
 
-    async def __init__(self, actor_id: int, arrays_metadata: Dict[str, Dict] = {}) -> None:
+    async def __init__(self, actor_id: int, arrays_metadata: dict[str, dict] = {}) -> None:
         """
         Initialize a scheduling actor with shared node functionality.
 
@@ -540,7 +539,7 @@ class NodeActor(NodeActorBase):
     This is a Ray actor. Shared logic is implemented in :class:`NodeActorBase`.
     """
 
-    async def __init__(self, actor_id: int, arrays_metadata: Dict[str, Dict] = {}) -> None:
+    async def __init__(self, actor_id: int, arrays_metadata: dict[str, dict] = {}) -> None:
         """
         Initialize a plain node actor (without scheduling responsibilities).
 

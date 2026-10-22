@@ -12,7 +12,7 @@ import ray
 from ray.cluster_utils import Cluster
 
 from deisa.ray.types import DeisaArray
-from tests.utils import wait_for_head_node, pick_free_port  # noqa: F401
+from tests.utils import pick_free_port, wait_for_head_node
 
 NB_ITERATIONS = 240  # Should be enough to saturate the memory in case the chunks are not released
 OBJECT_STORE_MEMORY = 80 * 1024 * 1024
@@ -137,7 +137,7 @@ def ray_spilling_cluster(monkeypatch, tmp_path):
 
 
 @pytest.mark.parametrize("enable_distributed_scheduling", [True, False])
-def test_memory_release(enable_distributed_scheduling, ray_spilling_cluster: str) -> None:  # noqa: F811
+def test_memory_release(enable_distributed_scheduling, ray_spilling_cluster: str) -> None:
     """
     Perform a long simulation with a small object store spilling to disk. If the
     memory is not released correctly, the test will detect spilled objects on disk and

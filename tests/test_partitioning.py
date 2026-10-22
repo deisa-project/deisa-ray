@@ -9,15 +9,14 @@ from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 from deisa.ray.types import DeisaArray
 from tests.utils import pick_free_port, wait_for_head_node
 
-
 NB_ITERATIONS = 5
 
 
 @ray.remote(max_retries=0)
 def head_script(partitioning_strategy: str) -> None:
     """The head node checks that the values are correct"""
-    from deisa.ray.window_handler import Deisa
     from deisa.ray.types import Window
+    from deisa.ray.window_handler import Deisa
 
     os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1"
 
@@ -66,7 +65,7 @@ def bridge_script(*, rank: int, port: int) -> None:
 
 
 @pytest.mark.parametrize("partitioning_strategy", ["random", "greedy"])
-def test_partitioning(partitioning_strategy: str, ray_multinode_cluster) -> None:  # noqa: F811
+def test_partitioning(partitioning_strategy: str, ray_multinode_cluster) -> None:
     cluster = ray_multinode_cluster["cluster"]
     head_node_id = None
     worker_node_ids = []

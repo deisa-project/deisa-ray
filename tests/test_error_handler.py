@@ -1,11 +1,12 @@
+import numpy as np
 import pytest
 import ray
-import numpy as np
-from deisa.ray.errors import ContractError
+from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
+
 from deisa.ray.bridge import Bridge
+from deisa.ray.errors import ContractError
 from tests.comm_utils import NoOpComm
 from tests.utils import wait_for_head_node
-from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 
 
 @ray.remote(max_retries=0)
@@ -86,7 +87,7 @@ def contract_error_bridge_script(rank: int) -> str:
 
 # CRITICAL WARNING : This test checks that an assertion error in the callback is detected. If this test fails,
 # it means that all callbacks could secretely fail and the test harness is not detecting it.
-def test_exception_handler_not_bypass_computation(ray_multinode_cluster) -> None:  # noqa: F811
+def test_exception_handler_not_bypass_computation(ray_multinode_cluster) -> None:
     with pytest.raises(AssertionError):
         cluster = ray_multinode_cluster["cluster"]
         head_node_id = None
@@ -124,7 +125,7 @@ def test_exception_handler_not_bypass_computation(ray_multinode_cluster) -> None
         ray.get(head_ref)
 
 
-def test_contract_error(ray_multinode_cluster) -> None:  # noqa: F811
+def test_contract_error(ray_multinode_cluster) -> None:
     cluster = ray_multinode_cluster["cluster"]
     head_node_id = None
     worker_node_ids = []
