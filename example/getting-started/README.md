@@ -16,9 +16,17 @@ field to Ray, and runs an in situ analytics callback that plots it.
 
 ## Requirements
 
-- `deisa-ray` installed (`pip install deisa-ray`).
-- MPI and `mpi4py` available on the machine.
-- `numpy` and `matplotlib` (pulled in by `deisa-ray`).
+- Create a virtual environment and install the example dependencies into it:
+
+  ```bash
+  python3 -m venv .venv
+  source .venv/bin/activate
+  pip install "deisa-ray[example]"
+  ```
+
+  This installs `deisa-ray` together with the `example` extra, which provides
+  `matplotlib`. `numpy` and `mpi4py` come in as regular `deisa-ray` dependencies.
+- MPI (`mpirun`) available on the machine.
 - Exactly 4 MPI ranks for the simulation, matching `mpi_parallelism = (2, 2)`
   in `simulation.py`.
 
