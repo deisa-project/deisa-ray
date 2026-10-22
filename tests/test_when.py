@@ -80,8 +80,8 @@ def bridge_script_all_arrays(*, rank: int, port: int) -> None:
 @ray.remote(max_retries=0)
 def head_script(enable_distributed_scheduling):
     """The head node checks that the values are correct"""
-    from deisa.ray.window_handler import Deisa
     from deisa.ray.types import Window
+    from deisa.ray.window_handler import Deisa
 
     os.environ["DEISA_DISTRIBUTED_SCHEDULING"] = "1" if enable_distributed_scheduling else "0"
 
@@ -130,7 +130,7 @@ def get_node_ids(ray_multinode_cluster):
     "enable_distributed_scheduling",
     [True, False],
 )
-def test_and_or_analytics_works_correctly(enable_distributed_scheduling: bool, ray_multinode_cluster) -> None:  # noqa: F811
+def test_and_or_analytics_works_correctly(enable_distributed_scheduling: bool, ray_multinode_cluster) -> None:
     head_node_id, worker_node_ids = get_node_ids(ray_multinode_cluster)
 
     head_ref = head_script.options(
@@ -164,7 +164,7 @@ def test_and_or_analytics_works_correctly(enable_distributed_scheduling: bool, r
 )
 def test_and_or_counts_match_when_all_arrays_update_together(
     enable_distributed_scheduling: bool, ray_multinode_cluster
-) -> None:  # noqa: F811
+) -> None:
     head_node_id, worker_node_ids = get_node_ids(ray_multinode_cluster)
 
     head_ref = head_script.options(
@@ -188,4 +188,5 @@ def test_and_or_counts_match_when_all_arrays_update_together(
 
     results = ray.get([head_ref] + worker_refs)
     or_count, and_count = results[0]
-    assert or_count == and_count
+    assert or_count == NB_ITERATIONS * 2 - 1
+    assert and_count == NB_ITERATIONS

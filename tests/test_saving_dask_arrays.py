@@ -179,7 +179,7 @@ def _assert_hdf5_dataset(path: pathlib.Path, dataset: str, expected: np.ndarray)
 
 
 @pytest.mark.parametrize("enable_distributed_scheduling", [False, True])
-def test_dask_array_persistence_formats(enable_distributed_scheduling, ray_multinode_cluster, tmp_path) -> None:  # noqa: F811
+def test_dask_array_persistence_formats(enable_distributed_scheduling, ray_multinode_cluster, tmp_path) -> None:
     import h5py
     import xarray as xr
 

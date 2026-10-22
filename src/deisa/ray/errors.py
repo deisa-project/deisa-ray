@@ -1,5 +1,5 @@
-import traceback
 import sys
+import traceback
 
 
 class ContractError(Exception):
@@ -20,8 +20,6 @@ class ContractError(Exception):
 
 class ConfigError(RuntimeError):
     """Raised when configuration is mutated after it has been locked."""
-
-    pass
 
 
 def _default_exception_handler(e: BaseException):

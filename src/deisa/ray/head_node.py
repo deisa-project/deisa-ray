@@ -1,11 +1,12 @@
 import asyncio
 from collections import deque
-from typing import Any, Hashable
+from collections.abc import Hashable
+from typing import Any
 
 import dask.array as da
 import numpy as np
-import ray
 
+import ray
 from deisa.ray import Timestep
 from deisa.ray.types import DaskArrayData, RayActorHandle
 

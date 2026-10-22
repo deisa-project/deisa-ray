@@ -1,11 +1,11 @@
 import pytest
 
-from deisa.ray.window_handler import Deisa
 from deisa.ray.config import (
     DEISA_DISTRIBUTED_SCHEDULING_ENV,
     ConfigError,
     distributed_scheduling_enabled_from_env,
 )
+from deisa.ray.window_handler import Deisa
 
 
 @pytest.fixture(autouse=True)

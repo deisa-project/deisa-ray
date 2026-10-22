@@ -66,7 +66,7 @@ def bridge_script(*, rank: int, port: int) -> None:
 
 
 @pytest.mark.parametrize("enable_distributed_scheduling", [True, False])
-def test_multiple_callbacks(enable_distributed_scheduling: bool, ray_multinode_cluster) -> None:  # noqa: F811
+def test_multiple_callbacks(enable_distributed_scheduling: bool, ray_multinode_cluster) -> None:
     cluster = ray_multinode_cluster["cluster"]
     head_node_id = None
     worker_node_ids = []

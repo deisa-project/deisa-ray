@@ -1,13 +1,15 @@
 import os
+
 import ray
+from ray._private.state import actors as list_actor_info
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
-from tests.stubs import StubSchedulingActor
+
 from deisa.ray.bridge import Bridge
-from tests.comm_utils import NoOpComm
-from ray.util.state import list_actors
 from deisa.ray.types import DeisaArray
-from tests.utils import wait_for_head_node
 from deisa.ray.utils import DEISA_HEAD_ACTOR_NAME, DEISA_NAMESPACE
+from tests.comm_utils import NoOpComm
+from tests.stubs import StubSchedulingActor
+from tests.utils import wait_for_head_node
 
 
 @ray.remote
@@ -44,13 +46,15 @@ def bridge_script(rank):
 
 
 def node_id_of_actor(name: str) -> str:
-    for a in list_actors(
-        address=ray.get_runtime_context().gcs_address,
-        filters=[("state", "=", "ALIVE")],
-    ):
-        if a.get("name") == name and a.get("ray_namespace") == DEISA_NAMESPACE:
-            # Newer Ray: address.node_id; older: may differ slightly
-            nid = a.get("node_id")
+    """Return the node id hosting the alive actor called ``name``.
+
+    Reads the GCS actor table directly rather than the dashboard-backed
+    ``ray.util.state`` API, so it works with a plain ``ray`` install that has
+    no ``ray[default]`` dependencies.
+    """
+    for info in list_actor_info().values():
+        if info.get("Name") == name and info.get("State") == "ALIVE":
+            nid = info.get("Address", {}).get("NodeID")
             if nid:
                 return nid
     raise RuntimeError(f"Actor {name} not found in namespace {DEISA_NAMESPACE}")

@@ -1,12 +1,12 @@
 # TODO is this really something we want to test? At the end of the day its a python feature... so maybe it should just be
 # shown as an example in the docs.
-import ray
 import numpy as np
+import ray
+from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 
 from deisa.ray.bridge import Bridge
 from tests.comm_utils import NoOpComm
 from tests.utils import wait_for_head_node
-from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 
 SHARED_SUM = 0
 
@@ -61,7 +61,7 @@ def bridge_script(rank: int) -> str:
     return bridge.node_id
 
 
-def test_multiple_callbacks(ray_multinode_cluster) -> None:  # noqa: F811
+def test_multiple_callbacks(ray_multinode_cluster) -> None:
     cluster = ray_multinode_cluster["cluster"]
     head_node_id = None
     worker_node_ids = []

@@ -1,27 +1,27 @@
-from collections import deque, defaultdict
-import gc
 import logging
 import time
-from typing import Any, Callable, List, Optional, Literal
+from collections import defaultdict, deque
+from collections.abc import Callable
+from typing import Any, Literal
 
 import dask
 import dask.array as da
-import ray
-from ray.util.dask import ray_dask_get
+from deisa.core import IDeisa
 
+import ray
 from deisa.ray._scheduler import deisa_ray_get
 from deisa.ray.config import distributed_scheduling_enabled_from_env
-from deisa.core import IDeisa
 from deisa.ray.head_node import HeadNodeActor
 from deisa.ray.types import (
     ActorID,
+    CallbackArgs,
     DeisaArray,
     RayActorHandle,
     Window,
-    CallbackArgs,
     _CallbackConfig,
 )
 from deisa.ray.utils import get_head_actor_options, get_ray_address
+from ray.util.dask import ray_dask_get
 
 Callback = IDeisa.Callback
 ExceptionHandler = IDeisa.ExceptionHandler
@@ -126,7 +126,7 @@ class Deisa(IDeisa):
             Number of timesteps the analytics may lag behind the simulation.
             Defaults to 1.
         """
-        ray_start: Optional[Callable[[], None]] = kwargs.pop("ray_start", None)
+        ray_start: Callable[[], None] | None = kwargs.pop("ray_start", None)
         max_simulation_ahead: int = kwargs.pop("max_simulation_ahead", 1)
         if kwargs:
             unexpected = next(iter(kwargs))
@@ -371,6 +371,7 @@ class Deisa(IDeisa):
                 # guarantee.
                 current_timestep = arr_timestep
                 while True:
+                    self._inspect_callbacks()
                     name, arr_timestep, array = ray.get(self.head.get_next_array.remote())
                     # guarantee sequential flow of data.
                     # TODO add test
@@ -393,34 +394,6 @@ class Deisa(IDeisa):
                         self.has_new_timestep[name] = True
                         self.has_seen_array[name] = True
 
-                # inspect what callbacks can be called
-                for cb_cfg in self.registered_callbacks:
-                    simulation_callback = cb_cfg.simulation_callback
-                    description_arrays_needed = cb_cfg.arrays_description
-                    exception_handler = cb_cfg.exception_handler
-                    when = cb_cfg.when
-
-                    should_call = self._should_call(description_arrays_needed, when)
-                    if should_call:
-                        # Compute the arrays to pass to the callback
-                        callback_args: dict[str, List[DeisaArray]] = self._determine_callback_args(
-                            description_arrays_needed
-                        )
-                        try:
-                            simulation_callback(**callback_args)
-                        # TODO need to discuss whats the best way to handle this.
-                        # this is simulation_callback strictly, so maybe ALL errors
-                        # should be caught.
-                        except TimeoutError as e:
-                            raise e
-                        except AssertionError as e:
-                            raise e
-                        except BaseException as e:
-                            exception_handler(e)
-
-                        del callback_args
-                        gc.collect()
-
                 # set all new timesteps to be false
                 for queue in self.has_new_timestep:
                     self.has_new_timestep[queue] = False
@@ -433,7 +406,31 @@ class Deisa(IDeisa):
                         self.has_new_timestep[name] = True
                         self.has_seen_array[name] = True
 
-    def _determine_callback_args(self, description_of_arrays_needed) -> dict[str, List[DeisaArray]]:
+    def _inspect_callbacks(self):
+        # inspect what callbacks can be called
+        for cb_cfg in self.registered_callbacks:
+            simulation_callback = cb_cfg.simulation_callback
+            description_arrays_needed = cb_cfg.arrays_description
+            exception_handler = cb_cfg.exception_handler
+            when = cb_cfg.when
+
+            should_call = self._should_call(description_arrays_needed, when)
+            if should_call:
+                # Compute the arrays to pass to the callback
+                callback_args: dict[str, list[DeisaArray]] = self._determine_callback_args(description_arrays_needed)
+                try:
+                    simulation_callback(**callback_args)
+                # TODO need to discuss whats the best way to handle this.
+                # this is simulation_callback strictly, so maybe ALL errors
+                # should be caught.
+                except TimeoutError as e:
+                    raise e
+                except AssertionError as e:
+                    raise e
+                except BaseException as e:
+                    exception_handler(e)
+
+    def _determine_callback_args(self, description_of_arrays_needed) -> dict[str, list[DeisaArray]]:
         """
         Build the kwargs passed to a simulation callback.
 

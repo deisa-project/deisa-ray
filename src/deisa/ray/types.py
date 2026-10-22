@@ -1,18 +1,18 @@
 import asyncio
-from collections import defaultdict
-from dataclasses import dataclass
 import math
-from typing import Any, TypeAlias, Literal, Callable
+import pathlib
+from collections import defaultdict
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any, Literal, TypeAlias
 
 import dask.array as da
-from dask.highlevelgraph import HighLevelGraph
 import dask.delayed
 import numpy as np
+from dask.highlevelgraph import HighLevelGraph
+
 import ray
 import ray.actor
-
-import pathlib
-
 from deisa.ray import Timestep
 from deisa.ray._async_dict import AsyncDict
 

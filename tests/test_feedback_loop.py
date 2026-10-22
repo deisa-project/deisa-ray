@@ -4,9 +4,9 @@ import dask
 import numpy as np
 import pytest
 import ray
+from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 
 from deisa.ray.config import DEISA_DISTRIBUTED_SCHEDULING_ENV
-from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 from tests.utils import pick_free_port, wait_for_head_node
 
 # I need to test:
@@ -101,7 +101,7 @@ def test_bridge_get_returns_default_when_feedback_missing(monkeypatch) -> None:
     assert bridge.head_actor.get_feedback.calls == [("foo", 7)]
 
 
-def test_feedback_queue_rejects_non_increasing_timesteps_and_evicts_old_values(ray_multinode_cluster) -> None:  # noqa: F811
+def test_feedback_queue_rejects_non_increasing_timesteps_and_evicts_old_values(ray_multinode_cluster) -> None:
     from deisa.ray.window_handler import Deisa
 
     deisa = Deisa(feedback_queue_size=2)
@@ -130,7 +130,7 @@ def test_feedback_queue_rejects_non_increasing_timesteps_and_evicts_old_values(r
     assert ray.get(deisa.head.get_feedback.remote("joe")) == (False, None)
 
 
-def test_feedback_set_does_not_leak_dask_scheduler(ray_multinode_cluster) -> None:  # noqa: F811
+def test_feedback_set_does_not_leak_dask_scheduler(ray_multinode_cluster) -> None:
     """Publishing feedback should not change later unrelated Dask computations."""
     from deisa.ray.window_handler import Deisa
 
@@ -218,7 +218,7 @@ def feedback_worker(*, rank: int, port: int) -> tuple[int, str, int]:
     return feedback_0, missing, feedback_1
 
 
-def test_bridge_get_broadcasts_timestamped_feedback(ray_multinode_cluster) -> None:  # noqa: F811
+def test_bridge_get_broadcasts_timestamped_feedback(ray_multinode_cluster) -> None:
     cluster = ray_multinode_cluster["cluster"]
     head_node_id = None
     worker_node_ids = []

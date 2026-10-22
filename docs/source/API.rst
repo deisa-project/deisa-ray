@@ -471,6 +471,9 @@ Data locality
 Current limitations
 -------------------
 
+- The ``distributed`` library (``dask.distributed``) cannot be used together
+  with ``deisa-ray``. DEISA installs its own Dask-on-Ray scheduler, so
+  ``distributed`` must not be installed or used alongside it.
 - Feedback is for small Python objects. Distributed-array feedback from
   analytics back to simulation is not part of the current user API.
 - ``Bridge.send`` expects CPU ``numpy.ndarray`` inputs.
