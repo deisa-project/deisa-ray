@@ -371,7 +371,7 @@ class Deisa(IDeisa):
                 # guarantee.
                 current_timestep = arr_timestep
                 while True:
-                    self._inspect_callbacks()
+                    self._inspect_callbacks(current_timestep)
                     name, arr_timestep, array = ray.get(self.head.get_next_array.remote())
                     # guarantee sequential flow of data.
                     # TODO add test
@@ -406,29 +406,33 @@ class Deisa(IDeisa):
                         self.has_new_timestep[name] = True
                         self.has_seen_array[name] = True
 
-    def _inspect_callbacks(self):
+    def _inspect_callbacks(self, current_timestep: int) -> None:
         # inspect what callbacks can be called
         for cb_cfg in self.registered_callbacks:
-            simulation_callback = cb_cfg.simulation_callback
-            description_arrays_needed = cb_cfg.arrays_description
-            exception_handler = cb_cfg.exception_handler
-            when = cb_cfg.when
+            # New timestep -> reset this callback's per-timestep bookkeeping so
+            # it can fire again for the new timestep.
+            if cb_cfg.state_timestep != current_timestep:
+                cb_cfg.state_timestep = current_timestep
+                cb_cfg.fired_this_timestep = False
+                cb_cfg.consumed_names = set()
 
-            should_call = self._should_call(description_arrays_needed, when)
-            if should_call:
-                # Compute the arrays to pass to the callback
-                callback_args: dict[str, list[DeisaArray]] = self._determine_callback_args(description_arrays_needed)
-                try:
-                    simulation_callback(**callback_args)
-                # TODO need to discuss whats the best way to handle this.
-                # this is simulation_callback strictly, so maybe ALL errors
-                # should be caught.
-                except TimeoutError as e:
-                    raise e
-                except AssertionError as e:
-                    raise e
-                except BaseException as e:
-                    exception_handler(e)
+            if not self._should_call(cb_cfg):
+                continue
+
+            # Compute the arrays to pass to the callback
+            description_arrays_needed = cb_cfg.arrays_description
+            callback_args: dict[str, list[DeisaArray]] = self._determine_callback_args(description_arrays_needed)
+            try:
+                cb_cfg.simulation_callback(**callback_args)
+            # TODO need to discuss whats the best way to handle this.
+            # this is simulation_callback strictly, so maybe ALL errors
+            # should be caught.
+            except TimeoutError as e:
+                raise e
+            except AssertionError as e:
+                raise e
+            except BaseException as e:
+                cb_cfg.exception_handler(e)
 
     def _determine_callback_args(self, description_of_arrays_needed) -> dict[str, list[DeisaArray]]:
         """
@@ -455,28 +459,49 @@ class Deisa(IDeisa):
                 callback_args[name] = list(queue)[-window_size:]
         return callback_args
 
-    def _should_call(self, description_of_arrays_needed, when: Literal["AND", "OR"]) -> bool:
+    def _should_call(self, cb_cfg: _CallbackConfig) -> bool:
         """
-        Determine whether a callback should execute for the current state.
+        Determine whether a callback should execute for the current state, and
+        record that the triggering update(s) have been consumed.
+
+        - ``"AND"``: fires at most once per timestep, as soon as every requested
+          array has new data. Afterwards ``fired_this_timestep`` suppresses any
+          further calls until the timestep advances.
+        - ``"OR"``: fires once per requested array that has new data, once all
+          requested arrays have been seen at least once. A name is added to
+          ``consumed_names`` when it triggers a call so that unrelated arrays
+          arriving on the same timestep do not re-trigger the callback.
 
         Parameters
         ----------
-        description_of_arrays_needed : Sequence[Window]
-            Array descriptions governing the callback.
-        when : Literal["AND", "OR"]
-            Execution mode specifying whether all arrays or any array must have
-            new data.
+        cb_cfg : _CallbackConfig
+            Registered callback. It carries the per-timestep bookkeeping fields
+            (``fired_this_timestep`` and ``consumed_names``) that this method
+            updates.
 
         Returns
         -------
         bool
             ``True`` when the callback criteria are met.
         """
-        names = [d.name for d in description_of_arrays_needed]
-        if when == "AND":
-            return all(self.has_new_timestep[n] for n in names)
-        else:  # when == 'OR'
-            return all(self.has_seen_array[n] for n in names) and any(self.has_new_timestep[n] for n in names)
+        names = [w.name for w in cb_cfg.arrays_description]
+
+        if cb_cfg.when == "AND":
+            if cb_cfg.fired_this_timestep:
+                return False
+            if not all(self.has_new_timestep[n] for n in names):
+                return False
+            cb_cfg.fired_this_timestep = True
+            return True
+
+        # when == "OR"
+        if not all(self.has_seen_array[n] for n in names):
+            return False
+        pending = [n for n in names if self.has_new_timestep[n] and n not in cb_cfg.consumed_names]
+        if not pending:
+            return False
+        cb_cfg.consumed_names.update(pending)
+        return True
 
     def set(
         self,

@@ -3,7 +3,7 @@ import math
 import pathlib
 from collections import defaultdict
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Literal, TypeAlias
 
 import dask.array as da
@@ -508,6 +508,15 @@ class _CallbackConfig:
     arrays_description: list[Window]
     exception_handler: Callable
     when: Literal["AND", "OR"]
+    # --- per-timestep bookkeeping, managed by Deisa._inspect_callbacks ---
+    # Timestep the fields below refer to. When a newer timestep is seen the
+    # state is reset so the callback can fire again.
+    state_timestep: int | None = None
+    # "AND" mode: whether the callback already fired for ``state_timestep``.
+    fired_this_timestep: bool = False
+    # "OR" mode: names of the callback's own arrays whose update has already
+    # triggered a call for ``state_timestep``.
+    consumed_names: set[str] = field(default_factory=set)
 
 
 class DaskArrayData:

@@ -130,7 +130,7 @@ class Bridge(IBridge):
         Raises
         ------
         RuntimeError
-            If the scheduling actor cannot be created or initialized after
+            If theescheduling actor cannot be created or initialized after
             the specified number of retries.
         ValueError
             If ``comm`` is ``None``.
@@ -221,7 +221,7 @@ class Bridge(IBridge):
         """
         Push per-array metadata to the node actor.
 
-        Notes
+        Notes    s
         -----
         This method registers both global chunk layout and the bridge-specific
         chunk position for every array described in ``arrays_metadata``.
@@ -371,7 +371,7 @@ class Bridge(IBridge):
             name/namespace derived from the bridge.
 
         Raises
-        ------
+        ------   e
         RuntimeError
             If the node actor cannot be created or readied after
             ``_init_retries`` attempts.
@@ -405,7 +405,7 @@ class Bridge(IBridge):
         """
         Return the global head actor handle, caching it on bridge ``0``.
 
-        Notes
+        Notes    r
         -----
         Bridge ``0`` is the only rank that reads global feedback from Ray.
         Other ranks receive the result through the communicator broadcast in
