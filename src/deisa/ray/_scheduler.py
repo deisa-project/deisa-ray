@@ -62,7 +62,12 @@ def random_partitioning(dsk, scheduling_actors: dict) -> dict[str, int]:
             chunkref: ChunkRef = val.value
             partition[key] = chunkref.actorid
             dsk[key] = DataNode(key, chunkref.ref)
-        elif deps == set() and isinstance(val, Task):
+        elif deps == set() and isinstance(val, Task) and isinstance(val.args[0], dict):
+            # A dependency-free Task whose first argument is a DICT is the array-of-chunks wrapper: its values may be
+            # DataNodes holding a ChunkRef, in which case the task belongs to the actor that owns that chunk. Guard on
+            # ``args[0]`` being a dict: array CREATION tasks (``da.arange``, ``da.eye``, ``da.full``, ...) are also
+            # dependency-free Tasks, but their first argument is a scalar / DataNode, not a dict. Calling ``.items()``
+            # on those raised the opaque ``'int' object has no attribute 'items'`` this guard prevents.
             data_item = next(
                 ((k, v) for k, v in val.args[0].items() if isinstance(v, DataNode) and isinstance(v.value, ChunkRef)),
                 (None, None),
@@ -153,7 +158,11 @@ def greedy_partitioning(dsk, scheduling_actors: dict) -> dict[str, int]:
             chunkref: ChunkRef = dsk[k].value
             partition[k] = chunkref.actorid
             dsk[k] = DataNode(k, chunkref.ref)
-        elif deps == set() and isinstance(dsk[k], Task):
+        elif deps == set() and isinstance(dsk[k], Task) and isinstance(dsk[k].args[0], dict):
+            # See ``random_partitioning``: only a dependency-free Task whose first argument is a DICT can carry a
+            # ChunkRef. Array-creation tasks (``da.arange`` / ``da.eye`` / ``da.full``) are dependency-free Tasks whose
+            # first argument is a scalar or DataNode, so they must NOT be ``.items()``-ed here; they fall through to the
+            # dependency branch below, which assigns a random actor for the empty dependency set.
             data_item = next(
                 (
                     (k, v)
