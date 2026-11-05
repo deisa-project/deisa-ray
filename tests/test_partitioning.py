@@ -22,6 +22,11 @@ def head_script(partitioning_strategy: str) -> None:
 
     d = Deisa()
 
+    def _fail_fast(exc: BaseException) -> None:
+        # The default handler logs and continues, which is why this bug shipped: the callback's AttributeError was
+        # printed and swallowed, so the test still passed. Re-raise instead so any callback failure fails the test.
+        raise exc
+
     def simulation_callback(array: list[DeisaArray]):
         x = array[0].sum().compute(deisa_ray_partitioning_strategy=partitioning_strategy)
         assert x == 3 * array[0].t
@@ -29,9 +34,22 @@ def head_script(partitioning_strategy: str) -> None:
         # Test with a full Dask computation
         assert da.ones((2, 2), chunks=(1, 1)).sum().compute(deisa_ray_partitioning_strategy=partitioning_strategy) == 4
 
+        # Array CREATION tasks are dependency-free tasks whose first argument is a scalar or a DataNode, not a dict.
+        # Computing them through the distributed scheduler must work (regression: the partitioner called
+        # ``task.args[0].items()`` and raised "'int' object has no attribute 'items'").
+        np.testing.assert_array_equal(
+            da.arange(6, chunks=2).compute(deisa_ray_partitioning_strategy=partitioning_strategy),
+            np.arange(6),
+        )
+        np.testing.assert_array_equal(
+            da.eye(3, chunks=2).compute(deisa_ray_partitioning_strategy=partitioning_strategy),
+            np.eye(3),
+        )
+
     d.register_callback(
         simulation_callback,
         *[Window("array")],
+        exception_handler=_fail_fast,
     )
     d.execute_callbacks()
 

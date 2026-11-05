@@ -62,7 +62,12 @@ def random_partitioning(dsk, scheduling_actors: dict) -> dict[str, int]:
             chunkref: ChunkRef = val.value
             partition[key] = chunkref.actorid
             dsk[key] = DataNode(key, chunkref.ref)
-        elif deps == set() and isinstance(val, Task):
+        elif deps == set() and isinstance(val, Task) and isinstance(val.args[0], dict):
+            # A dependency-free Task whose first argument is a DICT is the array-of-chunks wrapper: its values may be
+            # DataNodes holding a ChunkRef, in which case the task belongs to the actor that owns that chunk. Guard on
+            # ``args[0]`` being a dict: array CREATION tasks (``da.arange``, ``da.eye``, ``da.full``, ...) are also
+            # dependency-free Tasks, but their first argument is a scalar / DataNode, not a dict. Calling ``.items()``
+            # on those raised the opaque ``'int' object has no attribute 'items'`` this guard prevents.
             data_item = next(
                 ((k, v) for k, v in val.args[0].items() if isinstance(v, DataNode) and isinstance(v.value, ChunkRef)),
                 (None, None),
@@ -153,7 +158,11 @@ def greedy_partitioning(dsk, scheduling_actors: dict) -> dict[str, int]:
             chunkref: ChunkRef = dsk[k].value
             partition[k] = chunkref.actorid
             dsk[k] = DataNode(k, chunkref.ref)
-        elif deps == set() and isinstance(dsk[k], Task):
+        elif deps == set() and isinstance(dsk[k], Task) and isinstance(dsk[k].args[0], dict):
+            # See ``random_partitioning``: only a dependency-free Task whose first argument is a DICT can carry a
+            # ChunkRef. Array-creation tasks (``da.arange`` / ``da.eye`` / ``da.full``) are dependency-free Tasks whose
+            # first argument is a scalar or DataNode, so they must NOT be ``.items()``-ed here; they fall through to the
+            # dependency branch below, which assigns a random actor for the empty dependency set.
             data_item = next(
                 (
                     (k, v)
@@ -229,6 +238,16 @@ def get_scheduling_actors_mapping():
     return scheduling_actor_id_to_handle
 
 
+def _is_replicable_literal(value: GraphValue) -> bool:
+    """Whether a graph value is a dependency-free literal that can be copied into any subgraph.
+
+    Such a node has no owning actor and carries no tabular data, so replicating it avoids routing a plain value through
+    ``get_value`` (which expects a ref-of-ref). A ChunkRef data node -- a ``DataNode`` whose value is a ``ray.ObjectRef``
+    -- is deliberately NOT replicable: it is real data that lives on its owner and must be fetched cross-actor.
+    """
+    return isinstance(value, DataNode) and not isinstance(value.value, ray.ObjectRef)
+
+
 def partition_and_schedule_graph(
     *,
     full_dask_graph: dict,
@@ -262,7 +281,16 @@ def partition_and_schedule_graph(
 
         for dep in get_dependencies(full_dask_graph, k):
             if graph_key_to_actor_id_map[dep] != actor_id:
-                partitioned_graphs[actor_id][dep] = ScheduledByOtherActor(graph_key_to_actor_id_map[dep])
+                # A dependency-free literal (a ``DataNode`` not holding a chunk ref: an embedded constant, the output
+                # of ``da.fft.fftfreq``, ...) has NO owning actor, so copy it into this subgraph instead of routing it
+                # through ``ScheduledByOtherActor``/``get_value``. Replicating is both cheaper and correct: there is no
+                # ref-of-ref to invent for a plain value, and a consumer task (e.g. dask's ``setitem``) must receive the
+                # value itself, not a reference to it. Chunk payloads are ``DataNode`` holding a ``ray.ObjectRef`` and
+                # are NOT replicated: they genuinely live on their owner and must be fetched cross-actor.
+                if _is_replicable_literal(full_dask_graph[dep]):
+                    partitioned_graphs[actor_id][dep] = full_dask_graph[dep]
+                else:
+                    partitioned_graphs[actor_id][dep] = ScheduledByOtherActor(graph_key_to_actor_id_map[dep])
 
     for actorID, actor_handle in scheduling_actor_id_to_handle.items():
         if partitioned_graphs[actorID]:

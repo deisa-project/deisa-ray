@@ -518,6 +518,16 @@ class SchedulingActor(NodeActorBase):
         await graph_info.scheduled_event.wait()
         ref = graph_info.refs[key]
 
+        # ``ray_dask_get(..., ray_persist=True)`` returns a ref-of-ref for TASK keys, but the PLAIN VALUE for keys that
+        # are not tasks -- literals / aliases (Dask ``DataNode`` / ``Alias``), e.g. the array built by
+        # ``da.fft.fftfreq`` or any embedded constant. ``await ref`` on such a value raised
+        # ``TypeError: object numpy.ndarray can't be used in 'await' expression`` (or stalled) the moment another actor
+        # needed that key -- intermittent, depending on where the partitioner placed the literal. A literal has no
+        # ref-of-ref to unwrap, so hand back a single ref to the value: that is exactly the shape ``await ref`` yields
+        # for a task key, and the caller's own ``.remote()`` re-wraps it into the ref-of-ref every consumer expects.
+        if not isinstance(ref, ray.ObjectRef):
+            return ray.put(ref)
+
         async with asyncio.timeout(10.0):
             # For tomorrow: I understood this - the await is similar to a ray.get() so it unpacks the ref once.
             # therefore, at the end all the refs are refs of refs (same leve). Then the patches dask task wrapper
