@@ -24,9 +24,7 @@ from deisa.ray.utils import get_head_actor_options
 
 
 def test_get_value_resolves_a_literal_key(ray_multinode_cluster) -> None:
-    worker_node_ids = [
-        node.node_id for node in ray_multinode_cluster["cluster"].list_all_nodes() if not node.is_head()
-    ]
+    worker_node_ids = [node.node_id for node in ray_multinode_cluster["cluster"].list_all_nodes() if not node.is_head()]
 
     head = HeadNodeActor.options(**get_head_actor_options()).remote()
     ray.get(head.ready.remote())
